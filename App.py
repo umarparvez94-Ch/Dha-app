@@ -3,9 +3,13 @@ import pandas as pd
 from datetime import datetime
 import urllib.parse
 import re
+import requests
 
 # Page Setup
 st.set_page_config(page_title="DHA Personal Property Portal", layout="wide")
+
+# Google Apps Script Webhook URL
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbz4NxFv3LQbpY18JMBcmf4wUAIYikSButRr5C8ODtAVA--m71to_e3_o_nxVGi7GqzYiw/exec"
 
 # DHA Lahore Complete Phases List
 DHA_PHASES_LIST = [
@@ -22,6 +26,15 @@ if "property_db" not in st.session_state:
         "Plot_Size", "Road_Width", "Features", "Price_Demand",
         "Dealer_Name", "Contact", "Source", "Status", "Notes"
     ])
+
+def sync_to_google_sheet(data_payload):
+    """Sync single record or list of records to Google Sheet via Webhook"""
+    try:
+        response = requests.post(WEBHOOK_URL, json=data_payload, headers={"Content-Type": "application/json"})
+        return response.status_code == 200
+    except Exception as e:
+        st.error(f"Error syncing to Google Sheet: {e}")
+        return False
 
 st.title("🏡 DHA Real Estate Workspace")
 
@@ -71,8 +84,14 @@ with st.expander("➕ Add New Property / Input Options (Click to Open)", expande
                 "Status": "Available",
                 "Notes": notes
             }
+            # Save locally
             st.session_state.property_db = pd.concat([st.session_state.property_db, pd.DataFrame([new_row])], ignore_index=True)
-            st.success("Record Added Successfully!")
+            
+            # Sync to Google Sheet
+            if sync_to_google_sheet(new_row):
+                st.success("Record Added Successfully & Synced to Google Sheet!")
+            else:
+                st.warning("Record saved locally, but Google Sheet sync failed.")
 
     else:
         uploaded_file = st.file_uploader("Choose a .txt file", type=["txt"])
@@ -80,7 +99,7 @@ with st.expander("➕ Add New Property / Input Options (Click to Open)", expande
             stringio = uploaded_file.getvalue().decode("utf-8")
             messages = stringio.split("\n\n")
             st.info(f"Detected {len(messages)} potential listing entries.")
-            if st.button("Process TXT File", type="primary"):
+            if st.button("Process TXT File & Sync to Google Sheet", type="primary"):
                 new_entries = []
                 for msg in messages:
                     if len(msg.strip()) > 10:
@@ -103,6 +122,101 @@ with st.expander("➕ Add New Property / Input Options (Click to Open)", expande
                             "Source": "Bulk TXT File",
                             "Status": "Available",
                             "Notes": msg[:50] + "..."
+                        })
+                if new_entries:
+                    st.session_state.property_db = pd.concat([st.session_state.property_db, pd.DataFrame(new_entries)], ignore_index=True)
+                    
+                    # Batch Sync to Google Sheet
+                    with st.spinner("Syncing all records to Google Sheet..."):
+                        if sync_to_google_sheet(new_entries):
+                            st.success(f"Added & Synced {len(new_entries)} records to Google Sheet!")
+                        else:
+                            st.warning("Processed records locally, but Google Sheet sync encountered an issue.")
+
+st.divider()
+
+# --- MAIN DASHBOARD FRONT END ---
+tab_voice_search, tab_sheet_view = st.tabs([
+    "🎙️ Voice / Text Smart Search & WA Export", 
+    "📊 Master Sheet Table View"
+])
+
+# --- TAB 1: VOICE COMMAND SEARCH & WHATSAPP GENERATOR ---
+with tab_voice_search:
+    st.subheader("🎙️ Voice Command & Smart Property Filter")
+    st.caption("موبائل کی بورڈ کے مائیک (Mic) بٹن پر کلک کر کے بولیں (e.g. 'Prism M block 1 kanal')")
+    
+    voice_query = st.text_input("🗣️ Spoken Search Command / Keyword:", placeholder="Click mic on your mobile keyboard & speak e.g. 'Prism M Block'")
+    
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        selected_phase = st.multiselect("Filter Phase", DHA_PHASES_LIST)
+    with col_f2:
+        selected_size = st.multiselect("Filter Size", ["5 Marla", "10 Marla", "1 Kanal", "2 Marla Comm", "4 Marla Comm"])
+
+    # Filtering Logic
+    df_filtered = st.session_state.property_db.copy()
+
+    if voice_query:
+        keywords = voice_query.lower().split()
+        for kw in keywords:
+            df_filtered = df_filtered[
+                df_filtered['Phase'].str.lower().str.contains(kw, na=False) |
+                df_filtered['Block_Zone_CCA'].str.lower().str.contains(kw, na=False) |
+                df_filtered['Plot_Size'].str.lower().str.contains(kw, na=False) |
+                df_filtered['Features'].str.lower().str.contains(kw, na=False) |
+                df_filtered['Notes'].str.lower().str.contains(kw, na=False)
+            ]
+
+    if selected_phase:
+        df_filtered = df_filtered[df_filtered["Phase"].isin(selected_phase)]
+    if selected_size:
+        df_filtered = df_filtered[df_filtered["Plot_Size"].isin(selected_size)]
+
+    st.markdown("---")
+    
+    if not df_filtered.empty:
+        st.success(f"Found {len(df_filtered)} matching properties!")
+        
+        # Prepare WhatsApp Bulk List Text Format
+        wa_text = "📋 *DHA LAHORE PROPERTY LISTING*\n"
+        wa_text += f"🗓️ Date: {datetime.now().strftime('%d-%b-%Y')}\n"
+        wa_text += "-----------------------------------\n\n"
+        
+        for idx, row in df_filtered.iterrows():
+            wa_text += f"📍 *{row['Phase']} - {row['Block_Zone_CCA']}*\n"
+            wa_text += f"📐 Size: {row['Plot_Size']} ({row['Prop_Category']})\n"
+            wa_text += f"💰 Demand: {row['Price_Demand']}\n"
+            if row['Features']: wa_text += f"⭐ Features: {row['Features']}\n"
+            wa_text += f"📞 Contact: {row['Contact']} ({row['Dealer_Name']})\n"
+            wa_text += "-----------------------------------\n"
+            
+            # Display Cards on UI
+            with st.expander(f"📍 {row['Phase']} - {row['Block_Zone_CCA']} | {row['Plot_Size']} - {row['Price_Demand']}"):
+                st.write(f"**Features:** {row['Features']} | **Road:** {row['Road_Width']}")
+                st.write(f"**Dealer:** {row['Dealer_Name']} ({row['Contact']})")
+                st.write(f"**Notes:** {row['Notes']}")
+        
+        # Direct WhatsApp Share Button
+        encoded_wa_list = urllib.parse.quote(wa_text)
+        wa_direct_url = f"https://api.whatsapp.com/send?text={encoded_wa_list}"
+        
+        st.markdown("### 🚀 Send Generated List to WhatsApp")
+        st.markdown(f'''
+            <a href="{wa_direct_url}" target="_blank">
+                <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; font-size:16px; border-radius:8px; cursor:pointer; font-weight:bold;">
+                    📲 Open WhatsApp & Send Full List
+                </button>
+            </a>
+        ''', unsafe_allow_html=True)
+        
+    else:
+        st.info("No matching records found. Speak another query or add new listings.")
+
+# --- TAB 2: MASTER SHEET TABLE ---
+with tab_sheet_view:
+    st.subheader("Master Sheet View")
+    st.dataframe(st.session_state.property_db, use_container_width=True)
                         })
                 if new_entries:
                     st.session_state.property_db = pd.concat([st.session_state.property_db, pd.DataFrame(new_entries)], ignore_index=True)
