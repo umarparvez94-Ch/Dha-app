@@ -17,7 +17,7 @@ except Exception as e:
 
 # Google Sheet Connection
 try:
-    sheet = gc.open("Dha_Master_data_app").sheet1
+    sheet = gc.open_by_url("https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID_HERE/edit").sheet1
 except Exception as e:
     st.error(f"Sheet Connection Error: {e}")
     st.stop()
