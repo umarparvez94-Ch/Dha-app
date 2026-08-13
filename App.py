@@ -28,10 +28,18 @@ if "property_db" not in st.session_state:
     ])
 
 def sync_to_google_sheet(data_payload):
-    """Sync single record or list of records to Google Sheet via Webhook"""
+    """Sync single record or list of records to Google Sheet in chunks to prevent timeout"""
     try:
-        response = requests.post(WEBHOOK_URL, json=data_payload, headers={"Content-Type": "application/json"})
-        return response.status_code == 200
+        if isinstance(data_payload, dict):
+            data_payload = [data_payload]
+            
+        chunk_size = 500
+        for i in range(0, len(data_payload), chunk_size):
+            chunk = data_payload[i:i + chunk_size]
+            response = requests.post(WEBHOOK_URL, json=chunk, headers={"Content-Type": "application/json"}, timeout=30)
+            if response.status_code != 200:
+                return False
+        return True
     except Exception as e:
         st.error(f"Error syncing to Google Sheet: {e}")
         return False
@@ -127,7 +135,7 @@ with st.expander("➕ Add New Property / Input Options (Click to Open)", expande
                     st.session_state.property_db = pd.concat([st.session_state.property_db, pd.DataFrame(new_entries)], ignore_index=True)
                     
                     # Batch Sync to Google Sheet
-                    with st.spinner("Syncing all records to Google Sheet..."):
+                    with st.spinner("Syncing all records to Google Sheet in chunks..."):
                         if sync_to_google_sheet(new_entries):
                             st.success(f"Added & Synced {len(new_entries)} records to Google Sheet!")
                         else:
