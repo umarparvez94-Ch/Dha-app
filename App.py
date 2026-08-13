@@ -28,15 +28,15 @@ if "property_db" not in st.session_state:
     ])
 
 def sync_to_google_sheet(data_payload):
-    """Sync single record or list of records to Google Sheet in chunks to prevent timeout"""
+    """Sync single record or list of records to Google Sheet in small safe chunks"""
     try:
         if isinstance(data_payload, dict):
             data_payload = [data_payload]
             
-        chunk_size = 500
+        chunk_size = 100
         for i in range(0, len(data_payload), chunk_size):
             chunk = data_payload[i:i + chunk_size]
-            response = requests.post(WEBHOOK_URL, json=chunk, headers={"Content-Type": "application/json"}, timeout=30)
+            response = requests.post(WEBHOOK_URL, json=chunk, headers={"Content-Type": "application/json"}, timeout=20)
             if response.status_code != 200:
                 return False
         return True
@@ -106,10 +106,15 @@ with st.expander("➕ Add New Property / Input Options (Click to Open)", expande
         if uploaded_file is not None:
             stringio = uploaded_file.getvalue().decode("utf-8")
             messages = stringio.split("\n\n")
-            st.info(f"Detected {len(messages)} potential listing entries.")
-            if st.button("Process TXT File & Sync to Google Sheet", type="primary"):
+            
+            # Limit entries to avoid browser memory freeze
+            max_limit = st.number_input("Limit entries to process at once", min_value=10, max_value=5000, value=1000, step=100)
+            
+            st.info(f"Detected {len(messages)} total entries. Processing top {max_limit} to prevent freezing.")
+            
+            if st.button("Process & Sync to Google Sheet", type="primary"):
                 new_entries = []
-                for msg in messages:
+                for msg in messages[:max_limit]:
                     if len(msg.strip()) > 10:
                         ph = "Phase 9 Prism" if "prism" in msg.lower() or "9" in msg else "Phase 6"
                         sz = "1 Kanal" if "kanal" in msg.lower() else "10 Marla"
@@ -134,8 +139,7 @@ with st.expander("➕ Add New Property / Input Options (Click to Open)", expande
                 if new_entries:
                     st.session_state.property_db = pd.concat([st.session_state.property_db, pd.DataFrame(new_entries)], ignore_index=True)
                     
-                    # Batch Sync to Google Sheet
-                    with st.spinner("Syncing all records to Google Sheet in chunks..."):
+                    with st.spinner("Syncing records to Google Sheet..."):
                         if sync_to_google_sheet(new_entries):
                             st.success(f"Added & Synced {len(new_entries)} records to Google Sheet!")
                         else:
