@@ -15,9 +15,9 @@ except Exception as e:
     st.error(f"Credentials Error: {e}")
     st.stop()
 
-# Google Sheet Connection
+# Google Sheet Connection by Sheet Name
 try:
-    sheet = gc.open_by_url("https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID_HERE/edit").sheet1
+    sheet = gc.open("Dha_Master_data_app").sheet1
 except Exception as e:
     st.error(f"Sheet Connection Error: {e}")
     st.stop()
@@ -31,7 +31,6 @@ raw_text = st.text_area("Paste Raw Property Text Here", height=200)
 if st.button("💾 Save Data", use_container_width=True):
     if raw_text.strip():
         try:
-            # Append data to sheet: [Source, Raw Text]
             sheet.append_row([source, raw_text])
             st.success("✅ ڈیٹا کامیابی سے گوگل شیٹ میں محفوظ ہو گیا ہے!")
             st.balloons()
