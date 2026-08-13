@@ -4,7 +4,7 @@ import re
 import pandas as pd
 from datetime import datetime
 
-# 1. Page & UI Configuration (Stitch Design System)
+# 1. Page Configuration (Stitch UI Theme)
 st.set_page_config(
     page_title="DHA Smart Property Engine",
     page_icon="🏢",
@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Stitch Custom CSS Injection
+# Custom Styling
 st.markdown("""
     <style>
     .stApp { background-color: #F8FAFC; font-family: 'Inter', sans-serif; }
@@ -26,10 +26,6 @@ st.markdown("""
         background-color: #10B981; color: white; padding: 4px 12px;
         border-radius: 20px; font-size: 13px; font-weight: 600; float: right;
     }
-    .card-box {
-        background: white; border-radius: 12px; padding: 16px;
-        border: 1px solid #E2E8F0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    }
     .stButton>button {
         background: #059669 !important; color: white !important;
         border-radius: 8px !important; font-weight: 600 !important; border: none !important;
@@ -38,25 +34,41 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Google Sheet Secure Connection
+# 2. Google Workbook Connection
 @st.cache_resource
-def get_google_sheet():
+def get_google_workbook():
     creds_dict = dict(st.secrets["gcp_service_account"])
     gc = gspread.service_account_from_dict(creds_dict)
     sheet_url = "https://docs.google.com/spreadsheets/d/14FCDh1QuLTTobH94d-cJ-DMGCQugnzoblnbFmJvyuDU/edit?gid=0#gid=0"
-    return gc.open_by_url(sheet_url).sheet1
+    return gc.open_by_url(sheet_url)
 
 try:
-    sheet = get_google_sheet()
+    workbook = get_google_workbook()
 except Exception as e:
     st.error(f"Google Sheet Connection Failed: {e}")
     st.stop()
 
-# Session State for Office Name
+# Helper function to append row to specific block tab
+def append_to_block_sheet(workbook, block_name, row_data):
+    # Sanitize sheet title (max 100 chars, clean string)
+    tab_title = str(block_name).strip() if block_name and block_name != "N/A" else "General_Entries"
+    
+    try:
+        # Try fetching existing worksheet by block name
+        worksheet = workbook.worksheet(tab_title)
+    except gspread.exceptions.WorksheetNotFound:
+        # Create a new tab for this block if it doesn't exist
+        worksheet = workbook.add_worksheet(title=tab_title, rows=100, cols=10)
+        # Add Header row to the new sheet
+        worksheet.append_row(["Timestamp", "Source", "Category", "Phase", "Block", "Size", "Features", "Raw Listing Text"])
+        
+    worksheet.append_row(row_data)
+
+# Session State
 if "office_name" not in st.session_state:
     st.session_state["office_name"] = "Wali Muhammad Associates"
 
-# 3. Smart Parsing Engine
+# 3. Smart Extraction Engine
 def parse_property_text(text):
     text_upper = text.upper()
     category = "Selling"
@@ -93,25 +105,24 @@ def parse_property_text(text):
 
     return category, phase, block, size, feature_str
 
-# 4. Header & Office Name Modal
+# 4. Header UI
 st.markdown(f"""
     <div class="header-banner">
         <span class="office-badge">📍 {st.session_state['office_name']}</span>
         <h1 class="header-title">🏢 DHA Smart Property Engine</h1>
-        <p style="margin: 5px 0 0 0; color: #94A3B8; font-size: 13px;">Advanced AI Property Categorization & Search Dashboard</p>
+        <p style="margin: 5px 0 0 0; color: #94A3B8; font-size: 13px;">Auto-Categorized Block-Wise Sheet Engine</p>
     </div>
 """, unsafe_allow_html=True)
 
-# Office Name Setup Expander
 with st.expander("⚙️ Change Office / Agency Name"):
     new_office = st.text_input("Enter Office Name", value=st.session_state["office_name"])
     if st.button("Update Office Name"):
         st.session_state["office_name"] = new_office
         st.rerun()
 
-# 5. Supreme Multi-Feature Search Bar
-st.subheader("🔍 Supreme Ultra-Smart Search Engine")
-search_query = st.text_input("🔎 Search by Phase, Block, Size, Feature (Corner, Park, Main Road), or Dealer Phone", placeholder="e.g. Phase 6 Block M Corner 1 Kanal")
+# 5. Search Bar
+st.subheader("🔍 Search Property Records")
+search_query = st.text_input("🔎 Search across all block sheets by keyword, size, or feature")
 
 # 6. Location Navigation Hierarchy
 st.markdown("---")
@@ -122,78 +133,81 @@ with c_col2:
     selected_phase = st.selectbox("📍 Select Phase", [f"Phase {i}" for i in range(1, 14)] + ["DHA EME", "DHA Rahwali"])
 with c_col3:
     blocks = [f"Block {chr(i)}" for i in range(65, 91)] + ["Block CCA", "Phase 9 Prism"]
-    selected_block = st.selectbox("🧱 Select Block", blocks)
+    selected_block = st.selectbox("🧱 Select Target Block Sheet", blocks)
 
-# 7. Data Input Panel (Text, Camera & File Upload)
+# 7. Input Entry (Block-Wise Save Engine)
 st.markdown("---")
-st.subheader("📥 Add Property Listing (Text / Camera / File OCR)")
-tab_text, tab_camera = st.tabs(["📝 Text & File Entry", "📸 Camera Scan"])
+st.subheader("📥 Add New Listing (Auto-Saves to Block Tab)")
 
-with tab_text:
-    col_in1, col_in2 = st.columns([2, 1])
-    with col_in1:
-        source = st.selectbox("Data Source", ["WhatsApp Group", "Newspaper Advert", "Direct Client", "Facebook"])
-        raw_text = st.text_area("Paste Property Listing Text", height=150, placeholder="Example: DHA Phase 6 Block M 1 Kanal Corner plot for sale demand 4.5 crore...")
-        uploaded_file = st.file_uploader("Or Upload Image / Text File", type=["txt", "jpg", "jpeg", "png"])
-        if uploaded_file and uploaded_file.type == "text/plain":
-            raw_text = str(uploaded_file.read(), "utf-8")
-            
-    with col_in2:
-        st.markdown("### 🤖 Auto Extraction")
-        if raw_text.strip():
+col_in1, col_in2 = st.columns([2, 1])
+with col_in1:
+    source = st.selectbox("Data Source", ["WhatsApp Group", "Newspaper Advert", "Direct Client", "Facebook"])
+    raw_text = st.text_area("Paste Property Listing Text", height=150, placeholder="Example: DHA Phase 6 Block M 1 Kanal Corner plot for sale demand 4.5 crore...")
+    
+with col_in2:
+    st.markdown("### 🤖 Detected Metadata")
+    if raw_text.strip():
+        cat, ph, blk, sz, feat = parse_property_text(raw_text)
+        
+        # Override detected block if user specifically selected a block from dropdown
+        target_block = blk if blk != "N/A" else selected_block
+        
+        st.write(f"**Category:** `{cat}`")
+        st.write(f"**Phase:** `{ph}`")
+        st.write(f"**Target Sheet/Block:** `{target_block}`")
+        st.write(f"**Size:** `{sz}`")
+        st.write(f"**Features:** `{feat}`")
+
+if st.button("💾 Save to Block Sheet", use_container_width=True):
+    if raw_text.strip():
+        try:
             cat, ph, blk, sz, feat = parse_property_text(raw_text)
-            st.write(f"**Category:** `{cat}`")
-            st.write(f"**Phase:** `{ph}`")
-            st.write(f"**Block:** `{blk}`")
-            st.write(f"**Size:** `{sz}`")
-            st.write(f"**Features:** `{feat}`")
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+            
+            # Determine sheet tab name
+            target_sheet_name = blk if blk != "N/A" else selected_block
+            
+            # Save into dedicated Block Sheet Tab
+            row_payload = [now_str, source, cat, ph, target_sheet_name, sz, feat, raw_text]
+            append_to_block_sheet(workbook, target_sheet_name, row_payload)
+            
+            st.success(f"✅ Data saved directly into Google Sheet Tab: **[{target_sheet_name}]**!")
+            st.balloons()
+        except Exception as e:
+            st.error(f"Block Save Error: {e}")
 
-    if st.button("💾 Save Listing to Engine", use_container_width=True):
-        if raw_text.strip():
-            try:
-                cat, ph, blk, sz, feat = parse_property_text(raw_text)
-                now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                sheet.append_row([now_str, source, cat, ph, blk, sz, feat, raw_text])
-                st.success("✅ Property successfully categorized and saved to Google Sheet!")
-                st.balloons()
-            except Exception as e:
-                st.error(f"Save Error: {e}")
-
-with tab_camera:
-    img_capture = st.camera_input("Take Photo of Newspaper Advert / Card")
-    if img_capture:
-        st.info("📸 Photo captured successfully! Text processing ready.")
-
-# 8. Categorized 3-Sheet Database View
+# 8. View Selected Block Sheet Tabs
 st.markdown("---")
-st.subheader(f"📊 Live Inventory: {selected_phase} - {selected_block}")
+st.subheader(f"📊 Viewing Sheet Tab: [{selected_block}]")
 
 try:
-    data = sheet.get_all_values()
-    if len(data) > 0:
-        cols = ["Timestamp", "Source", "Category", "Phase", "Block", "Size", "Features", "Raw Listing"]
-        df = pd.DataFrame(data[1:], columns=cols[:len(data[1])]) if len(data) > 1 else pd.DataFrame(columns=cols)
-        
-        # Search Filtering
-        if search_query:
-            df = df[df["Raw Listing"].str.contains(search_query, case=False, na=False) | 
-                    df["Features"].str.contains(search_query, case=False, na=False) |
-                    df["Phase"].str.contains(search_query, case=False, na=False)]
+    # Try fetching selected block sheet
+    try:
+        current_worksheet = workbook.worksheet(selected_block)
+        data = current_worksheet.get_all_values()
+    except gspread.exceptions.WorksheetNotFound:
+        data = []
 
-        # 3 Sheets Tabs
-        sheet_selling, sheet_buying, sheet_rent = st.tabs(["🔴 Selling / Inventory", "🟢 Buying / Requirements", "🔵 Rental / Leases"])
+    if len(data) > 1:
+        cols = ["Timestamp", "Source", "Category", "Phase", "Block", "Size", "Features", "Raw Listing"]
+        df = pd.DataFrame(data[1:], columns=cols[:len(data[1])])
         
-        with sheet_selling:
-            df_sell = df[df["Category"] == "Selling"] if "Category" in df.columns else df
-            st.dataframe(df_sell, use_container_width=True)
+        if search_query:
+            df = df[df["Raw Listing"].str.contains(search_query, case=False, na=False) |
+                    df["Features"].str.contains(search_query, case=False, na=False)]
+
+        tab_sell, tab_buy, tab_rent = st.tabs(["🔴 Selling / Inventory", "🟢 Buying / Requirements", "🔵 Rental"])
+        
+        with tab_sell:
+            st.dataframe(df[df["Category"] == "Selling"] if "Category" in df.columns else df, use_container_width=True)
             
-        with sheet_buying:
-            df_buy = df[df["Category"] == "Buying"] if "Category" in df.columns else df
-            st.dataframe(df_buy, use_container_width=True)
+        with tab_buy:
+            st.dataframe(df[df["Category"] == "Buying"] if "Category" in df.columns else df, use_container_width=True)
             
-        with sheet_rent:
-            df_rent = df[df["Category"] == "Rental"] if "Category" in df.columns else df
-            st.dataframe(df_rent, use_container_width=True)
+        with tab_rent:
+            st.dataframe(df[df["Category"] == "Rental"] if "Category" in df.columns else df, use_container_width=True)
+    else:
+        st.info(f"No entries found yet in Google Sheet tab: **{selected_block}**. Add a new listing above to create this sheet automatically!")
 
 except Exception as e:
-    st.info("Awaiting new inventory entries...")
+    st.error(f"Error loading block data: {e}")
