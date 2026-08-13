@@ -3,27 +3,23 @@ import gspread
 
 st.set_page_config(page_title="DHA Property Portal", layout="centered")
 
-# Credentials loading
+# Load Credentials & Connect to Google Sheets
+@st.cache_resource
+def get_google_sheet():
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    gc = gspread.service_account_from_dict(creds_dict)
+    # Opens the sheet named Dha_Master_data_app
+    return gc.open("Dha_Master_data_app").sheet1
+
 try:
-    if "gcp_service_account" in st.secrets:
-        creds_dict = dict(st.secrets["gcp_service_account"])
-        gc = gspread.service_account_from_dict(creds_dict)
-    else:
-        st.error("Secrets missing! Please check Streamlit Secrets.")
-        st.stop()
+    sheet = get_google_sheet()
 except Exception as e:
-    st.error(f"Credentials Error: {e}")
+    st.error(f"Sheet Connection Failed: {e}")
     st.stop()
 
-# Google Sheet Connection by Sheet Name
-try:
-    sheet = gc.open("Dha_Master_data_app").sheet1
-except Exception as e:
-    st.error(f"Sheet Connection Error: {e}")
-    st.stop()
-
+# Portal UI
 st.title("🏠 DHA Property Entry Portal")
-st.write("پراپرٹی کا خام ڈیٹا نیچے ڈبے میں پیسٹ کریں اور سیو کریں۔")
+st.write("پراپرٹی کا ڈیٹا نیچے باکس میں پیسٹ کریں اور سیو کریں۔")
 
 source = st.selectbox("Data Source", ["WhatsApp Group", "Direct Client", "Facebook", "Other"])
 raw_text = st.text_area("Paste Raw Property Text Here", height=200)
