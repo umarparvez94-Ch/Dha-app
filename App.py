@@ -8,8 +8,11 @@ st.set_page_config(page_title="DHA Property Portal", layout="centered")
 def get_google_sheet():
     creds_dict = dict(st.secrets["gcp_service_account"])
     gc = gspread.service_account_from_dict(creds_dict)
-    # Opens the sheet named Dha_Master_data_app
-    return gc.open("Dha_Master_data_app").sheet1
+    
+    # Direct Sheet Link
+    sheet_url = "https://docs.google.com/spreadsheets/d/14FCDh1QuLTTobH94d-cJ-DMGCQugnzoblnbFmJvyuDU/edit?gid=0#gid=0"
+    
+    return gc.open_by_url(sheet_url).sheet1
 
 try:
     sheet = get_google_sheet()
