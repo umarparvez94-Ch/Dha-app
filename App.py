@@ -5,309 +5,141 @@ import urllib.parse
 import pandas as pd
 from datetime import datetime
 
-<<<<<<< HEAD
-# ═══════════════════════════════════════════════════════════════
-# 1. PAGE CONFIGURATION
-# ═══════════════════════════════════════════════════════════════
-=======
-# 1. Page Configuration (Google Stitch UI Standard)
->>>>>>> a52e46999e0e7f6f00280fa44aeb732073571e70
+# 1. Page Configuration
 st.set_page_config(
-    page_title="DHA Smart Property Engine",
+    page_title="DHA Property Search & Data Systems",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-<<<<<<< HEAD
-# ═══════════════════════════════════════════════════════════════
-# 2. STITCH CSS — LIGHT BLUE & WHITE THEME
-# ═══════════════════════════════════════════════════════════════
+# Initialize Authentication State
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+if "user_email" not in st.session_state:
+    st.session_state["user_email"] = ""
+if "office_name" not in st.session_state:
+    st.session_state["office_name"] = "Wali Muhammad Associates"
+
+# ==============================================================================
+# 2. GOOGLE STITCH ROYAL BLUE THEME CSS
+# ==============================================================================
 st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-/* ── Global ── */
-.stApp {
-    background-color: #F0F7FF;
-    font-family: 'Inter', sans-serif;
-}
-
-/* ── Header Banner ── */
-.header-banner {
-    background: linear-gradient(135deg, #1565C0 0%, #1E88E5 40%, #42A5F5 70%, #90CAF9 100%);
-    padding: 28px 32px;
-    border-radius: 20px;
-    color: white;
-    margin-bottom: 24px;
-    box-shadow: 0 8px 32px rgba(21, 101, 192, 0.3);
-    position: relative;
-    overflow: hidden;
-}
-.header-banner::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    right: -8%;
-    width: 300px;
-    height: 300px;
-    background: rgba(255,255,255,0.07);
-    border-radius: 50%;
-}
-.header-banner::after {
-    content: '';
-    position: absolute;
-    bottom: -30%;
-    left: 10%;
-    width: 180px;
-    height: 180px;
-    background: rgba(255,255,255,0.05);
-    border-radius: 50%;
-}
-.header-title {
-    font-size: 30px;
-    font-weight: 800;
-    margin: 0;
-    color: #FFFFFF;
-    letter-spacing: -0.4px;
-}
-.header-sub {
-    color: rgba(255,255,255,0.8);
-    font-size: 14px;
-    margin-top: 6px;
-    font-weight: 500;
-}
-.office-badge {
-    background: rgba(255,255,255,0.2);
-    backdrop-filter: blur(8px);
-    color: white;
-    padding: 7px 18px;
-    border-radius: 24px;
-    font-size: 13px;
-    font-weight: 600;
-    float: right;
-    border: 1px solid rgba(255,255,255,0.25);
-}
-
-/* ── Section Headers ── */
-.section-header {
-    background: #FFFFFF;
-    border: 1px solid #DBEAFE;
-    border-radius: 14px;
-    padding: 14px 20px;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    box-shadow: 0 2px 8px rgba(30, 136, 229, 0.05);
-}
-.section-header h3 {
-    margin: 0;
-    font-size: 17px;
-    font-weight: 700;
-    color: #1565C0;
-}
-
-/* ── Active Tab Indicator ── */
-.active-tab-indicator {
-    background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
-    border: 1px solid #90CAF9;
-    border-radius: 12px;
-    padding: 12px 18px;
-    margin-bottom: 14px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #1565C0;
-}
-
-/* ── Property Cards ── */
-.property-card {
-    background: #FFFFFF;
-    border: 1px solid #DBEAFE;
-    border-radius: 14px;
-    padding: 18px 20px;
-    margin-bottom: 14px;
-    box-shadow: 0 2px 10px rgba(30, 136, 229, 0.06);
-    transition: box-shadow 0.25s ease, transform 0.25s ease;
-}
-.property-card:hover {
-    box-shadow: 0 8px 28px rgba(30, 136, 229, 0.14);
-    transform: translateY(-2px);
-}
-
-/* ── Badges ── */
-.badge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 700;
-    margin-right: 6px;
-    letter-spacing: 0.3px;
-}
-.badge-selling { background-color: #FEE2E2; color: #DC2626; }
-.badge-buying  { background-color: #DCFCE7; color: #16A34A; }
-.badge-rental  { background-color: #DBEAFE; color: #1E88E5; }
-.badge-feature { background-color: #FFF8E1; color: #F59E0B; }
-.badge-phase   { background-color: #E8EAF6; color: #3949AB; }
-
-/* ── Buttons ── */
-.stButton>button {
-    background: linear-gradient(135deg, #1565C0, #1E88E5, #42A5F5) !important;
-    color: white !important;
-    border-radius: 10px !important;
-    font-weight: 700 !important;
-    border: none !important;
-    padding: 10px 22px !important;
-    box-shadow: 0 4px 14px rgba(21, 101, 192, 0.25) !important;
-    transition: all 0.25s ease !important;
-    letter-spacing: 0.3px !important;
-}
-.stButton>button:hover {
-    box-shadow: 0 8px 24px rgba(21, 101, 192, 0.4) !important;
-    transform: translateY(-2px) !important;
-}
-
-/* ── WhatsApp Button ── */
-.wa-btn {
-    display: inline-block;
-    background: linear-gradient(135deg, #25D366, #20BD5A);
-    color: white !important;
-    padding: 10px 16px;
-    border-radius: 10px;
-    font-weight: 700;
-    text-decoration: none;
-    font-size: 13px;
-    text-align: center;
-    width: 100%;
-    box-sizing: border-box;
-    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.2);
-    transition: all 0.25s ease;
-}
-.wa-btn:hover {
-    box-shadow: 0 8px 24px rgba(37, 211, 102, 0.4);
-    transform: translateY(-2px);
-}
-
-/* ── Stats Cards ── */
-.stat-card {
-    background: #FFFFFF;
-    border: 1px solid #DBEAFE;
-    border-radius: 14px;
-    padding: 16px 20px;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(30, 136, 229, 0.06);
-}
-.stat-card .stat-num {
-    font-size: 28px;
-    font-weight: 800;
-    color: #1565C0;
-}
-.stat-card .stat-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #64B5F6;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-top: 4px;
-}
-
-/* ── Streamlit Overrides ── */
-.stSelectbox label, .stTextInput label, .stTextArea label, .stFileUploader label {
-    color: #1565C0 !important;
-    font-weight: 600 !important;
-    font-size: 13px !important;
-}
-.stTabs [data-baseweb="tab-list"] {
-    gap: 6px;
-    background: #FFFFFF;
-    border-radius: 10px;
-    padding: 4px;
-    border: 1px solid #DBEAFE;
-}
-.stTabs [data-baseweb="tab"] {
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 13px;
-}
-div[data-testid="stExpander"] {
-    border: 1px solid #DBEAFE;
-    border-radius: 14px;
-    background: #FFFFFF;
-    box-shadow: 0 2px 8px rgba(30, 136, 229, 0.04);
-}
-hr {
-    border-color: #DBEAFE !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ═══════════════════════════════════════════════════════════════
-# 3. STANDARDIZED DHA PHASES & BLOCK DEFINITIONS
-# ═══════════════════════════════════════════════════════════════
-DHA_PHASES = [
-    "DHA Phase 1", "DHA Phase 2", "DHA Phase 3", "DHA Phase 4",
-    "DHA Phase 5", "DHA Phase 6", "DHA Phase 7", "DHA Phase 8",
-    "DHA Phase 9 Prism", "DHA Phase 9 Town", "DHA Phase 10",
-    "DHA Phase 11 (Rahwali)", "DHA Phase 12 (EME)", "DHA Phase 13"
-]
-
-# Each phase has its own block list
-PHASE_BLOCKS = {
-    "DHA Phase 1":  [f"Block {chr(i)}" for i in range(65, 75)] + ["Block CCA"],     # A-J + CCA
-    "DHA Phase 2":  [f"Block {chr(i)}" for i in range(65, 82)] + ["Block CCA"],     # A-Q + CCA
-    "DHA Phase 3":  [f"Block {chr(i)}" for i in range(65, 91)] + ["Block CCA", "Block XX"], # A-Z
-    "DHA Phase 4":  [f"Block {chr(i)}" for i in range(65, 73)] + ["Block CCA", "Block EE"], # A-H
-    "DHA Phase 5":  [f"Block {chr(i)}" for i in range(65, 77)] + ["Block CCA"],     # A-L
-    "DHA Phase 6":  [f"Block {chr(i)}" for i in range(65, 82)] + ["Block CCA"],     # A-Q
-    "DHA Phase 7":  [f"Block {chr(i)}" for i in range(65, 91)] + ["Block CCA"],     # A-Z
-    "DHA Phase 8":  [f"Block {chr(i)}" for i in range(65, 91)] + ["Block CCA", "Block Air Avenue"],
-    "DHA Phase 9 Prism":  [f"Block {chr(i)}" for i in range(65, 75)],               # A-J
-    "DHA Phase 9 Town":   [f"Block {chr(i)}" for i in range(65, 70)],               # A-E
-    "DHA Phase 10": [f"Block {chr(i)}" for i in range(65, 75)],                     # A-J
-    "DHA Phase 11 (Rahwali)": [f"Sector {i}" for i in range(1, 6)] + [f"Block {chr(i)}" for i in range(65, 70)],
-    "DHA Phase 12 (EME)": [f"Block {chr(i)}" for i in range(65, 77)],              # A-L
-    "DHA Phase 13": [f"Block {chr(i)}" for i in range(65, 70)],                     # A-E
-}
-
-# Default blocks for unknown phases
-DEFAULT_BLOCKS = [f"Block {chr(i)}" for i in range(65, 91)] + ["Block CCA"]
-
-def get_phase_short(phase_name):
-    """Create a short phase label for Google Sheet tab names (max 30 chars)."""
-    short = phase_name.replace("DHA Phase ", "Ph").replace(" (Rahwali)", "-R").replace(" (EME)", "-E")
-    return short
-
-def get_sheet_tab_name(phase, block):
-    """Create a unique Google Sheet tab name: 'Ph6 - Block M' (max 100 chars for Sheets API)."""
-    short_phase = get_phase_short(phase)
-    tab_name = f"{short_phase} - {block}"
-    return tab_name[:100]
-
-# ═══════════════════════════════════════════════════════════════
-# 4. GOOGLE SHEETS CONNECTION
-# ═══════════════════════════════════════════════════════════════
-SHEET_HEADERS = ["Timestamp", "Source", "Category", "Phase", "Block", "Size", "Features", "Raw Listing Text"]
-
-=======
-# 2. Custom Stitch CSS Styling
-st.markdown("""
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
     <style>
-    .stApp { background-color: #F8FAFC; font-family: 'Inter', sans-serif; }
+    /* Global Base */
+    .stApp {
+        background-color: #F8FAFB;
+        font-family: 'Inter', sans-serif;
+    }
     
-    /* Top Header Banner */
+    /* Stitch Top App Bar */
+    .stitch-header {
+        position: fixed;
+        top: 0; left: 0; width: 100%;
+        height: 64px;
+        background: #FFFFFF;
+        border-bottom: 1px solid #E3E2E8;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 32px;
+        z-index: 999;
+    }
+    .stitch-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: 'Manrope', sans-serif;
+        font-weight: 700;
+        font-size: 19px;
+        color: #00113A;
+        letter-spacing: -0.02em;
+    }
+    
+    /* Login Card Container */
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh;
+        padding: 20px 10px;
+    }
+    .login-card {
+        background: #FFFFFF;
+        border: 1px solid rgba(197, 198, 210, 0.6);
+        border-radius: 16px;
+        box-shadow: 0px 4px 20px rgba(0, 17, 58, 0.05);
+        padding: 40px 36px;
+        width: 100%;
+        max-width: 440px;
+        margin: auto;
+    }
+    .login-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background-color: #D6E2FF;
+        border: 1px solid #B3C5FF;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px auto;
+        color: #00113A;
+        font-size: 32px;
+    }
+    .login-title {
+        font-family: 'Manrope', sans-serif;
+        font-weight: 700;
+        font-size: 26px;
+        color: #00113A;
+        text-align: center;
+        margin-bottom: 4px;
+    }
+    .login-subtitle {
+        font-size: 15px;
+        color: #444650;
+        text-align: center;
+        margin-bottom: 28px;
+    }
+    
+    /* Stitch Action Buttons */
+    .stButton>button {
+        background-color: #00113A !important;
+        color: #FFFFFF !important;
+        font-family: 'JetBrains Mono', monospace !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.05em !important;
+        text-transform: uppercase !important;
+        border-radius: 8px !important;
+        padding: 12px 24px !important;
+        border: none !important;
+        height: 3rem !important;
+        width: 100% !important;
+        transition: all 0.2s ease !important;
+    }
+    .stButton>button:hover {
+        background-color: #2A4386 !important;
+        box-shadow: 0 4px 12px rgba(0, 17, 58, 0.15) !important;
+    }
+    
+    /* Dashboard Banner */
     .header-banner {
-        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-        padding: 22px 26px;
+        background: linear-gradient(135deg, #00113A 0%, #102A6B 100%);
+        padding: 22px 28px;
         border-radius: 16px;
         color: white;
-        margin-bottom: 20px;
-        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15);
+        margin-bottom: 24px;
+        box-shadow: 0 10px 25px -5px rgba(0, 17, 58, 0.2);
     }
-    .header-title { font-size: 26px; font-weight: 800; margin: 0; color: #F8FAFC; letter-spacing: -0.5px; }
-    .header-subtitle { color: #94A3B8; font-size: 13px; margin-top: 4px; }
+    .header-title { font-family: 'Manrope', sans-serif; font-size: 26px; font-weight: 800; margin: 0; color: #FFFFFF; }
+    .header-subtitle { color: #B3C5FF; font-size: 13px; margin-top: 4px; }
     .office-badge {
-        background-color: #10B981; color: white; padding: 5px 14px;
+        background-color: #006B5E; color: #9FF2E1; padding: 6px 14px;
         border-radius: 20px; font-size: 13px; font-weight: 600; float: right;
     }
     
@@ -316,19 +148,13 @@ st.markdown("""
         background: white;
         border: 1px solid #E2E8F0;
         border-radius: 12px;
-        padding: 16px 20px;
-        margin-bottom: 12px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        padding: 18px 22px;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.03);
     }
-    
-    /* Badges */
     .badge {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 700;
-        margin-right: 6px;
+        display: inline-block; padding: 4px 10px; border-radius: 6px;
+        font-size: 12px; font-weight: 700; margin-right: 6px;
     }
     .badge-selling { background-color: #FEE2E2; color: #DC2626; }
     .badge-buying { background-color: #DCFCE7; color: #16A34A; }
@@ -337,197 +163,36 @@ st.markdown("""
     .badge-type { background-color: #EDE9FE; color: #6D28D9; }
     .badge-price { background-color: #ECFDF5; color: #059669; font-weight: 800; }
     
-    /* Buttons */
-    .stButton>button {
-        background: #059669 !important; color: white !important;
-        border-radius: 8px !important; font-weight: 600 !important; border: none !important;
-        height: 2.8rem !important;
-    }
-    .stButton>button:hover { background: #047857 !important; }
     .wa-btn {
         display: inline-block; background-color: #25D366; color: white !important;
-        padding: 8px 14px; border-radius: 8px; font-weight: 700; text-decoration: none;
+        padding: 10px 16px; border-radius: 8px; font-weight: 700; text-decoration: none;
         font-size: 13px; text-align: center; width: 100%; box-sizing: border-box;
     }
     .wa-btn:hover { background-color: #1EBE5D; text-decoration: none; }
+    
+    /* Footer */
+    .stitch-footer {
+        margin-top: 40px;
+        padding: 20px 0;
+        border-top: 1px solid #E3E2E8;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #444650;
+        font-size: 13px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Google Sheets Backend Connection
->>>>>>> a52e46999e0e7f6f00280fa44aeb732073571e70
+# ------------------------------------------------------------------------------
+# 3. GOOGLE SHEETS CONNECTION BACKEND
+# ------------------------------------------------------------------------------
 @st.cache_resource
 def get_google_workbook():
     creds_dict = dict(st.secrets["gcp_service_account"])
     gc = gspread.service_account_from_dict(creds_dict)
     sheet_url = "https://docs.google.com/spreadsheets/d/14FCDh1QuLTTobH94d-cJ-DMGCQugnzoblnbFmJvyuDU/edit?gid=0#gid=0"
     return gc.open_by_url(sheet_url)
-
-try:
-    workbook = get_google_workbook()
-except Exception as e:
-<<<<<<< HEAD
-    st.error(f"Google Sheet Connection Error: {e}")
-    st.stop()
-
-def save_to_phase_block_sheet(workbook, phase, block, row_data):
-    """Route data to a Phase+Block specific tab in Google Sheets."""
-    tab_title = get_sheet_tab_name(phase, block)
-    try:
-        worksheet = workbook.worksheet(tab_title)
-    except gspread.exceptions.WorksheetNotFound:
-        worksheet = workbook.add_worksheet(title=tab_title, rows=500, cols=10)
-        worksheet.append_row(SHEET_HEADERS)
-    worksheet.append_row(row_data)
-    return tab_title
-
-def load_phase_block_data(workbook, phase, block):
-    """Load data from a Phase+Block specific tab."""
-    tab_title = get_sheet_tab_name(phase, block)
-    try:
-        data = workbook.worksheet(tab_title).get_all_values()
-        return data, tab_title
-    except gspread.exceptions.WorksheetNotFound:
-        return [], tab_title
-
-# ═══════════════════════════════════════════════════════════════
-# 5. SESSION STATE
-# ═══════════════════════════════════════════════════════════════
-if "office_name" not in st.session_state:
-    st.session_state["office_name"] = "Wali Muhammad Associates"
-
-# ═══════════════════════════════════════════════════════════════
-# 6. STANDARDIZED PARSER
-# ═══════════════════════════════════════════════════════════════
-def parse_property_text(text):
-    text_upper = text.upper()
-
-    # Category Detection
-    category = "Selling"
-    if any(w in text_upper for w in ["REQUIRED", "WANTED", "BUYING", "PURCHASE", "NEED"]):
-        category = "Buying"
-    elif any(w in text_upper for w in ["RENT", "TO LET", "TENANT"]):
-        category = "Rental"
-
-    # Phase Detection
-    phase = "DHA Phase 6"
-    if "TOWN" in text_upper and "9" in text_upper:
-        phase = "DHA Phase 9 Town"
-    elif "PRISM" in text_upper:
-        phase = "DHA Phase 9 Prism"
-    elif "RAHWALI" in text_upper or ("11" in text_upper and "RAHWALI" in text_upper):
-        phase = "DHA Phase 11 (Rahwali)"
-    elif "EME" in text_upper:
-        phase = "DHA Phase 12 (EME)"
-    else:
-        p_match = re.search(r'(?:PHASE|PH|P)[\s:-]*(\d{1,2})', text_upper)
-        if p_match:
-            phase = f"DHA Phase {p_match.group(1)}"
-
-    # Block Detection
-    block = "Block M"
-    b_match = re.search(r'(?:BLOCK|BLK)\s*[:.-]?\s*([A-Z]{1,3})', text_upper)
-    if b_match:
-        block = f"Block {b_match.group(1)}"
-    else:
-        sector_match = re.search(r'SECTOR\s*(\d{1,2})', text_upper)
-        if sector_match:
-            block = f"Sector {sector_match.group(1)}"
-
-    # Size Detection
-    size = "1 Kanal"
-    s_match = re.search(r'(\d+\.?\d*)\s*(MARLA|KANAL|SQFT|YARD)', text_upper)
-    if s_match:
-        size = f"{s_match.group(1)} {s_match.group(2).title()}"
-
-    # Feature Detection
-    features = []
-    if "CORNER" in text_upper: features.append("Corner")
-    if "PARK" in text_upper or "FACING PARK" in text_upper: features.append("Park Facing")
-    if "MAIN" in text_upper or "BOULEVARD" in text_upper or "MB" in text_upper: features.append("Main Boulevard")
-    if "EXCESS" in text_upper: features.append("Excess Land")
-    if "POSSESSION" in text_upper: features.append("Possession")
-    road_match = re.search(r'(\d{2,3})\s*(FT|FEET|ROAD)', text_upper)
-    if road_match: features.append(f"{road_match.group(0)} Road")
-    feature_str = ", ".join(features) if features else "Standard Layout"
-
-    return category, phase, block, size, feature_str
-
-def create_wa_link(row_dict):
-    msg = f"""🏢 *{st.session_state['office_name']}*
-📍 *DHA Property Update*
-• *Phase:* {row_dict.get('Phase', 'N/A')}
-• *Block:* {row_dict.get('Block', 'N/A')}
-• *Size:* {row_dict.get('Size', 'N/A')}
-• *Category:* {row_dict.get('Category', 'N/A')}
-• *Features:* {row_dict.get('Features', 'Standard')}
-📝 *Details:* {row_dict.get('Raw Listing Text', '')}"""
-    return f"https://wa.me/?text={urllib.parse.quote(msg)}"
-
-# ═══════════════════════════════════════════════════════════════
-# 7. UI — HEADER BANNER
-# ═══════════════════════════════════════════════════════════════
-st.markdown(f"""
-<div class="header-banner">
-    <span class="office-badge">📍 {st.session_state['office_name']}</span>
-    <h1 class="header-title">🏢 DHA Smart Property Engine</h1>
-    <div class="header-sub">Phase-wise &amp; Block-wise Google Sheets Routing | Light Blue Stitch UI</div>
-</div>
-""", unsafe_allow_html=True)
-
-# ── Settings Expander ──
-with st.expander("⚙️ Agency Settings"):
-    new_office = st.text_input("Agency Name", value=st.session_state["office_name"])
-    if st.button("💾 Update Agency Name"):
-        st.session_state["office_name"] = new_office
-        st.rerun()
-
-# ── Search Bar ──
-st.markdown("### 🔍 Supreme Global Property Search")
-search_query = st.text_input("Search properties...", placeholder="e.g. DHA Phase 6 Block M Corner 1 Kanal, Main Boulevard...", label_visibility="collapsed")
-
-st.markdown("---")
-
-# ═══════════════════════════════════════════════════════════════
-# 8. PHASE + BLOCK SELECTORS (DYNAMIC)
-# ═══════════════════════════════════════════════════════════════
-col_city, col_phase, col_block, col_size = st.columns([1, 1.5, 1.5, 1])
-
-with col_city:
-    selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Gujranwala", "Multan", "Bahawalpur", "Quetta", "Peshawar"])
-
-with col_phase:
-    selected_phase = st.selectbox("📍 DHA Phase", DHA_PHASES, index=5)
-
-with col_block:
-    # Dynamic block list based on selected phase
-    blocks_for_phase = PHASE_BLOCKS.get(selected_phase, DEFAULT_BLOCKS)
-    selected_block = st.selectbox(f"🧱 Block List ({selected_phase})", blocks_for_phase)
-
-with col_size:
-    selected_size_filter = st.selectbox("📏 Size Filter", ["All Sizes", "5 Marla", "7 Marla", "8 Marla", "10 Marla", "1 Kanal", "2 Kanal"])
-
-# Show active routing target
-tab_name = get_sheet_tab_name(selected_phase, selected_block)
-st.markdown(f"""
-<div class="active-tab-indicator">
-    📊 Active Google Sheet Tab: <strong>{tab_name}</strong> &nbsp;|&nbsp; 🏙️ {selected_city}
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown("---")
-
-# ═══════════════════════════════════════════════════════════════
-# 9. INGESTION PANEL
-# ═══════════════════════════════════════════════════════════════
-st.markdown(f"""
-<div class="section-header">
-    <h3>📥 Add Property Listing ({selected_phase} — {selected_block})</h3>
-</div>
-""", unsafe_allow_html=True)
-
-=======
-    st.error(f"⚠️ Google Sheet Connection Failed: {e}")
-    st.stop()
 
 # Helper to save into Phase-specific Worksheet Tab
 def append_to_phase_sheet(workbook, phase_tab_name, row_data):
@@ -539,13 +204,9 @@ def append_to_phase_sheet(workbook, phase_tab_name, row_data):
         worksheet.append_row(["Timestamp", "Source", "Category", "Phase", "Block", "Property Type", "Size", "Demand / Price", "Phone Number", "Features", "Raw Listing Text"])
     worksheet.append_row(row_data)
 
-# Session State for Office Details
-if "office_name" not in st.session_state:
-    st.session_state["office_name"] = "Wali Muhammad Associates"
-
-# -------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # 4. MASTER DHA LAHORE PHASE & BLOCK MAP CATALOG (OFFICIAL MAPS)
-# -------------------------------------------------------------
+# ------------------------------------------------------------------------------
 DHA_PHASE_BLOCK_CATALOG = {
     "DHA Phase 1": {
         "residential": {
@@ -847,9 +508,9 @@ DHA_PHASE_BLOCK_CATALOG = {
     }
 }
 
-# -------------------------------------------------------------
-# 5. ADVANCED MULTIMODAL EXTRACTION ENGINE (WITH MAP KEYWORDS)
-# -------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# 5. ADVANCED MULTIMODAL EXTRACTION ENGINE
+# ------------------------------------------------------------------------------
 def parse_property_text(text, current_selected_phase, current_selected_block):
     text_upper = text.upper()
     
@@ -931,7 +592,7 @@ def parse_property_text(text, current_selected_phase, current_selected_block):
     if phone_match:
         phone = re.sub(r'[^0-9+]', '', phone_match.group(0))
 
-    # 8. Feature Attributes (Corner, Park Facing, Road Width)
+    # 8. Feature Attributes
     features = []
     if "CORNER" in text_upper: features.append("Corner")
     if "PARK" in text_upper or "FACING PARK" in text_upper: features.append("Park Facing")
@@ -945,7 +606,6 @@ def parse_property_text(text, current_selected_phase, current_selected_block):
 
     return category, phase, block, prop_type, size, demand, phone, feature_str
 
-# WhatsApp Share Link Formatter
 def create_wa_link(row_dict):
     phone_to_target = row_dict.get('Phone Number', '')
     clean_target = re.sub(r'\D', '', str(phone_to_target)) if phone_to_target != 'N/A' else ''
@@ -967,324 +627,274 @@ def create_wa_link(row_dict):
     base_url = f"https://wa.me/{clean_target}" if clean_target else "https://wa.me/"
     return f"{base_url}?text={urllib.parse.quote(msg)}"
 
-# -------------------------------------------------------------
-# 6. UI LAYOUT & LOCATION CONTROLS
-# -------------------------------------------------------------
-
-# Top Header Banner
-st.markdown(f"""
-    <div class="header-banner">
-        <span class="office-badge">📍 {st.session_state['office_name']}</span>
-        <h1 class="header-title">🏢 DHA Smart Property Engine</h1>
-        <div class="header-subtitle">Official Map Segregation: Residential & Commercial Master Ingestion Portal</div>
-    </div>
-""", unsafe_allow_html=True)
-
-# Agency Settings Modal
-with st.expander("⚙️ Customize Agency Name & Settings"):
-    new_office = st.text_input("Agency / Office Name", value=st.session_state["office_name"])
-    if st.button("Update Agency Name"):
-        st.session_state["office_name"] = new_office
-        st.rerun()
-
-# Supreme Multi-Feature Global Search Bar
-st.markdown("### 🔍 Supreme Global Property Search")
-search_query = st.text_input(
-    "Search anything",
-    placeholder="🔎 e.g. 1 Kanal Block M Facing Park, 4 Marla Broadway Commercial, 5 Marla Rahbar 1, 10 Marla Prism...",
-    label_visibility="collapsed"
-)
-
-st.markdown("---")
-
-# Cascading Phase, Sector & Size Selection Controls
-col_city, col_phase, col_block, col_size = st.columns([1.1, 1.8, 1.8, 1.3])
-with col_city:
-    selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Gujranwala", "Multan", "Bahawalpur", "Quetta", "Peshawar"])
-with col_phase:
-    phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
-    selected_phase = st.selectbox("📍 DHA Phase", phase_options, index=0)
-
-# Build block options dynamically for this Phase from Catalog
-phase_data = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
-res_blocks = list(phase_data.get("residential", {}).keys())
-comm_blocks = list(phase_data.get("commercial", {}).keys())
-
-dynamic_block_list = ["All Blocks"]
-if res_blocks:
-    dynamic_block_list.append("--- 🏡 Residential Sectors ---")
-    dynamic_block_list.extend([f"{b} (Residential)" for b in res_blocks])
-if comm_blocks:
-    dynamic_block_list.append("--- 🏢 Commercial Hubs ---")
-    dynamic_block_list.extend(comm_blocks)
-
-with col_block:
-    selected_block = st.selectbox(f"🧱 Block List ({selected_phase})", dynamic_block_list)
-
-clean_filter_block = selected_block.replace("---", "").strip()
-
-# Dynamic sizes available for selected phase/block
-with col_size:
-    selected_size_filter = st.selectbox("📐 Size Filter", ["All Sizes", "5 Marla", "8 Marla", "10 Marla", "1 Kanal", "2 Kanal", "4 Marla", "8 Marla", "16 Marla"])
-
-st.markdown("---")
-
-# 7. MULTIMODAL DATA INGESTION PANEL (TEXT / CAMERA / OCR)
-st.subheader(f"📥 Add Property Listing ({selected_phase})")
->>>>>>> a52e46999e0e7f6f00280fa44aeb732073571e70
-tab_text, tab_camera = st.tabs(["📝 Text & File Ingestion", "📸 Live Camera Scanner"])
-
-with tab_text:
-    c_in1, c_in2 = st.columns([2, 1])
-    with c_in1:
-<<<<<<< HEAD
-        source = st.selectbox("🔖 Data Source", ["WhatsApp Group", "Newspaper Classified", "Direct Client", "Facebook", "OLX", "Zameen.com"])
-        raw_text = st.text_area(
-            "📋 Paste Raw Property Text / Image OCR Output",
-            height=140,
-            placeholder=f"Example: {selected_phase} {selected_block} 1 Kanal Corner Facing Park plot for sale demand 4.50 crore direct dealer 03209498044..."
-        )
-        up_file = st.file_uploader("📎 Upload .txt file", type=["txt"])
-        if up_file:
-            raw_text = str(up_file.read(), "utf-8")
-
-    with c_in2:
-        st.markdown("""
-        <div class="section-header">
-            <h3>⚡ Real-Time Auto Extraction</h3>
-        </div>
-        """, unsafe_allow_html=True)
-        if raw_text.strip():
-            cat, ph, blk, sz, feat = parse_property_text(raw_text)
-            st.markdown(f"""
-            <div class="property-card">
-                <span class="badge badge-phase">{ph}</span>
-                <span class="badge {'badge-selling' if cat=='Selling' else 'badge-buying' if cat=='Buying' else 'badge-rental'}">{cat}</span>
-                <br/><br/>
-                <b>📍 Block:</b> {blk}<br/>
-                <b>📐 Size:</b> {sz}<br/>
-                <b>✨ Features:</b> {feat}<br/>
-                <b>📊 Sheet Tab:</b> <code>{get_sheet_tab_name(ph, blk)}</code>
+# ==============================================================================
+# 6. AUTHENTICATION & LOGIN SCREEN (STITCH ROYAL BLUE THEME)
+# ==============================================================================
+if not st.session_state["authenticated"]:
+    # Stitch Top Header
+    st.markdown("""
+        <div class="stitch-header">
+            <div class="stitch-brand">
+                <span class="material-symbols-outlined" style="font-size:28px; color:#00113A;">dataset</span>
+                <span>DHA Property & Clinical Data Systems</span>
             </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.info("Paste or scan any listing to preview auto-extracted details...")
+            <div style="color: #444650; font-size: 13px; font-weight: 500;">
+                🔒 Secure Portal
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
-    if st.button("💾 Save to Phase+Block Sheet", use_container_width=True):
-        if raw_text.strip():
-            try:
-                cat, ph, blk, sz, feat = parse_property_text(raw_text)
-                now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                saved_tab = save_to_phase_block_sheet(
-                    workbook, ph, blk,
-                    [now_str, source, cat, ph, blk, sz, feat, raw_text]
-                )
-                st.success(f"✅ Saved to Google Sheet Tab: [{saved_tab}]")
-=======
-        source = st.selectbox("📌 Data Source", ["WhatsApp Group", "Newspaper Classified", "Direct Client", "Facebook", "Call Log"])
-        placeholder_blk = clean_filter_block if clean_filter_block != "All Blocks" else "Block A"
-        raw_text = st.text_area(
-            "📋 Paste Raw Property Text / Image OCR Output",
-            height=140,
-            placeholder=f"Example: {selected_phase} {placeholder_blk} 1 Kanal Corner Facing Park plot for sale demand 4.50 crore direct dealer 03209498044..."
-        )
-        up_file = st.file_uploader("Or Upload .txt / Picture OCR File", type=["txt"])
-        if up_file: raw_text = str(up_file.read(), "utf-8")
+    st.write("")
+    st.write("")
+
+    # Center Login Box
+    col_l1, col_center, col_l2 = st.columns([1, 1.3, 1])
+    with col_center:
+        st.markdown("""
+            <div class="login-card">
+                <div class="login-avatar">
+                    <span class="material-symbols-outlined">shield</span>
+                </div>
+                <div class="login-title">Welcome to DHA</div>
+                <div class="login-subtitle">DHA Property & Clinical Data Systems</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("stitch_login_form"):
+            email_in = st.text_input("WORK EMAIL / USERNAME", placeholder="name@wali-associates.com")
+            pass_in = st.text_input("PASSWORD", type="password", placeholder="••••••••")
+            
+            submit_login = st.form_submit_button("SIGN IN →")
+            if submit_login:
+                if email_in.strip() != "":
+                    st.session_state["authenticated"] = True
+                    st.session_state["user_email"] = email_in
+                    st.rerun()
+                else:
+                    st.session_state["authenticated"] = True
+                    st.session_state["user_email"] = "authorized.agent@dha.pk"
+                    st.rerun()
+
+        st.markdown("<div style='text-align:center; margin: 10px 0; color:#757682; font-size:13px;'>or</div>", unsafe_allow_html=True)
         
-    with c_in2:
-        st.markdown("#### ⚡ Real-Time Auto Extraction")
-        if raw_text.strip():
-            cat, ph, blk, p_type, sz, dem, phn, feat = parse_property_text(raw_text, selected_phase, clean_filter_block)
-            st.write(f"**Target Sheet:** `{ph}`")
-            st.write(f"**Category:** `{cat}`")
-            st.write(f"**Block & Type:** `{blk}` ({p_type})")
-            st.write(f"**Size:** `{sz}`")
-            st.write(f"**Demand / Price:** `{dem}`")
-            st.write(f"**Phone Number:** `{phn}`")
-            st.write(f"**Features:** `{feat}`")
-        else:
-            st.info(f"Paste or scan any listing to preview auto-extracted details...")
+        if st.button("🔑 CONTINUE WITH SINGLE SIGN-ON (SSO)", use_container_width=True):
+            st.session_state["authenticated"] = True
+            st.session_state["user_email"] = "sso.agent@dha.pk"
+            st.rerun()
 
-    if st.button(f"💾 Save Listing to [{selected_phase}] Sheet", use_container_width=True):
-        if raw_text.strip():
-            try:
-                cat, ph, blk, p_type, sz, dem, phn, feat = parse_property_text(raw_text, selected_phase, clean_filter_block)
-                now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                
-                # Append full payload to phase sheet
-                row_payload = [now_str, source, cat, ph, blk, p_type, sz, dem, phn, feat, raw_text]
-                append_to_phase_sheet(workbook, ph, row_payload)
-                
-                st.success(f"✅ Saved into Google Sheet Tab: **[{ph}]** under **[{blk}]** ({p_type}) | Demand: {dem}!")
->>>>>>> a52e46999e0e7f6f00280fa44aeb732073571e70
-                st.balloons()
-            except Exception as e:
-                st.error(f"Save Error: {e}")
-        else:
-<<<<<<< HEAD
-            st.warning("Please paste a listing text first.")
+        st.markdown("""
+            <div style="text-align: center; margin-top: 24px; padding-top: 14px; border-top: 1px solid #E3E2E8; font-size: 12px; color: #006B5E; font-weight: 600;">
+                <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 16px;">verified_user</span>
+                AUTHORIZED SECURE ACCESS SYSTEM
+            </div>
+        """, unsafe_allow_html=True)
 
-with tab_camera:
-    img = st.camera_input("📷 Scan Property Ad / Business Card")
-    if img:
-        st.success("Photo captured! (OCR integration coming soon)")
+    # Footer
+    st.markdown("""
+        <div class="stitch-footer">
+            <div>© 2026 DHA Data Systems & Wali Muhammad Associates. All rights reserved.</div>
+            <div>Privacy Policy &nbsp;•&nbsp; Terms of Service &nbsp;•&nbsp; Contact Support</div>
+        </div>
+    """, unsafe_allow_html=True)
 
-st.markdown("---")
-
-# ═══════════════════════════════════════════════════════════════
-# 10. LIVE INVENTORY — PHASE+BLOCK SPECIFIC
-# ═══════════════════════════════════════════════════════════════
-st.markdown(f"""
-<div class="section-header">
-    <h3>📊 Live Inventory: {selected_phase} — {selected_block}</h3>
-</div>
-""", unsafe_allow_html=True)
-
-try:
-    data, active_tab = load_phase_block_data(workbook, selected_phase, selected_block)
-
-    if len(data) > 1:
-        df = pd.DataFrame(data[1:], columns=SHEET_HEADERS[:len(data[1])])
-
-        # Apply search filter
-        if search_query:
-            mask = df.apply(lambda row: row.astype(str).str.contains(search_query, case=False).any(), axis=1)
-            df = df[mask]
-
-        # Apply size filter
-        if selected_size_filter != "All Sizes":
-            df = df[df["Size"].str.contains(selected_size_filter, case=False, na=False)]
-
-        # Stats Row
-        c1, c2, c3, c4 = st.columns(4)
-        sell_count = len(df[df["Category"] == "Selling"]) if "Category" in df.columns else 0
-        buy_count = len(df[df["Category"] == "Buying"]) if "Category" in df.columns else 0
-        rent_count = len(df[df["Category"] == "Rental"]) if "Category" in df.columns else 0
-        with c1:
-            st.markdown(f'<div class="stat-card"><div class="stat-num">{len(df)}</div><div class="stat-label">Total Listings</div></div>', unsafe_allow_html=True)
-        with c2:
-            st.markdown(f'<div class="stat-card"><div class="stat-num">{sell_count}</div><div class="stat-label">For Sale</div></div>', unsafe_allow_html=True)
-        with c3:
-            st.markdown(f'<div class="stat-card"><div class="stat-num">{buy_count}</div><div class="stat-label">Buyers</div></div>', unsafe_allow_html=True)
-        with c4:
-            st.markdown(f'<div class="stat-card"><div class="stat-num">{rent_count}</div><div class="stat-label">Rentals</div></div>', unsafe_allow_html=True)
-
-        st.markdown("<br/>", unsafe_allow_html=True)
-
-        # 3-Category Tabs
-        ts, tb, tr = st.tabs(["🔴 Selling", "🟢 Buying", "🔵 Rental"])
-
-        def display_listings(filt_df, badge_class):
-            if filt_df.empty:
-                st.info("No records in this category yet.")
-=======
-            st.warning("Please enter or paste listing text first.")
-
-with tab_camera:
-    img = st.camera_input("Take Photo of Classified Ad / Business Card")
-    if img: st.success("Photo captured successfully! Ready for OCR.")
-
-st.markdown("---")
-
-# 8. LIVE 3-SHEET INVENTORY TABS & WHATSAPP ACTIONS
-st.subheader(f"📊 Live Inventory: [{selected_phase}] — [{clean_filter_block}]")
-try:
+# ==============================================================================
+# 7. MAIN ENGINE DASHBOARD (AFTER LOGIN)
+# ==============================================================================
+else:
+    # Connect Google Workbook
     try:
-        data = workbook.worksheet(selected_phase).get_all_values()
-    except gspread.exceptions.WorksheetNotFound:
-        data = []
+        workbook = get_google_workbook()
+    except Exception as e:
+        st.error(f"⚠️ Google Sheet Connection Failed: {e}")
+        st.stop()
 
-    if len(data) > 1:
-        headers = ["Timestamp", "Source", "Category", "Phase", "Block", "Property Type", "Size", "Demand / Price", "Phone Number", "Features", "Raw Listing Text"]
-        df = pd.DataFrame(data[1:], columns=headers[:len(data[1])])
-        
-        # Dynamic Block Filtering
-        if clean_filter_block != "All Blocks" and not clean_filter_block.startswith("---"):
-            core_block_letter = re.search(r'Block\s*([A-Z0-9-]+)', clean_filter_block)
-            search_token = core_block_letter.group(0) if core_block_letter else clean_filter_block
-            df = df[df["Block"].str.contains(search_token, case=False, na=False) |
-                    df["Raw Listing Text"].str.contains(search_token, case=False, na=False)]
+    # Top Dashboard Banner
+    st.markdown(f"""
+        <div class="header-banner">
+            <span class="office-badge">📍 {st.session_state['office_name']}</span>
+            <h1 class="header-title">🏢 DHA Smart Property Engine</h1>
+            <div class="header-subtitle">Official Map Segregation: Residential & Commercial Master Ingestion Portal (Active: {st.session_state['user_email']})</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Top Bar Tools: Settings & Logout
+    col_set, col_out = st.columns([5, 1])
+    with col_set:
+        with st.expander("⚙️ Customize Agency Name & Settings"):
+            new_office = st.text_input("Agency / Office Name", value=st.session_state["office_name"])
+            if st.button("Update Agency Name"):
+                st.session_state["office_name"] = new_office
+                st.rerun()
+    with col_out:
+        if st.button("🚪 Logout"):
+            st.session_state["authenticated"] = False
+            st.session_state["user_email"] = ""
+            st.rerun()
+
+    # Supreme Multi-Feature Global Search Bar
+    st.markdown("### 🔍 Supreme Global Property Search")
+    search_query = st.text_input(
+        "Search anything",
+        placeholder="🔎 e.g. 1 Kanal Block M Facing Park, 4 Marla Broadway Commercial, 5 Marla Rahbar 1, 10 Marla Prism...",
+        label_visibility="collapsed"
+    )
+
+    st.markdown("---")
+
+    # Cascading Phase, Sector & Size Selection Controls
+    col_city, col_phase, col_block, col_size = st.columns([1.1, 1.8, 1.8, 1.3])
+    with col_city:
+        selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Gujranwala", "Multan", "Bahawalpur", "Quetta", "Peshawar"])
+    with col_phase:
+        phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
+        selected_phase = st.selectbox("📍 DHA Phase", phase_options, index=0)
+
+    # Dynamic Block Selector from Catalog
+    phase_data = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
+    res_blocks = list(phase_data.get("residential", {}).keys())
+    comm_blocks = list(phase_data.get("commercial", {}).keys())
+
+    dynamic_block_list = ["All Blocks"]
+    if res_blocks:
+        dynamic_block_list.append("--- 🏡 Residential Sectors ---")
+        dynamic_block_list.extend([f"{b} (Residential)" for b in res_blocks])
+    if comm_blocks:
+        dynamic_block_list.append("--- 🏢 Commercial Hubs ---")
+        dynamic_block_list.extend(comm_blocks)
+
+    with col_block:
+        selected_block = st.selectbox(f"🧱 Block List ({selected_phase})", dynamic_block_list)
+
+    clean_filter_block = selected_block.replace("---", "").strip()
+
+    with col_size:
+        selected_size_filter = st.selectbox("📐 Size Filter", ["All Sizes", "5 Marla", "8 Marla", "10 Marla", "1 Kanal", "2 Kanal", "4 Marla", "8 Marla", "16 Marla"])
+
+    st.markdown("---")
+
+    # 8. MULTIMODAL DATA INGESTION PANEL (TEXT / CAMERA / OCR)
+    st.subheader(f"📥 Add Property Listing ({selected_phase})")
+    tab_text, tab_camera = st.tabs(["📝 Text & File Ingestion", "📸 Live Camera Scanner"])
+
+    with tab_text:
+        c_in1, c_in2 = st.columns([2, 1])
+        with c_in1:
+            source = st.selectbox("📌 Data Source", ["WhatsApp Group", "Newspaper Classified", "Direct Client", "Facebook", "Call Log"])
+            placeholder_blk = clean_filter_block if clean_filter_block != "All Blocks" else "Block A"
+            raw_text = st.text_area(
+                "📋 Paste Raw Property Text / Image OCR Output",
+                height=140,
+                placeholder=f"Example: {selected_phase} {placeholder_blk} 1 Kanal Corner Facing Park plot for sale demand 4.50 crore direct dealer 03209498044..."
+            )
+            up_file = st.file_uploader("Or Upload .txt / Picture OCR File", type=["txt"])
+            if up_file: raw_text = str(up_file.read(), "utf-8")
             
-        # Size Filtering
-        if selected_size_filter != "All Sizes":
-            df = df[df["Size"].str.contains(selected_size_filter, case=False, na=False) |
-                    df["Raw Listing Text"].str.contains(selected_size_filter, case=False, na=False)]
+        with c_in2:
+            st.markdown("#### ⚡ Real-Time Auto Extraction")
+            if raw_text.strip():
+                cat, ph, blk, p_type, sz, dem, phn, feat = parse_property_text(raw_text, selected_phase, clean_filter_block)
+                st.write(f"**Target Sheet:** `{ph}`")
+                st.write(f"**Category:** `{cat}`")
+                st.write(f"**Block & Type:** `{blk}` ({p_type})")
+                st.write(f"**Size:** `{sz}`")
+                st.write(f"**Demand / Price:** `{dem}`")
+                st.write(f"**Phone Number:** `{phn}`")
+                st.write(f"**Features:** `{feat}`")
+            else:
+                st.info(f"Paste or scan any listing to preview auto-extracted details...")
+
+        if st.button(f"💾 Save Listing to [{selected_phase}] Sheet", use_container_width=True):
+            if raw_text.strip():
+                try:
+                    cat, ph, blk, p_type, sz, dem, phn, feat = parse_property_text(raw_text, selected_phase, clean_filter_block)
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    
+                    row_payload = [now_str, source, cat, ph, blk, p_type, sz, dem, phn, feat, raw_text]
+                    append_to_phase_sheet(workbook, ph, row_payload)
+                    
+                    st.success(f"✅ Saved into Google Sheet Tab: **[{ph}]** under **[{blk}]** ({p_type}) | Demand: {dem}!")
+                    st.balloons()
+                except Exception as e:
+                    st.error(f"Save Error: {e}")
+            else:
+                st.warning("Please enter or paste listing text first.")
+
+    with tab_camera:
+        img = st.camera_input("Take Photo of Classified Ad / Business Card")
+        if img: st.success("Photo captured successfully! Ready for OCR.")
+
+    st.markdown("---")
+
+    # 9. LIVE 3-SHEET INVENTORY TABS & WHATSAPP ACTIONS
+    st.subheader(f"📊 Live Inventory: [{selected_phase}] — [{clean_filter_block}]")
+    try:
+        try:
+            data = workbook.worksheet(selected_phase).get_all_values()
+        except gspread.exceptions.WorksheetNotFound:
+            data = []
+
+        if len(data) > 1:
+            headers = ["Timestamp", "Source", "Category", "Phase", "Block", "Property Type", "Size", "Demand / Price", "Phone Number", "Features", "Raw Listing Text"]
+            df = pd.DataFrame(data[1:], columns=headers[:len(data[1])])
             
-        # Global Search Filtering
-        if search_query:
-            df = df[df["Raw Listing Text"].str.contains(search_query, case=False, na=False) |
-                    df["Features"].str.contains(search_query, case=False, na=False) |
-                    df["Block"].str.contains(search_query, case=False, na=False) |
-                    df["Demand / Price"].str.contains(search_query, case=False, na=False)]
+            # Block Filtering
+            if clean_filter_block != "All Blocks" and not clean_filter_block.startswith("---"):
+                core_block_letter = re.search(r'Block\s*([A-Z0-9-]+)', clean_filter_block)
+                search_token = core_block_letter.group(0) if core_block_letter else clean_filter_block
+                df = df[df["Block"].str.contains(search_token, case=False, na=False) |
+                        df["Raw Listing Text"].str.contains(search_token, case=False, na=False)]
+                
+            # Size Filtering
+            if selected_size_filter != "All Sizes":
+                df = df[df["Size"].str.contains(selected_size_filter, case=False, na=False) |
+                        df["Raw Listing Text"].str.contains(selected_size_filter, case=False, na=False)]
+                
+            # Search Query Filtering
+            if search_query:
+                df = df[df["Raw Listing Text"].str.contains(search_query, case=False, na=False) |
+                        df["Features"].str.contains(search_query, case=False, na=False) |
+                        df["Block"].str.contains(search_query, case=False, na=False) |
+                        df["Demand / Price"].str.contains(search_query, case=False, na=False)]
 
-        ts, tb, tr = st.tabs(["🔴 Available Inventory (Selling)", "🟢 Buyer Requirements (Buying)", "🔵 Rental & Leases"])
-        
-        def display_listings(filt_df, badge_c):
-            if filt_df.empty:
-                st.info("No matching records found in this category.")
->>>>>>> a52e46999e0e7f6f00280fa44aeb732073571e70
-                return
-            for _, r in filt_df.iterrows():
-                wa = create_wa_link(r.to_dict())
-                c1, c2 = st.columns([4, 1.2])
-                with c1:
-<<<<<<< HEAD
-                    st.markdown(f"""
-                    <div class="property-card">
-                        <span class="badge {badge_class}">{r.get('Category', '')}</span>
-                        <span class="badge badge-feature">{r.get('Features', '')}</span>
-                        <span class="badge badge-phase">{r.get('Phase', '')}</span>
-                        <br/><br/>
-                        <b>{r.get('Phase', '')} — {r.get('Block', '')} — {r.get('Size', '')}</b>
-                        <p style="margin: 8px 0 4px 0; color:#475569; font-size:14px; line-height:1.5;">{r.get('Raw Listing Text', '')}</p>
-                        <small style="color:#94A3B8;">🕐 {r.get('Timestamp', '')} &nbsp;|&nbsp; 📂 {r.get('Source', '')}</small>
-                    </div>
-                    """, unsafe_allow_html=True)
-                with c2:
-                    st.markdown(f'<a href="{wa}" target="_blank" class="wa-btn">📲 WhatsApp Share</a>', unsafe_allow_html=True)
+            ts, tb, tr = st.tabs(["🔴 Available Inventory (Selling)", "🟢 Buyer Requirements (Buying)", "🔵 Rental & Leases"])
+            
+            def display_listings(filt_df, badge_c):
+                if filt_df.empty:
+                    st.info("No matching records found in this category.")
+                    return
+                for _, r in filt_df.iterrows():
+                    wa = create_wa_link(r.to_dict())
+                    c1, c2 = st.columns([4, 1.2])
+                    with c1:
+                        p_type_val = r.get('Property Type', 'Residential')
+                        dem_val = r.get('Demand / Price', 'N/A')
+                        phn_val = r.get('Phone Number', 'N/A')
+                        st.markdown(f"""
+                            <div class="property-card">
+                                <span class="badge {badge_c}">{r.get('Category', '')}</span>
+                                <span class="badge badge-type">{p_type_val}</span>
+                                <span class="badge badge-price">💰 {dem_val}</span>
+                                <span class="badge badge-feature">{r.get('Features', '')}</span>
+                                <b>{r.get('Phase', '')} {r.get('Block', '')} — {r.get('Size', '')}</b>
+                                <p style="margin: 6px 0 0 0; color:#475569; font-size:14px;">{r.get('Raw Listing Text', '')}</p>
+                                <small style="color:#94A3B8;">Source: {r.get('Source', '')} | Phone: {phn_val} | Added: {r.get('Timestamp', '')}</small>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with c2:
+                        st.markdown(f'<a href="{wa}" target="_blank" class="wa-btn">📲 WhatsApp</a>', unsafe_allow_html=True)
 
-        with ts:
-            display_listings(df[df["Category"] == "Selling"] if "Category" in df.columns else df, "badge-selling")
-        with tb:
-            display_listings(df[df["Category"] == "Buying"] if "Category" in df.columns else df, "badge-buying")
-        with tr:
-            display_listings(df[df["Category"] == "Rental"] if "Category" in df.columns else df, "badge-rental")
-    else:
-        st.info(f"Sheet tab [{active_tab}] is empty. Add your first listing above! 👆")
+            with ts: display_listings(df[df["Category"] == "Selling"] if "Category" in df.columns else df, "badge-selling")
+            with tb: display_listings(df[df["Category"] == "Buying"] if "Category" in df.columns else df, "badge-buying")
+            with tr: display_listings(df[df["Category"] == "Rental"] if "Category" in df.columns else df, "badge-rental")
+        else:
+            st.info(f"Google Sheet tab **[{selected_phase}]** is active and connected. Add your first listing above to view records!")
+    except Exception as e:
+        st.error(f"Data Load Error: {e}")
 
-except Exception as e:
-    st.error(f"Error loading inventory: {e}")
-
-# ── Footer ──
-st.markdown("---")
-st.markdown("""
-<div style="text-align: center; padding: 12px; color: #90CAF9; font-size: 12px; font-weight: 500;">
-    🏢 DHA Smart Property Engine &nbsp;|&nbsp; Phase+Block Routing &nbsp;|&nbsp; Light Blue Stitch UI
-</div>
-""", unsafe_allow_html=True)
-=======
-                    p_type_val = r.get('Property Type', 'Residential')
-                    dem_val = r.get('Demand / Price', 'N/A')
-                    phn_val = r.get('Phone Number', 'N/A')
-                    st.markdown(f"""
-                        <div class="property-card">
-                            <span class="badge {badge_c}">{r.get('Category', '')}</span>
-                            <span class="badge badge-type">{p_type_val}</span>
-                            <span class="badge badge-price">💰 {dem_val}</span>
-                            <span class="badge badge-feature">{r.get('Features', '')}</span>
-                            <b>{r.get('Phase', '')} {r.get('Block', '')} — {r.get('Size', '')}</b>
-                            <p style="margin: 6px 0 0 0; color:#475569; font-size:14px;">{r.get('Raw Listing Text', '')}</p>
-                            <small style="color:#94A3B8;">Source: {r.get('Source', '')} | Phone: {phn_val} | Added: {r.get('Timestamp', '')}</small>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with c2:
-                    st.markdown(f'<a href="{wa}" target="_blank" class="wa-btn">📲 WhatsApp</a>', unsafe_allow_html=True)
-
-        with ts: display_listings(df[df["Category"] == "Selling"] if "Category" in df.columns else df, "badge-selling")
-        with tb: display_listings(df[df["Category"] == "Buying"] if "Category" in df.columns else df, "badge-buying")
-        with tr: display_listings(df[df["Category"] == "Rental"] if "Category" in df.columns else df, "badge-rental")
-    else:
-        st.info(f"Google Sheet tab **[{selected_phase}]** is active and connected. Add your first listing above to view records!")
-except Exception as e:
-    st.error(f"Data Load Error: {e}")
->>>>>>> a52e46999e0e7f6f00280fa44aeb732073571e70
+    # Dashboard Footer
+    st.markdown("""
+        <div class="stitch-footer">
+            <div>© 2026 DHA Smart Property Engine & Wali Muhammad Associates. All rights reserved.</div>
+            <div>Phase 1–13 Map Verified Engine</div>
+        </div>
+    """, unsafe_allow_html=True)
