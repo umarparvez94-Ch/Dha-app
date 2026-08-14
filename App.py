@@ -36,6 +36,7 @@ st.markdown("""
     .badge-buying { background-color: #DCFCE7; color: #16A34A; }
     .badge-rental { background-color: #E0F2FE; color: #0284C7; }
     .badge-feature { background-color: #FEF3C7; color: #D97706; }
+    .badge-type { background-color: #EDE9FE; color: #6D28D9; }
     .stButton>button {
         background: #059669 !important; color: white !important;
         border-radius: 8px !important; font-weight: 600 !important; border: none !important;
@@ -62,27 +63,71 @@ except Exception as e:
     st.error(f"⚠️ Google Sheet Connection Error: {e}")
     st.stop()
 
-# Helper to save directly into the Phase 1 / Phase Specific Sheet Tab
 def append_to_phase_sheet(workbook, phase_tab_name, row_data):
     clean_tab_title = str(phase_tab_name).strip() if phase_tab_name else "DHA Phase 1"
     try:
         worksheet = workbook.worksheet(clean_tab_title)
     except gspread.exceptions.WorksheetNotFound:
         worksheet = workbook.add_worksheet(title=clean_tab_title, rows=300, cols=10)
-        worksheet.append_row(["Timestamp", "Source", "Category", "Phase", "Block", "Size", "Features", "Raw Listing Text"])
+        worksheet.append_row(["Timestamp", "Source", "Category", "Phase", "Block", "Property Type", "Size", "Features", "Raw Listing Text"])
     worksheet.append_row(row_data)
 
 if "office_name" not in st.session_state:
     st.session_state["office_name"] = "Wali Muhammad Associates"
 
-# 4. Standardized Parser
-def parse_property_text(text, current_selected_phase):
+# 4. Standard DHA Phase to Block Mapping Directory (with Segregated Residential & Commercial)
+DHA_PHASE_BLOCKS = {
+    "DHA Phase 1": [
+        "All Blocks",
+        "--- 🏡 Residential Sectors ---",
+        "Block A (Residential)",
+        "Block B (Residential)",
+        "Block C (Residential)",
+        "Block D (Residential)",
+        "Block E (Residential)",
+        "Block J (Residential)",
+        "Block K (Residential)",
+        "Block L (Residential)",
+        "Block M (Residential)",
+        "Block N (Residential)",
+        "Block P (Residential)",
+        "--- 🏢 Commercial Hubs ---",
+        "Block F (Commercial Market)",
+        "Block G (Main Commercial)",
+        "Block H (Commercial & Stadium)",
+        "Block J (Club Commercial)",
+        "Block M (Commercial)",
+        "Sector Shops (Local Commercial)"
+    ],
+    "DHA Phase 2": ["All Blocks", "Block Q (Residential)", "Block R (Residential)", "Block S (Residential)", "Block T (Residential)", "Block U (Residential)", "Block V (Residential)", "Phase 2 Commercial CCA"],
+    "DHA Phase 3": ["All Blocks", "Block W (Residential)", "Block X (Residential)", "Block Y (Residential)", "Block Z (Residential)", "Y Block Commercial (Main Hub)", "Z Block Commercial"],
+    "DHA Phase 4": ["All Blocks", "Block AA (Residential)", "Block BB (Residential)", "Block CC (Residential)", "Block DD (Residential)", "Block EE (Residential)", "Block FF (Residential)", "Block GG (Residential)", "Block JJ (Residential)", "Block KK (Residential)", "Phase 4 CCA Commercial"],
+    "DHA Phase 5": ["All Blocks", "Block A (Residential)", "Block B (Residential)", "Block C (Residential)", "Block D (Residential)", "Block E (Residential)", "Block F (Residential)", "Block G (Residential)", "Block H (Residential)", "Block J (Residential)", "Block K (Residential)", "Block L (Residential)", "Block M (Residential)", "Phase 5 CCA 1", "Phase 5 CCA 2"],
+    "DHA Phase 6": ["All Blocks", "Block A (Residential)", "Block B (Residential)", "Block C (Residential)", "Block D (Residential)", "Block E (Residential)", "Block F (Residential)", "Block G (Residential)", "Block H (Residential)", "Block J (Residential)", "Block K (Residential)", "Block L (Residential)", "Block M (Residential)", "Block N (Residential)", "Main MB Commercial", "CCA 1 Commercial", "CCA 2 Commercial"],
+    "DHA Phase 7": ["All Blocks", "Block P (Residential)", "Block Q (Residential)", "Block R (Residential)", "Block S (Residential)", "Block T (Residential)", "Block U (Residential)", "Block V (Residential)", "Block W (Residential)", "Block X (Residential)", "Block Y (Residential)", "Block Z (Residential)", "Phase 7 CCA Commercial"],
+    "DHA Phase 8": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P", "Block Q", "Block R", "Block S", "Block T", "Block U", "Block V", "Block W", "Block X", "Block Y", "Block Z", "Broadway Commercial", "CCA 1", "CCA 2"],
+    "DHA Phase 9 Prism": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P", "Block Q", "Block R", "Zone 1 Commercial", "Zone 2 Commercial", "Zone 3 Commercial", "Main Oval Commercial"],
+    "DHA Phase 9 Town": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E", "Commercial CCA"],
+    "DHA Phase 10": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E", "Main Commercial"],
+    "DHA Phase 11 (Rahwali)": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Main Commercial"],
+    "DHA Phase 12 (EME)": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Commercial Market"],
+    "DHA Phase 13": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E"]
+}
+
+# 5. Smart Extractor
+def parse_property_text(text, current_selected_phase, current_selected_block):
     text_upper = text.upper()
     category = "Selling"
     if any(w in text_upper for w in ["REQUIRED", "WANTED", "BUYING", "PURCHASE", "NEED"]):
         category = "Buying"
     elif any(w in text_upper for w in ["RENT", "TO LET", "TENANT"]):
         category = "Rental"
+
+    prop_type = "Residential"
+    if any(w in text_upper for w in ["COMMERCIAL", "COMM", "SHOP", "PLAZA", "OFFICE", "CCA", "BOUTIQUE", "RESTAURANT", "BANK"]):
+        prop_type = "Commercial"
+    elif "COMMERCIAL" in str(current_selected_block).upper():
+        prop_type = "Commercial"
 
     phase = current_selected_phase
     p_match = re.search(r'(?:PHASE|PH|P)[\s:-]*(\d{1,2}|I{1,3}|IV|V|VI|VII|VIII|IX|X)', text_upper)
@@ -92,7 +137,7 @@ def parse_property_text(text, current_selected_phase):
     if "PRISM" in text_upper:
         phase = "DHA Phase 9 Prism"
 
-    block = "Block A"
+    block = current_selected_block if (current_selected_block != "All Blocks" and not current_selected_block.startswith("---")) else "Block A"
     b_match = re.search(r'(?:BLOCK|BLK)\s*[:.-]?\s*([A-Z]{1,2})', text_upper)
     if b_match:
         block = f"Block {b_match.group(1)}"
@@ -115,25 +160,26 @@ def parse_property_text(text, current_selected_phase):
     if road_match: features.append(f"{road_match.group(0)} Road")
     feature_str = ", ".join(features) if features else "Standard Layout"
 
-    return category, phase, block, size, feature_str
+    return category, phase, block, prop_type, size, feature_str
 
 def create_wa_link(row_dict):
     msg = f"""🏢 *{st.session_state['office_name']}*
 📍 *DHA Property Update*
 • *Phase:* {row_dict.get('Phase', 'N/A')}
 • *Block:* {row_dict.get('Block', 'N/A')}
+• *Type:* {row_dict.get('Property Type', 'Residential')}
 • *Size:* {row_dict.get('Size', 'N/A')}
 • *Category:* {row_dict.get('Category', 'N/A')}
 • *Features:* {row_dict.get('Features', 'Standard')}
 📝 *Details:* {row_dict.get('Raw Listing Text', row_dict.get('Raw Listing', ''))}"""
     return f"https://wa.me/?text={urllib.parse.quote(msg)}"
 
-# 5. UI Layout
+# 6. UI Layout
 st.markdown(f"""
     <div class="header-banner">
         <span class="office-badge">📍 {st.session_state['office_name']}</span>
         <h1 class="header-title">🏢 DHA Smart Property Engine</h1>
-        <div style="color: #94A3B8; font-size: 13px; margin-top: 4px;">Phase-Connected Dynamic Inventory & Ingestion Dashboard</div>
+        <div style="color: #94A3B8; font-size: 13px; margin-top: 4px;">Segregated Residential & Commercial Phase-Wise Inventory Engine</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -144,62 +190,59 @@ with st.expander("⚙️ Settings (Change Agency Name)"):
         st.rerun()
 
 st.markdown("### 🔍 Supreme Global Property Search")
-search_query = st.text_input("Search anything", placeholder="e.g. DHA Phase 1 Block A Corner 1 Kanal, Main Boulevard...", label_visibility="collapsed")
+search_query = st.text_input("Search anything", placeholder="e.g. DHA Phase 1 Block G Commercial, Block A Corner 1 Kanal, Main Boulevard...", label_visibility="collapsed")
 
 st.markdown("---")
 
-# Standardized DHA Phases List
-dha_phases_list = [
-    "DHA Phase 1", "DHA Phase 2", "DHA Phase 3", "DHA Phase 4",
-    "DHA Phase 5", "DHA Phase 6", "DHA Phase 7", "DHA Phase 8",
-    "DHA Phase 9 Prism", "DHA Phase 9 Town", "DHA Phase 10",
-    "DHA Phase 11 (Rahwali)", "DHA Phase 12 (EME)", "DHA Phase 13"
-]
-
+# Cascading Phase & Block Selection Row
 col_city, col_phase, col_block = st.columns([1.2, 1.8, 1.8])
 with col_city:
     selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Gujranwala", "Multan", "Bahawalpur", "Quetta", "Peshawar"])
 with col_phase:
-    selected_phase = st.selectbox("📍 DHA Phase", dha_phases_list, index=0)
+    selected_phase = st.selectbox("📍 DHA Phase", list(DHA_PHASE_BLOCKS.keys()), index=0)
 with col_block:
-    selected_block = st.selectbox("🧱 Block Filter", [f"Block {chr(i)}" for i in range(65, 91)] + ["Block CCA", "All Blocks"])
+    available_blocks = DHA_PHASE_BLOCKS.get(selected_phase, ["All Blocks", "Block A (Residential)"])
+    selected_block = st.selectbox(f"🧱 Block List ({selected_phase})", available_blocks)
 
 st.markdown("---")
 
-# 6. Ingestion Panel Connected to Selected Phase Sheet
-st.subheader(f"📥 Add Property Listing (Connected to: [{selected_phase}])")
+clean_filter_block = selected_block.replace("---", "").strip()
+
+# 7. Ingestion Panel
+st.subheader(f"📥 Add Property Listing ({selected_phase})")
 tab_text, tab_camera = st.tabs(["📝 Text & File Entry", "📸 Camera Scanner"])
 
 with tab_text:
     c_in1, c_in2 = st.columns([2, 1])
     with c_in1:
         source = st.selectbox("Source", ["WhatsApp Group", "Newspaper Classified", "Direct Client", "Facebook"])
-        raw_text = st.text_area("Paste Listing Text", height=130, placeholder=f"Example: {selected_phase} Block A 1 Kanal Corner for sale...")
+        placeholder_blk = clean_filter_block if clean_filter_block != "All Blocks" else "Block A"
+        raw_text = st.text_area("Paste Listing Text", height=130, placeholder=f"Example: {selected_phase} {placeholder_blk} 1 Kanal plot for sale...")
         up_file = st.file_uploader("Upload .txt file", type=["txt"])
         if up_file: raw_text = str(up_file.read(), "utf-8")
     with c_in2:
         st.markdown("#### ⚡ Auto Extraction Preview")
         if raw_text.strip():
-            cat, ph, blk, sz, feat = parse_property_text(raw_text, selected_phase)
-            st.write(f"**Target Phase Sheet:** `{ph}`")
+            cat, ph, blk, p_type, sz, feat = parse_property_text(raw_text, selected_phase, clean_filter_block)
+            st.write(f"**Target Phase:** `{ph}`")
             st.write(f"**Category:** `{cat}`")
             st.write(f"**Block:** `{blk}`")
+            st.write(f"**Property Type:** `{p_type}`")
             st.write(f"**Size:** `{sz}`")
             st.write(f"**Features:** `{feat}`")
         else:
-            st.info(f"Ready to ingest listings for {selected_phase}...")
+            st.info(f"Select block & enter listing for {selected_phase}...")
 
     if st.button(f"💾 Save Listing to [{selected_phase}] Sheet", use_container_width=True):
         if raw_text.strip():
             try:
-                cat, ph, blk, sz, feat = parse_property_text(raw_text, selected_phase)
+                cat, ph, blk, p_type, sz, feat = parse_property_text(raw_text, selected_phase, clean_filter_block)
                 now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                 
-                # Save into the Phase 1 / Selected Phase tab
-                row_payload = [now_str, source, cat, ph, blk, sz, feat, raw_text]
+                row_payload = [now_str, source, cat, ph, blk, p_type, sz, feat, raw_text]
                 append_to_phase_sheet(workbook, ph, row_payload)
                 
-                st.success(f"✅ Saved directly into Google Sheet Tab: **[{ph}]**!")
+                st.success(f"✅ Saved into Google Sheet Tab: **[{ph}]** under **[{blk}]** ({p_type})!")
                 st.balloons()
             except Exception as e:
                 st.error(f"Save Error: {e}")
@@ -212,22 +255,23 @@ with tab_camera:
 
 st.markdown("---")
 
-# 7. Live 3-Sheet Inventory Tabs for the Connected Phase
-st.subheader(f"📊 Live Inventory: [{selected_phase}]")
+# 8. Live 3-Sheet Inventory Tabs
+st.subheader(f"📊 Live Inventory: [{selected_phase}] — [{clean_filter_block}]")
 try:
     try:
-        # Load the worksheet matching the selected phase (e.g. DHA Phase 1)
         data = workbook.worksheet(selected_phase).get_all_values()
     except gspread.exceptions.WorksheetNotFound:
         data = []
 
     if len(data) > 1:
-        headers = ["Timestamp", "Source", "Category", "Phase", "Block", "Size", "Features", "Raw Listing Text"]
+        headers = ["Timestamp", "Source", "Category", "Phase", "Block", "Property Type", "Size", "Features", "Raw Listing Text"]
         df = pd.DataFrame(data[1:], columns=headers[:len(data[1])])
         
-        # Block filtering if not "All Blocks"
-        if selected_block != "All Blocks":
-            df = df[df["Block"].str.contains(selected_block, case=False, na=False)]
+        if clean_filter_block != "All Blocks" and not clean_filter_block.startswith("---"):
+            core_block_letter = re.search(r'Block\s*([A-Z0-9]+)', clean_filter_block)
+            search_token = core_block_letter.group(0) if core_block_letter else clean_filter_block
+            df = df[df["Block"].str.contains(search_token, case=False, na=False) |
+                    df["Raw Listing Text"].str.contains(search_token, case=False, na=False)]
             
         if search_query:
             df = df[df["Raw Listing Text"].str.contains(search_query, case=False, na=False) |
@@ -237,15 +281,17 @@ try:
         ts, tb, tr = st.tabs(["🔴 Selling", "🟢 Buying", "🔵 Rental"])
         def display_listings(filt_df, badge_c):
             if filt_df.empty:
-                st.info("No records in this category for this phase.")
+                st.info(f"No records found for this category.")
                 return
             for _, r in filt_df.iterrows():
                 wa = create_wa_link(r.to_dict())
                 c1, c2 = st.columns([4, 1.2])
                 with c1:
+                    p_type_val = r.get('Property Type', 'Residential')
                     st.markdown(f"""
                         <div class="property-card">
                             <span class="badge {badge_c}">{r.get('Category', '')}</span>
+                            <span class="badge badge-type">{p_type_val}</span>
                             <span class="badge badge-feature">{r.get('Features', '')}</span>
                             <b>{r.get('Phase', '')} {r.get('Block', '')} — {r.get('Size', '')}</b>
                             <p style="margin: 6px 0 0 0; color:#475569; font-size:14px;">{r.get('Raw Listing Text', '')}</p>
@@ -259,6 +305,6 @@ try:
         with tb: display_listings(df[df["Category"] == "Buying"] if "Category" in df.columns else df, "badge-buying")
         with tr: display_listings(df[df["Category"] == "Rental"] if "Category" in df.columns else df, "badge-rental")
     else:
-        st.info(f"Google Sheet tab **[{selected_phase}]** is active and connected. Add your first listing above to view records!")
+        st.info(f"Google Sheet tab **[{selected_phase}]** is active. Add entries for {clean_filter_block} above!")
 except Exception as e:
     st.error(f"Load Error: {e}")
