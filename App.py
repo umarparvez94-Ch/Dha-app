@@ -5,15 +5,15 @@ import urllib.parse
 import pandas as pd
 from datetime import datetime
 
-# 1. Page Configuration
+# 1. Page Configuration (Hide Streamlit Defaults)
 st.set_page_config(
-    page_title="DHA Property Search & Data Systems",
+    page_title="DHA Clinical & Property Data Systems",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Initialize Authentication State
+# Initialize Session States
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 if "user_email" not in st.session_state:
@@ -22,101 +22,108 @@ if "office_name" not in st.session_state:
     st.session_state["office_name"] = "Wali Muhammad Associates"
 
 # ==============================================================================
-# 2. GOOGLE STITCH ROYAL BLUE THEME CSS
+# 2. EXACT GOOGLE STITCH ROYAL BLUE CSS INJECTION
 # ==============================================================================
 st.markdown("""
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    
     <style>
-    /* Global Base */
-    .stApp {
-        background-color: #F8FAFB;
-        font-family: 'Inter', sans-serif;
+    /* 1. Reset Streamlit Default Margins & Chrome */
+    #MainMenu, header, footer { visibility: hidden !important; height: 0 !important; }
+    .stAppDeployButton { display: none !important; }
+    .block-container {
+        padding-top: 1.5rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 100% !important;
     }
     
-    /* Stitch Top App Bar */
-    .stitch-header {
-        position: fixed;
-        top: 0; left: 0; width: 100%;
-        height: 64px;
-        background: #FFFFFF;
-        border-bottom: 1px solid #E3E2E8;
+    /* 2. Global Fonts & Surface Colors */
+    .stApp {
+        background-color: #F8FAFB !important;
+        font-family: 'Inter', sans-serif !important;
+        color: #1A1B20 !important;
+    }
+
+    /* 3. Top Stitch App Bar */
+    .stitch-navbar {
+        background: #FAFAFF;
+        border-bottom: 1px solid #C5C6D2;
+        padding: 12px 24px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 32px;
-        z-index: 999;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        box-shadow: 0px 2px 6px rgba(0, 17, 58, 0.02);
     }
-    .stitch-brand {
-        display: flex;
-        align-items: center;
-        gap: 10px;
+    .stitch-logo-text {
         font-family: 'Manrope', sans-serif;
         font-weight: 700;
-        font-size: 19px;
+        font-size: 20px;
         color: #00113A;
-        letter-spacing: -0.02em;
-    }
-    
-    /* Login Card Container */
-    .login-container {
         display: flex;
-        justify-content: center;
         align-items: center;
-        min-height: 80vh;
-        padding: 20px 10px;
+        gap: 8px;
     }
-    .login-card {
+
+    /* 4. Stitch Login Card */
+    .stitch-login-box {
         background: #FFFFFF;
         border: 1px solid rgba(197, 198, 210, 0.6);
         border-radius: 16px;
-        box-shadow: 0px 4px 20px rgba(0, 17, 58, 0.05);
-        padding: 40px 36px;
-        width: 100%;
-        max-width: 440px;
-        margin: auto;
+        box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04);
+        padding: 32px 28px;
+        margin-bottom: 16px;
+        text-align: center;
     }
-    .login-avatar {
-        width: 64px;
-        height: 64px;
+    .stitch-avatar {
+        width: 60px;
+        height: 60px;
         border-radius: 50%;
         background-color: #D6E2FF;
         border: 1px solid #B3C5FF;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 16px auto;
         color: #00113A;
-        font-size: 32px;
+        margin-bottom: 12px;
     }
-    .login-title {
+    .stitch-title {
         font-family: 'Manrope', sans-serif;
-        font-weight: 700;
-        font-size: 26px;
+        font-weight: 800;
+        font-size: 28px;
         color: #00113A;
-        text-align: center;
-        margin-bottom: 4px;
+        letter-spacing: -0.02em;
+        margin-bottom: 2px;
     }
-    .login-subtitle {
+    .stitch-subtitle {
         font-size: 15px;
         color: #444650;
-        text-align: center;
-        margin-bottom: 28px;
+        margin-bottom: 20px;
     }
-    
-    /* Stitch Action Buttons */
+
+    /* 5. Stitch Inputs & Buttons Styling */
+    div[data-baseweb="input"] {
+        border-radius: 8px !important;
+        background-color: #F4F3F9 !important;
+        border: 1px solid #C5C6D2 !important;
+    }
+    div[data-baseweb="input"]:focus-within {
+        border-color: #00113A !important;
+        background-color: #FFFFFF !important;
+    }
     .stButton>button {
         background-color: #00113A !important;
         color: #FFFFFF !important;
         font-family: 'JetBrains Mono', monospace !important;
         font-size: 13px !important;
         font-weight: 600 !important;
-        letter-spacing: 0.05em !important;
+        letter-spacing: 0.06em !important;
         text-transform: uppercase !important;
         border-radius: 8px !important;
-        padding: 12px 24px !important;
         border: none !important;
         height: 3rem !important;
         width: 100% !important;
@@ -124,10 +131,10 @@ st.markdown("""
     }
     .stButton>button:hover {
         background-color: #2A4386 !important;
-        box-shadow: 0 4px 12px rgba(0, 17, 58, 0.15) !important;
+        box-shadow: 0 4px 12px rgba(0, 17, 58, 0.2) !important;
     }
-    
-    /* Dashboard Banner */
+
+    /* 6. Main Dashboard Custom Banner */
     .header-banner {
         background: linear-gradient(135deg, #00113A 0%, #102A6B 100%);
         padding: 22px 28px;
@@ -142,8 +149,8 @@ st.markdown("""
         background-color: #006B5E; color: #9FF2E1; padding: 6px 14px;
         border-radius: 20px; font-size: 13px; font-weight: 600; float: right;
     }
-    
-    /* Listing Cards */
+
+    /* 7. Property Cards & Badges */
     .property-card {
         background: white;
         border: 1px solid #E2E8F0;
@@ -162,23 +169,23 @@ st.markdown("""
     .badge-feature { background-color: #FEF3C7; color: #D97706; }
     .badge-type { background-color: #EDE9FE; color: #6D28D9; }
     .badge-price { background-color: #ECFDF5; color: #059669; font-weight: 800; }
-    
+
     .wa-btn {
         display: inline-block; background-color: #25D366; color: white !important;
         padding: 10px 16px; border-radius: 8px; font-weight: 700; text-decoration: none;
         font-size: 13px; text-align: center; width: 100%; box-sizing: border-box;
     }
     .wa-btn:hover { background-color: #1EBE5D; text-decoration: none; }
-    
+
     /* Footer */
     .stitch-footer {
-        margin-top: 40px;
-        padding: 20px 0;
-        border-top: 1px solid #E3E2E8;
+        margin-top: 36px;
+        padding-top: 16px;
+        border-top: 1px solid #C5C6D2;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        color: #444650;
+        color: #757682;
         font-size: 13px;
     }
     </style>
@@ -194,7 +201,6 @@ def get_google_workbook():
     sheet_url = "https://docs.google.com/spreadsheets/d/14FCDh1QuLTTobH94d-cJ-DMGCQugnzoblnbFmJvyuDU/edit?gid=0#gid=0"
     return gc.open_by_url(sheet_url)
 
-# Helper to save into Phase-specific Worksheet Tab
 def append_to_phase_sheet(workbook, phase_tab_name, row_data):
     clean_tab_title = str(phase_tab_name).strip() if phase_tab_name else "DHA Phase 1"
     try:
@@ -205,7 +211,7 @@ def append_to_phase_sheet(workbook, phase_tab_name, row_data):
     worksheet.append_row(row_data)
 
 # ------------------------------------------------------------------------------
-# 4. MASTER DHA LAHORE PHASE & BLOCK MAP CATALOG (OFFICIAL MAPS)
+# 4. MASTER DHA LAHORE PHASE & BLOCK MAP CATALOG
 # ------------------------------------------------------------------------------
 DHA_PHASE_BLOCK_CATALOG = {
     "DHA Phase 1": {
@@ -514,21 +520,18 @@ DHA_PHASE_BLOCK_CATALOG = {
 def parse_property_text(text, current_selected_phase, current_selected_block):
     text_upper = text.upper()
     
-    # 1. Category Classification
     category = "Selling"
     if any(w in text_upper for w in ["REQUIRED", "WANTED", "BUYING", "PURCHASE", "NEED", "DEMANDING"]):
         category = "Buying"
     elif any(w in text_upper for w in ["RENT", "TO LET", "TENANT", "LEASE"]):
         category = "Rental"
 
-    # 2. Property Type Classification
     prop_type = "Residential"
     if any(w in text_upper for w in ["COMMERCIAL", "COMM", "SHOP", "PLAZA", "OFFICE", "CCA", "BROADWAY", "OVAL", "BOUTIQUE", "CIVIC", "MARKET"]):
         prop_type = "Commercial"
     elif "COMMERCIAL" in str(current_selected_block).upper() or "BROADWAY" in str(current_selected_block).upper() or "CCA" in str(current_selected_block).upper():
         prop_type = "Commercial"
 
-    # 3. Phase Normalization
     phase = current_selected_phase
     if "PRISM" in text_upper or "PHASE 9 PRISM" in text_upper or "9 PRISM" in text_upper:
         phase = "DHA Phase 9 Prism"
@@ -552,7 +555,6 @@ def parse_property_text(text, current_selected_phase, current_selected_block):
             norm_num = roman_dict.get(num, num)
             phase = f"DHA Phase {norm_num}"
 
-    # 4. Block Detection
     block = current_selected_block if (current_selected_block != "All Blocks" and not current_selected_block.startswith("---")) else "Block A"
     b_match = re.search(r'(?:BLOCK|BLK|SECTOR|SEC)\s*[:.-]?\s*([A-Z0-9-]{1,5})', text_upper)
     if b_match:
@@ -563,7 +565,6 @@ def parse_property_text(text, current_selected_phase, current_selected_block):
         if b_fallback:
             block = f"Block {b_fallback.group(1)}"
 
-    # 5. Size Detection
     size = "1 Kanal"
     s_match = re.search(r'(\d+\.?\d*)\s*(MARLA|KANAL|M|K|SQFT|YARD|SQYD)', text_upper)
     if s_match:
@@ -576,7 +577,6 @@ def parse_property_text(text, current_selected_phase, current_selected_block):
         else:
             size = f"{val} {unit}"
 
-    # 6. Price / Demand Extraction
     demand = "N/A"
     price_match = re.search(r'(?:DEMAND|PRICE|OFFER|BUDGET|RATE)?\s*[:.-]?\s*(\d+\.?\d*)\s*(CRORE|CR|LAC|LACS|LAKH|LAKHS|MILLION|PKR)', text_upper)
     if price_match:
@@ -586,13 +586,11 @@ def parse_property_text(text, current_selected_phase, current_selected_block):
         if direct_num:
             demand = f"{direct_num.group(1)} {direct_num.group(2)}"
 
-    # 7. Contact / Phone Number Extraction
     phone = "N/A"
     phone_match = re.search(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', text)
     if phone_match:
         phone = re.sub(r'[^0-9+]', '', phone_match.group(0))
 
-    # 8. Feature Attributes
     features = []
     if "CORNER" in text_upper: features.append("Corner")
     if "PARK" in text_upper or "FACING PARK" in text_upper: features.append("Park Facing")
@@ -628,54 +626,47 @@ def create_wa_link(row_dict):
     return f"{base_url}?text={urllib.parse.quote(msg)}"
 
 # ==============================================================================
-# 6. AUTHENTICATION & LOGIN SCREEN (STITCH ROYAL BLUE THEME)
+# 6. STITCH ROYAL BLUE LOGIN SCREEN
 # ==============================================================================
 if not st.session_state["authenticated"]:
-    # Stitch Top Header
+    # 1. Clean Top Navbar
     st.markdown("""
-        <div class="stitch-header">
-            <div class="stitch-brand">
-                <span class="material-symbols-outlined" style="font-size:28px; color:#00113A;">dataset</span>
-                <span>DHA Property & Clinical Data Systems</span>
+        <div class="stitch-navbar">
+            <div class="stitch-logo-text">
+                <span class="material-symbols-outlined" style="color:#00113A; font-size:26px;">dataset</span>
+                <span>DHA Clinical Data Systems</span>
             </div>
-            <div style="color: #444650; font-size: 13px; font-weight: 500;">
-                🔒 Secure Portal
+            <div style="color: #757682; font-size: 13px; font-weight: 500;">
+                <span class="material-symbols-outlined" style="vertical-align:middle; font-size:18px; color:#006B5E;">lock</span>
+                Secure Login Portal
             </div>
         </div>
     """, unsafe_allow_html=True)
 
-    st.write("")
-    st.write("")
-
-    # Center Login Box
+    # 2. Centered Login Card
     col_l1, col_center, col_l2 = st.columns([1, 1.3, 1])
     with col_center:
         st.markdown("""
-            <div class="login-card">
-                <div class="login-avatar">
-                    <span class="material-symbols-outlined">shield</span>
+            <div class="stitch-login-box">
+                <div class="stitch-avatar">
+                    <span class="material-symbols-outlined" style="font-size:30px;">medical_information</span>
                 </div>
-                <div class="login-title">Welcome to DHA</div>
-                <div class="login-subtitle">DHA Property & Clinical Data Systems</div>
+                <div class="stitch-title">Welcome to DHA</div>
+                <div class="stitch-subtitle">Clinical & Property Data Systems</div>
             </div>
         """, unsafe_allow_html=True)
 
         with st.form("stitch_login_form"):
-            email_in = st.text_input("WORK EMAIL / USERNAME", placeholder="name@wali-associates.com")
+            email_in = st.text_input("WORK EMAIL ADDRESS", placeholder="name@wali-associates.pk")
             pass_in = st.text_input("PASSWORD", type="password", placeholder="••••••••")
             
             submit_login = st.form_submit_button("SIGN IN →")
             if submit_login:
-                if email_in.strip() != "":
-                    st.session_state["authenticated"] = True
-                    st.session_state["user_email"] = email_in
-                    st.rerun()
-                else:
-                    st.session_state["authenticated"] = True
-                    st.session_state["user_email"] = "authorized.agent@dha.pk"
-                    st.rerun()
+                st.session_state["authenticated"] = True
+                st.session_state["user_email"] = email_in if email_in.strip() else "authorized.agent@dha.pk"
+                st.rerun()
 
-        st.markdown("<div style='text-align:center; margin: 10px 0; color:#757682; font-size:13px;'>or</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center; margin: 12px 0 8px 0; color:#757682; font-size:12px; text-transform:uppercase;'>or</div>", unsafe_allow_html=True)
         
         if st.button("🔑 CONTINUE WITH SINGLE SIGN-ON (SSO)", use_container_width=True):
             st.session_state["authenticated"] = True
@@ -683,16 +674,16 @@ if not st.session_state["authenticated"]:
             st.rerun()
 
         st.markdown("""
-            <div style="text-align: center; margin-top: 24px; padding-top: 14px; border-top: 1px solid #E3E2E8; font-size: 12px; color: #006B5E; font-weight: 600;">
-                <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 16px;">verified_user</span>
+            <div style="text-align: center; margin-top: 24px; padding-top: 14px; border-top: 1px solid #C5C6D2; font-size: 11px; color: #006B5E; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">
+                <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 15px;">verified_user</span>
                 AUTHORIZED SECURE ACCESS SYSTEM
             </div>
         """, unsafe_allow_html=True)
 
-    # Footer
+    # 3. Clean Footer
     st.markdown("""
         <div class="stitch-footer">
-            <div>© 2026 DHA Data Systems & Wali Muhammad Associates. All rights reserved.</div>
+            <div>© 2026 DHA Clinical Data Systems & Wali Muhammad Associates. All rights reserved.</div>
             <div>Privacy Policy &nbsp;•&nbsp; Terms of Service &nbsp;•&nbsp; Contact Support</div>
         </div>
     """, unsafe_allow_html=True)
@@ -701,7 +692,6 @@ if not st.session_state["authenticated"]:
 # 7. MAIN ENGINE DASHBOARD (AFTER LOGIN)
 # ==============================================================================
 else:
-    # Connect Google Workbook
     try:
         workbook = get_google_workbook()
     except Exception as e:
@@ -749,7 +739,6 @@ else:
         phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
         selected_phase = st.selectbox("📍 DHA Phase", phase_options, index=0)
 
-    # Dynamic Block Selector from Catalog
     phase_data = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
     res_blocks = list(phase_data.get("residential", {}).keys())
     comm_blocks = list(phase_data.get("commercial", {}).keys())
@@ -837,19 +826,16 @@ else:
             headers = ["Timestamp", "Source", "Category", "Phase", "Block", "Property Type", "Size", "Demand / Price", "Phone Number", "Features", "Raw Listing Text"]
             df = pd.DataFrame(data[1:], columns=headers[:len(data[1])])
             
-            # Block Filtering
             if clean_filter_block != "All Blocks" and not clean_filter_block.startswith("---"):
                 core_block_letter = re.search(r'Block\s*([A-Z0-9-]+)', clean_filter_block)
                 search_token = core_block_letter.group(0) if core_block_letter else clean_filter_block
                 df = df[df["Block"].str.contains(search_token, case=False, na=False) |
                         df["Raw Listing Text"].str.contains(search_token, case=False, na=False)]
                 
-            # Size Filtering
             if selected_size_filter != "All Sizes":
                 df = df[df["Size"].str.contains(selected_size_filter, case=False, na=False) |
                         df["Raw Listing Text"].str.contains(selected_size_filter, case=False, na=False)]
                 
-            # Search Query Filtering
             if search_query:
                 df = df[df["Raw Listing Text"].str.contains(search_query, case=False, na=False) |
                         df["Features"].str.contains(search_query, case=False, na=False) |
@@ -891,7 +877,6 @@ else:
     except Exception as e:
         st.error(f"Data Load Error: {e}")
 
-    # Dashboard Footer
     st.markdown("""
         <div class="stitch-footer">
             <div>© 2026 DHA Smart Property Engine & Wali Muhammad Associates. All rights reserved.</div>
