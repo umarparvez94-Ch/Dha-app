@@ -191,7 +191,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. 15-COLUMN CRM HEADERS & AUTO TAB BUILDER
+# 3. 15-COLUMN CRM HEADERS & COMPLETE 15-PHASE MASTER DIRECTORY
 # ==============================================================================
 CRM_SHEET_HEADERS = [
     "Date / Timestamp",
@@ -211,24 +211,23 @@ CRM_SHEET_HEADERS = [
     "Raw Listing & Source Material"
 ]
 
-DEFAULT_WORKBOOK_URL = "https://docs.google.com/spreadsheets/d/14FCDh1QuLTTobH94d-cJ-DMGCQugnzoblnbFmJvyuDU/edit"
-
+# Complete 15 Official Real DHA Spreadsheet URLs
 DHA_PHASE_SHEET_URLS = {
-    "DHA Phase 1": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 2": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 3": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 4": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 5": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 6": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 7": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 8 (Proper)": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 8 (Ivy Green / Sector Z)": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 8 (Park View)": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 8 (Air Avenue / Sector AA)": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 9 Prism": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 9 Town": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)": DEFAULT_WORKBOOK_URL,
-    "DHA Phase 12 (EME Sector)": DEFAULT_WORKBOOK_URL
+    "DHA Phase 1": "https://docs.google.com/spreadsheets/d/11Ns7taFjOJ7CNwyGJpGcSh6wgar3RbEWzUA7uR_N6D8/edit",
+    "DHA Phase 2": "https://docs.google.com/spreadsheets/d/1bvmcU_68Oz1LxIjGirSe8p4Y_fUBe75J7UUkAh7wiJc/edit",
+    "DHA Phase 3": "https://docs.google.com/spreadsheets/d/1Y7wznstQRPGPYxgpnBOyVPxdN4V869JvEl6fzX981cE/edit",
+    "DHA Phase 4": "https://docs.google.com/spreadsheets/d/1YuXlKVO1EoenHzYkxiSUE53_gIS_coOrr9XPcfeSPa4/edit",
+    "DHA Phase 5": "https://docs.google.com/spreadsheets/d/1R8OS2MikcqQWRa_MdLa26UjuCb_lmSgoEvKHiNcgS48/edit",
+    "DHA Phase 6": "https://docs.google.com/spreadsheets/d/18pl3cuvmDBL0nLq8n04GCuE7dvrsANY_OYtt7a8Zqn4/edit",
+    "DHA Phase 7": "https://docs.google.com/spreadsheets/d/1y-JgTuIXDODpqfC4cm-6QxQPCND6Wyq-WOOBDYj9Ysc/edit",
+    "DHA Phase 8 (Proper)": "https://docs.google.com/spreadsheets/d/1mHJM1z9g313D90ZpI5toj5l2uBkrPLLlrwW3EIJkBPA/edit",
+    "DHA Phase 8 (Ivy Green / Sector Z)": "https://docs.google.com/spreadsheets/d/12ylbY5ZeVKQzeoAM5GadJfrQbSeWNytStSDCRCY93J8/edit",
+    "DHA Phase 8 (Park View)": "https://docs.google.com/spreadsheets/d/1QjeNBg63AsG-DdgV_3hj_KN3-1VifEAZW_QgFYoR1rg/edit",
+    "DHA Phase 8 (Air Avenue / Sector AA)": "https://docs.google.com/spreadsheets/d/1symBkI9q-KqfBdINU_RIU5JdmvKcmfRvraerVOu73uY/edit",
+    "DHA Phase 9 Prism": "https://docs.google.com/spreadsheets/d/1Sfdn1B482sN0IRc1ae31szAs62g8GQ8EqeISF6h5Pb8/edit",
+    "DHA Phase 9 Town": "https://docs.google.com/spreadsheets/d/1AfidqzYwWWTkouwBkGKosxyK3CzwAyG8AEilS8-Nd0w/edit",
+    "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)": "https://docs.google.com/spreadsheets/d/1bVB4maSRNR_pzcqzVzYKPirePrm_I9Yhu1TqodBPypU/edit",
+    "DHA Phase 12 (EME Sector)": "https://docs.google.com/spreadsheets/d/1Ai07OSySM4pcPV9yRr--fsMpKNPXtD2uwJx285_mPho/edit"
 }
 
 @st.cache_resource
@@ -237,16 +236,13 @@ def get_gspread_client():
     return gspread.service_account_from_dict(creds_dict)
 
 def get_phase_workbook(gc, phase_name):
-    target_url = DHA_PHASE_SHEET_URLS.get(phase_name, DEFAULT_WORKBOOK_URL)
+    target_url = DHA_PHASE_SHEET_URLS.get(phase_name)
     try:
         return gc.open_by_url(target_url)
     except Exception:
-        try:
-            return gc.open(f"{phase_name} Database")
-        except Exception:
-            return gc.open_by_url(DEFAULT_WORKBOOK_URL)
+        return gc.open_by_url(DHA_PHASE_SHEET_URLS["DHA Phase 1"])
 
-# Automatic Provisioning of All Tabs for the Phase
+# Auto-Provision All Tabs & Headers for the Selected Phase
 def auto_provision_phase_tabs(workbook, phase_name):
     phase_info = DHA_PHASE_BLOCK_CATALOG.get(phase_name, {})
     all_blocks = list(phase_info.get("residential", {}).keys()) + list(phase_info.get("commercial", {}).keys())
@@ -374,19 +370,24 @@ DHA_PHASE_BLOCK_CATALOG = {
     },
     "DHA Phase 8 (Proper)": {
         "residential": {
-            "Block A": ["1 Kanal", "2 Kanal"], "Block B": ["1 Kanal", "2 Kanal"], "Block C": ["1 Kanal", "2 Kanal"],
-            "Block D": ["1 Kanal", "2 Kanal"], "Block E": ["1 Kanal", "2 Kanal"], "Block F": ["10 Marla", "1 Kanal"],
-            "Block G": ["10 Marla", "1 Kanal"], "Block H": ["10 Marla", "1 Kanal"], "Block J": ["10 Marla", "1 Kanal"],
-            "Block K": ["10 Marla", "1 Kanal"], "Block L": ["10 Marla", "1 Kanal"], "Block M": ["10 Marla", "1 Kanal"],
-            "Block N": ["10 Marla", "1 Kanal"], "Block P": ["10 Marla", "1 Kanal"], "Block Q": ["10 Marla", "1 Kanal"],
-            "Block R": ["10 Marla", "1 Kanal"], "Block S": ["5 Marla", "10 Marla", "1 Kanal"], "Block T": ["5 Marla", "10 Marla", "1 Kanal"],
-            "Block U": ["5 Marla", "10 Marla", "1 Kanal"], "Block V": ["5 Marla", "10 Marla", "1 Kanal"], "Block W": ["5 Marla", "10 Marla", "1 Kanal"],
-            "Block X": ["5 Marla", "10 Marla", "1 Kanal"], "Block Y": ["5 Marla", "10 Marla", "1 Kanal"]
+            "Block A": ["1 Kanal", "2 Kanal"], "Block B": ["1 Kanal", "2 Kanal"],
+            "Block C": ["1 Kanal", "2 Kanal"], "Block D": ["1 Kanal", "2 Kanal"],
+            "Block E": ["1 Kanal", "2 Kanal"], "Block F": ["10 Marla", "1 Kanal"],
+            "Block G": ["10 Marla", "1 Kanal"], "Block H": ["10 Marla", "1 Kanal"],
+            "Block J": ["10 Marla", "1 Kanal"], "Block K": ["10 Marla", "1 Kanal"],
+            "Block L": ["10 Marla", "1 Kanal"], "Block M": ["10 Marla", "1 Kanal"],
+            "Block N": ["10 Marla", "1 Kanal"], "Block P": ["10 Marla", "1 Kanal"],
+            "Block Q": ["10 Marla", "1 Kanal"], "Block R": ["10 Marla", "1 Kanal"],
+            "Block S": ["5 Marla", "10 Marla", "1 Kanal"], "Block T": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block U": ["5 Marla", "10 Marla", "1 Kanal"], "Block V": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block W": ["5 Marla", "10 Marla", "1 Kanal"], "Block X": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block Y": ["5 Marla", "10 Marla", "1 Kanal"]
         },
         "commercial": {
             "Broadway Commercial": ["4 Marla", "8 Marla"], "Commercial Broadway Sector 1": ["4 Marla", "8 Marla"],
             "Commercial Broadway Sector 2": ["4 Marla", "8 Marla"], "Commercial CCA 1": ["4 Marla", "8 Marla"],
-            "Commercial CCA 2": ["4 Marla", "8 Marla"], "Commercial CCA 3": ["4 Marla", "8 Marla"], "Sector Shops Phase 8": ["2 Marla"]
+            "Commercial CCA 2": ["4 Marla", "8 Marla"], "Commercial CCA 3": ["4 Marla", "8 Marla"],
+            "Sector Shops Phase 8": ["2 Marla"]
         }
     },
     "DHA Phase 8 (Ivy Green / Sector Z)": {
@@ -401,9 +402,11 @@ DHA_PHASE_BLOCK_CATALOG = {
     },
     "DHA Phase 8 (Park View)": {
         "residential": {
-            "Block A": ["1 Kanal", "2 Kanal"], "Block B": ["1 Kanal", "2 Kanal"], "Block C": ["10 Marla", "1 Kanal"],
-            "Block D": ["10 Marla", "1 Kanal"], "Block E": ["10 Marla", "1 Kanal"], "Block F": ["10 Marla", "1 Kanal"],
-            "Block G": ["10 Marla", "1 Kanal"], "Block H": ["10 Marla", "1 Kanal"], "Block J": ["10 Marla", "1 Kanal"], "Block K": ["10 Marla", "1 Kanal"]
+            "Block A": ["1 Kanal", "2 Kanal"], "Block B": ["1 Kanal", "2 Kanal"],
+            "Block C": ["10 Marla", "1 Kanal"], "Block D": ["10 Marla", "1 Kanal"],
+            "Block E": ["10 Marla", "1 Kanal"], "Block F": ["10 Marla", "1 Kanal"],
+            "Block G": ["10 Marla", "1 Kanal"], "Block H": ["10 Marla", "1 Kanal"],
+            "Block J": ["10 Marla", "1 Kanal"], "Block K": ["10 Marla", "1 Kanal"]
         },
         "commercial": {
             "Commercial Zone Park View": ["4 Marla", "8 Marla"], "Sector Shops Park View": ["2 Marla"]
@@ -421,11 +424,14 @@ DHA_PHASE_BLOCK_CATALOG = {
     },
     "DHA Phase 9 Prism": {
         "residential": {
-            "Block A": ["1 Kanal", "2 Kanal"], "Block B": ["1 Kanal", "2 Kanal"], "Block C": ["1 Kanal", "2 Kanal"],
-            "Block D": ["1 Kanal", "2 Kanal"], "Block E": ["1 Kanal"], "Block F": ["1 Kanal"],
-            "Block G": ["1 Kanal"], "Block H": ["1 Kanal"], "Block J": ["10 Marla", "1 Kanal"],
-            "Block K": ["10 Marla", "1 Kanal"], "Block L": ["10 Marla", "1 Kanal"], "Block M": ["10 Marla"],
-            "Block N": ["10 Marla"], "Block P": ["5 Marla"], "Block Q": ["5 Marla"], "Block R": ["5 Marla"]
+            "Block A": ["1 Kanal", "2 Kanal"], "Block B": ["1 Kanal", "2 Kanal"],
+            "Block C": ["1 Kanal", "2 Kanal"], "Block D": ["1 Kanal", "2 Kanal"],
+            "Block E": ["1 Kanal"], "Block F": ["1 Kanal"],
+            "Block G": ["1 Kanal"], "Block H": ["1 Kanal"],
+            "Block J": ["10 Marla", "1 Kanal"], "Block K": ["10 Marla", "1 Kanal"],
+            "Block L": ["10 Marla", "1 Kanal"], "Block M": ["10 Marla"],
+            "Block N": ["10 Marla"], "Block P": ["5 Marla"],
+            "Block Q": ["5 Marla"], "Block R": ["5 Marla"]
         },
         "commercial": {
             "Zone 1 Commercial (Civic Zone)": ["4 Marla", "8 Marla"], "Zone 2 Commercial": ["4 Marla", "8 Marla"],
@@ -436,7 +442,8 @@ DHA_PHASE_BLOCK_CATALOG = {
     "DHA Phase 9 Town": {
         "residential": {
             "Block A": ["5 Marla", "8 Marla"], "Block B": ["5 Marla", "8 Marla"],
-            "Block C": ["5 Marla", "8 Marla", "10 Marla"], "Block D": ["5 Marla", "8 Marla", "10 Marla"], "Block E": ["5 Marla", "8 Marla"]
+            "Block C": ["5 Marla", "8 Marla", "10 Marla"], "Block D": ["5 Marla", "8 Marla", "10 Marla"],
+            "Block E": ["5 Marla", "8 Marla"]
         },
         "commercial": {
             "Commercial CCA Phase 9 Town": ["4 Marla", "8 Marla"], "Sector Shops Phase 9 Town": ["2 Marla"]
@@ -459,7 +466,8 @@ DHA_PHASE_BLOCK_CATALOG = {
             "Block A": ["1 Kanal", "2 Kanal"], "Block B": ["1 Kanal", "2 Kanal"],
             "Block C": ["10 Marla", "1 Kanal"], "Block D": ["10 Marla", "1 Kanal"],
             "Block E": ["10 Marla", "1 Kanal"], "Block F": ["10 Marla", "1 Kanal"],
-            "Block G": ["5 Marla", "10 Marla", "1 Kanal"], "Block H": ["5 Marla", "10 Marla", "1 Kanal"], "Block J": ["5 Marla", "10 Marla"]
+            "Block G": ["5 Marla", "10 Marla", "1 Kanal"], "Block H": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block J": ["5 Marla", "10 Marla"]
         },
         "commercial": {
             "Commercial Civic Centre EME": ["4 Marla", "8 Marla"], "Block D Commercial Market": ["4 Marla", "8 Marla"],
@@ -546,7 +554,7 @@ def parse_property_crm(text, current_selected_phase, current_selected_block):
     if price_match:
         demand = f"{price_match.group(1)} {price_match.group(2)}"
     else:
-        direct_num = re.search(r'(\\d+\\.?\\d*)\\s*(CRORE|CR|LACS|LAKH)', text_upper)
+        direct_num = re.search(r'(\d+\.?\d*)\s*(CRORE|CR|LACS|LAKH)', text_upper)
         if direct_num:
             demand = f"{direct_num.group(1)} {direct_num.group(2)}"
 
