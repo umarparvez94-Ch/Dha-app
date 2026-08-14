@@ -58,6 +58,7 @@ st.markdown("""
     .badge-rental { background-color: #E0F2FE; color: #0284C7; }
     .badge-feature { background-color: #FEF3C7; color: #D97706; }
     .badge-type { background-color: #EDE9FE; color: #6D28D9; }
+    .badge-price { background-color: #ECFDF5; color: #059669; font-weight: 800; }
     
     /* Buttons */
     .stButton>button {
@@ -95,125 +96,440 @@ def append_to_phase_sheet(workbook, phase_tab_name, row_data):
     try:
         worksheet = workbook.worksheet(clean_tab_title)
     except gspread.exceptions.WorksheetNotFound:
-        worksheet = workbook.add_worksheet(title=clean_tab_title, rows=300, cols=10)
-        worksheet.append_row(["Timestamp", "Source", "Category", "Phase", "Block", "Property Type", "Size", "Features", "Raw Listing Text"])
+        worksheet = workbook.add_worksheet(title=clean_tab_title, rows=300, cols=12)
+        worksheet.append_row(["Timestamp", "Source", "Category", "Phase", "Block", "Property Type", "Size", "Demand / Price", "Phone Number", "Features", "Raw Listing Text"])
     worksheet.append_row(row_data)
 
 # Session State for Office Details
 if "office_name" not in st.session_state:
     st.session_state["office_name"] = "Wali Muhammad Associates"
 
-# 4. Standard DHA Phase to Block Mapping Directory (Official Phase 1 Map Structure)
-DHA_PHASE_BLOCKS = {
-    "DHA Phase 1": [
-        "All Blocks",
-        "--- 🏡 Residential Sectors ---",
-        "Block A (Residential)",
-        "Block B (Residential)",
-        "Block C (Residential)",
-        "Block D (Residential)",
-        "Block E (Residential)",
-        "Block J (Residential)",
-        "Block K (Residential)",
-        "Block L (Residential)",
-        "Block M (Residential)",
-        "Block N (Residential)",
-        "Block P (Residential)",
-        "--- 🏢 Commercial Hubs ---",
-        "Block F (Commercial Market)",
-        "Block G (Main Commercial)",
-        "Block H (Commercial & Stadium)",
-        "Block J (Club Commercial)",
-        "Block M (Commercial)",
-        "Sector Shops (Local Commercial)"
-    ],
-    "DHA Phase 2": ["All Blocks", "Block Q (Residential)", "Block R (Residential)", "Block S (Residential)", "Block T (Residential)", "Block U (Residential)", "Block V (Residential)", "Phase 2 Commercial CCA"],
-    "DHA Phase 3": ["All Blocks", "Block W (Residential)", "Block X (Residential)", "Block Y (Residential)", "Block Z (Residential)", "Y Block Commercial (Main Hub)", "Z Block Commercial"],
-    "DHA Phase 4": ["All Blocks", "Block AA (Residential)", "Block BB (Residential)", "Block CC (Residential)", "Block DD (Residential)", "Block EE (Residential)", "Block FF (Residential)", "Block GG (Residential)", "Block JJ (Residential)", "Block KK (Residential)", "Phase 4 CCA Commercial"],
-    "DHA Phase 5": ["All Blocks", "Block A (Residential)", "Block B (Residential)", "Block C (Residential)", "Block D (Residential)", "Block E (Residential)", "Block F (Residential)", "Block G (Residential)", "Block H (Residential)", "Block J (Residential)", "Block K (Residential)", "Block L (Residential)", "Block M (Residential)", "Phase 5 CCA 1", "Phase 5 CCA 2"],
-    "DHA Phase 6": ["All Blocks", "Block A (Residential)", "Block B (Residential)", "Block C (Residential)", "Block D (Residential)", "Block E (Residential)", "Block F (Residential)", "Block G (Residential)", "Block H (Residential)", "Block J (Residential)", "Block K (Residential)", "Block L (Residential)", "Block M (Residential)", "Block N (Residential)", "Main MB Commercial", "CCA 1 Commercial", "CCA 2 Commercial"],
-    "DHA Phase 7": ["All Blocks", "Block P (Residential)", "Block Q (Residential)", "Block R (Residential)", "Block S (Residential)", "Block T (Residential)", "Block U (Residential)", "Block V (Residential)", "Block W (Residential)", "Block X (Residential)", "Block Y (Residential)", "Block Z (Residential)", "Phase 7 CCA Commercial"],
-    "DHA Phase 8": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P", "Block Q", "Block R", "Block S", "Block T", "Block U", "Block V", "Block W", "Block X", "Block Y", "Block Z", "Broadway Commercial", "CCA 1", "CCA 2"],
-    "DHA Phase 9 Prism": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P", "Block Q", "Block R", "Zone 1 Commercial", "Zone 2 Commercial", "Zone 3 Commercial", "Main Oval Commercial"],
-    "DHA Phase 9 Town": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E", "Commercial CCA"],
-    "DHA Phase 10": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E", "Main Commercial"],
-    "DHA Phase 11 (Rahwali)": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Main Commercial"],
-    "DHA Phase 12 (EME)": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Commercial Market"],
-    "DHA Phase 13": ["All Blocks", "Block A", "Block B", "Block C", "Block D", "Block E"]
+# -------------------------------------------------------------
+# 4. MASTER DHA LAHORE PHASE & BLOCK MAP CATALOG (OFFICIAL MAPS)
+# -------------------------------------------------------------
+DHA_PHASE_BLOCK_CATALOG = {
+    "DHA Phase 1": {
+        "residential": {
+            "Block A": ["1 Kanal", "2 Kanal"],
+            "Block B": ["1 Kanal", "2 Kanal"],
+            "Block C": ["1 Kanal"],
+            "Block D": ["10 Marla", "1 Kanal"],
+            "Block E": ["1 Kanal"],
+            "Block J": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block K": ["1 Kanal", "2 Kanal"],
+            "Block L": ["1 Kanal"],
+            "Block M": ["1 Kanal"],
+            "Block N": ["1 Kanal"],
+            "Block P": ["10 Marla", "1 Kanal"]
+        },
+        "commercial": {
+            "Block F (Commercial Market)": ["4 Marla", "7 Marla", "8 Marla"],
+            "Block G (Main Commercial)": ["4 Marla", "8 Marla"],
+            "Block H (Commercial & Stadium)": ["4 Marla", "8 Marla"],
+            "Block J (Club Commercial)": ["4 Marla", "6 Marla"],
+            "Block M (Commercial)": ["4 Marla", "8 Marla"],
+            "Sector Shops (Local Commercial)": ["2 Marla", "3 Marla"]
+        }
+    },
+    "DHA Phase 2": {
+        "residential": {
+            "Block Q": ["1 Kanal", "2 Kanal"],
+            "Block R": ["1 Kanal", "2 Kanal"],
+            "Block S": ["1 Kanal"],
+            "Block T": ["10 Marla", "1 Kanal"],
+            "Block U": ["10 Marla", "1 Kanal"],
+            "Block V": ["1 Kanal", "2 Kanal"]
+        },
+        "commercial": {
+            "Commercial CCA (Central Commercial)": ["4 Marla", "8 Marla"],
+            "Block R Commercial Market": ["4 Marla", "6 Marla"],
+            "Block T Commercial Market": ["4 Marla", "5 Marla"],
+            "Sector Shops Phase 2": ["2 Marla"]
+        }
+    },
+    "DHA Phase 3": {
+        "residential": {
+            "Block W": ["1 Kanal", "2 Kanal"],
+            "Block X": ["1 Kanal", "2 Kanal"],
+            "Block Y": ["10 Marla", "1 Kanal", "2 Kanal"],
+            "Block Z": ["1 Kanal", "2 Kanal"],
+            "Block XX": ["10 Marla", "1 Kanal"]
+        },
+        "commercial": {
+            "Y Block Main Commercial (Central Hub)": ["4 Marla", "8 Marla", "16 Marla"],
+            "Z Block Commercial Market": ["4 Marla", "8 Marla"],
+            "W Block Commercial": ["4 Marla", "6 Marla"],
+            "Sector Shops Phase 3": ["2 Marla"]
+        }
+    },
+    "DHA Phase 4": {
+        "residential": {
+            "Block AA": ["1 Kanal", "2 Kanal"],
+            "Block BB": ["1 Kanal", "2 Kanal"],
+            "Block CC": ["10 Marla", "1 Kanal"],
+            "Block DD": ["1 Kanal"],
+            "Block EE": ["10 Marla", "1 Kanal"],
+            "Block FF": ["10 Marla", "1 Kanal"],
+            "Block GG": ["10 Marla", "1 Kanal"],
+            "Block JJ": ["10 Marla", "1 Kanal"],
+            "Block KK": ["10 Marla", "1 Kanal"]
+        },
+        "commercial": {
+            "CCA 1 Commercial": ["4 Marla", "8 Marla"],
+            "CCA 2 Commercial": ["4 Marla", "8 Marla"],
+            "Block DD Commercial": ["4 Marla", "6 Marla"],
+            "Sector Shops Phase 4": ["2 Marla"]
+        }
+    },
+    "DHA Phase 5": {
+        "residential": {
+            "Block A": ["1 Kanal", "2 Kanal"],
+            "Block B": ["1 Kanal", "2 Kanal"],
+            "Block C": ["10 Marla", "1 Kanal", "2 Kanal"],
+            "Block D": ["10 Marla", "1 Kanal"],
+            "Block E": ["10 Marla", "1 Kanal"],
+            "Block F": ["10 Marla", "1 Kanal"],
+            "Block G": ["10 Marla", "1 Kanal"],
+            "Block H": ["10 Marla", "1 Kanal"],
+            "Block J": ["10 Marla", "1 Kanal"],
+            "Block K": ["10 Marla", "1 Kanal"],
+            "Block L": ["10 Marla", "1 Kanal"],
+            "Block M": ["10 Marla", "1 Kanal"]
+        },
+        "commercial": {
+            "CCA 1 Commercial (Main Market)": ["4 Marla", "8 Marla"],
+            "CCA 2 Commercial (Civic Zone)": ["4 Marla", "8 Marla"],
+            "Sector Shops Phase 5": ["2 Marla"]
+        }
+    },
+    "DHA Phase 6": {
+        "residential": {
+            "Block A": ["1 Kanal", "2 Kanal"],
+            "Block B": ["1 Kanal", "2 Kanal"],
+            "Block C": ["1 Kanal", "2 Kanal"],
+            "Block D": ["10 Marla", "1 Kanal", "2 Kanal"],
+            "Block E": ["1 Kanal"],
+            "Block F": ["1 Kanal"],
+            "Block G": ["10 Marla", "1 Kanal"],
+            "Block H": ["10 Marla", "1 Kanal"],
+            "Block J": ["10 Marla", "1 Kanal"],
+            "Block K": ["10 Marla", "1 Kanal"],
+            "Block L": ["10 Marla", "1 Kanal"],
+            "Block M": ["1 Kanal", "2 Kanal"],
+            "Block N": ["10 Marla", "1 Kanal"]
+        },
+        "commercial": {
+            "Main Boulevard (MB) Commercial": ["4 Marla", "8 Marla", "16 Marla"],
+            "CCA 1 Commercial Hub": ["4 Marla", "8 Marla"],
+            "CCA 2 Commercial Hub": ["4 Marla", "8 Marla"],
+            "Sector Shops Phase 6": ["2 Marla"]
+        }
+    },
+    "DHA Phase 7": {
+        "residential": {
+            "Block P": ["1 Kanal"],
+            "Block Q": ["1 Kanal"],
+            "Block R": ["1 Kanal"],
+            "Block S": ["1 Kanal"],
+            "Block T": ["10 Marla", "1 Kanal"],
+            "Block U": ["10 Marla", "1 Kanal"],
+            "Block V": ["1 Kanal"],
+            "Block W": ["1 Kanal"],
+            "Block X": ["10 Marla", "1 Kanal"],
+            "Block Y": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block Z": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block Z-1": ["5 Marla", "10 Marla"],
+            "Block Z-2": ["5 Marla", "10 Marla"]
+        },
+        "commercial": {
+            "CCA 1 Commercial": ["4 Marla", "8 Marla"],
+            "CCA 2 Commercial": ["4 Marla", "8 Marla"],
+            "CCA 3 Commercial": ["4 Marla", "8 Marla"],
+            "CCA 4 Commercial": ["4 Marla", "8 Marla"],
+            "Sector Y Commercial": ["4 Marla", "8 Marla"],
+            "Sector Shops Phase 7": ["2 Marla"]
+        }
+    },
+    "DHA Phase 8 (Proper)": {
+        "residential": {
+            "Block A": ["1 Kanal", "2 Kanal"],
+            "Block B": ["1 Kanal", "2 Kanal"],
+            "Block C": ["1 Kanal", "2 Kanal"],
+            "Block D": ["1 Kanal", "2 Kanal"],
+            "Block E": ["1 Kanal", "2 Kanal"],
+            "Block F": ["10 Marla", "1 Kanal"],
+            "Block G": ["10 Marla", "1 Kanal"],
+            "Block H": ["10 Marla", "1 Kanal"],
+            "Block J": ["10 Marla", "1 Kanal"],
+            "Block K": ["10 Marla", "1 Kanal"],
+            "Block L": ["10 Marla", "1 Kanal"],
+            "Block M": ["10 Marla", "1 Kanal"],
+            "Block N": ["10 Marla", "1 Kanal"],
+            "Block P": ["10 Marla", "1 Kanal"],
+            "Block Q": ["10 Marla", "1 Kanal"],
+            "Block R": ["10 Marla", "1 Kanal"],
+            "Block S": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block T": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block U": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block V": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block W": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block X": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block Y": ["5 Marla", "10 Marla", "1 Kanal"]
+        },
+        "commercial": {
+            "Broadway Commercial": ["4 Marla", "8 Marla"],
+            "Commercial Broadway Sector 1": ["4 Marla", "8 Marla"],
+            "Commercial Broadway Sector 2": ["4 Marla", "8 Marla"],
+            "Commercial CCA 1": ["4 Marla", "8 Marla"],
+            "Commercial CCA 2": ["4 Marla", "8 Marla"],
+            "Commercial CCA 3": ["4 Marla", "8 Marla"],
+            "Sector Shops Phase 8": ["2 Marla"]
+        }
+    },
+    "DHA Phase 8 (Ivy Green / Sector Z)": {
+        "residential": {
+            "Block Z-1": ["5 Marla", "10 Marla", "1 Kanal", "2 Kanal"],
+            "Block Z-2": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block Z-3": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block Z-4": ["5 Marla", "10 Marla"],
+            "Block Z-5": ["5 Marla", "10 Marla"],
+            "Block Z-6": ["5 Marla", "10 Marla"]
+        },
+        "commercial": {
+            "Commercial CCA Sector Z": ["4 Marla", "8 Marla"],
+            "Sector Shops Sector Z": ["2 Marla"]
+        }
+    },
+    "DHA Phase 8 (Park View)": {
+        "residential": {
+            "Block A": ["1 Kanal", "2 Kanal"],
+            "Block B": ["1 Kanal", "2 Kanal"],
+            "Block C": ["10 Marla", "1 Kanal"],
+            "Block D": ["10 Marla", "1 Kanal"],
+            "Block E": ["10 Marla", "1 Kanal"],
+            "Block F": ["10 Marla", "1 Kanal"],
+            "Block G": ["10 Marla", "1 Kanal"],
+            "Block H": ["10 Marla", "1 Kanal"],
+            "Block J": ["10 Marla", "1 Kanal"],
+            "Block K": ["10 Marla", "1 Kanal"]
+        },
+        "commercial": {
+            "Commercial Zone Park View": ["4 Marla", "8 Marla"],
+            "Sector Shops Park View": ["2 Marla"]
+        }
+    },
+    "DHA Phase 8 (Air Avenue / Sector AA)": {
+        "residential": {
+            "Block L": ["10 Marla", "1 Kanal"],
+            "Block M": ["10 Marla", "1 Kanal"],
+            "Block N": ["10 Marla", "1 Kanal"],
+            "Block P": ["10 Marla", "1 Kanal"],
+            "Block Q": ["10 Marla", "1 Kanal"],
+            "Block R": ["10 Marla", "1 Kanal"]
+        },
+        "commercial": {
+            "Commercial CCA Air Avenue": ["4 Marla", "8 Marla"]
+        }
+    },
+    "DHA Phase 9 Prism": {
+        "residential": {
+            "Block A": ["1 Kanal", "2 Kanal"],
+            "Block B": ["1 Kanal", "2 Kanal"],
+            "Block C": ["1 Kanal", "2 Kanal"],
+            "Block D": ["1 Kanal", "2 Kanal"],
+            "Block E": ["1 Kanal"],
+            "Block F": ["1 Kanal"],
+            "Block G": ["1 Kanal"],
+            "Block H": ["1 Kanal"],
+            "Block J": ["10 Marla", "1 Kanal"],
+            "Block K": ["10 Marla", "1 Kanal"],
+            "Block L": ["10 Marla", "1 Kanal"],
+            "Block M": ["10 Marla"],
+            "Block N": ["10 Marla"],
+            "Block P": ["5 Marla"],
+            "Block Q": ["5 Marla"],
+            "Block R": ["5 Marla"]
+        },
+        "commercial": {
+            "Zone 1 Commercial (Civic Zone)": ["4 Marla", "8 Marla"],
+            "Zone 2 Commercial": ["4 Marla", "8 Marla"],
+            "Zone 3 Commercial": ["4 Marla", "8 Marla"],
+            "Main Oval Commercial": ["4 Marla", "8 Marla", "16 Marla"],
+            "Prism Direct MB Commercial": ["4 Marla", "8 Marla"]
+        }
+    },
+    "DHA Phase 9 Town": {
+        "residential": {
+            "Block A": ["5 Marla", "8 Marla"],
+            "Block B": ["5 Marla", "8 Marla"],
+            "Block C": ["5 Marla", "8 Marla", "10 Marla"],
+            "Block D": ["5 Marla", "8 Marla", "10 Marla"],
+            "Block E": ["5 Marla", "8 Marla"]
+        },
+        "commercial": {
+            "Commercial CCA Phase 9 Town": ["4 Marla", "8 Marla"],
+            "Sector Shops Phase 9 Town": ["2 Marla"]
+        }
+    },
+    "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)": {
+        "residential": {
+            "Sector 1 (Rahbar Phase 1)": ["5 Marla", "8 Marla", "10 Marla", "1 Kanal"],
+            "Sector 2 (Rahbar Phase 2)": ["5 Marla", "8 Marla", "10 Marla", "1 Kanal"],
+            "Sector 2 Extension": ["5 Marla"],
+            "Sector 3 (Rahbar Phase 3)": ["5 Marla"],
+            "Sector 4 (Rahbar Phase 4)": ["5 Marla"],
+            "Sector 5 (Haloki / Defense Road)": ["5 Marla", "10 Marla"]
+        },
+        "commercial": {
+            "Rahbar Main Commercial CCA 1": ["4 Marla", "8 Marla"],
+            "Rahbar Main Commercial CCA 2": ["4 Marla", "8 Marla"],
+            "Rahbar Sector 5 Commercial": ["4 Marla", "8 Marla"],
+            "Rahbar Local Sector Shops": ["2 Marla"]
+        }
+    },
+    "DHA Phase 12 (EME Sector)": {
+        "residential": {
+            "Block A": ["1 Kanal", "2 Kanal"],
+            "Block B": ["1 Kanal", "2 Kanal"],
+            "Block C": ["10 Marla", "1 Kanal"],
+            "Block D": ["10 Marla", "1 Kanal"],
+            "Block E": ["10 Marla", "1 Kanal"],
+            "Block F": ["10 Marla", "1 Kanal"],
+            "Block G": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block H": ["5 Marla", "10 Marla", "1 Kanal"],
+            "Block J": ["5 Marla", "10 Marla"]
+        },
+        "commercial": {
+            "Commercial Civic Centre EME": ["4 Marla", "8 Marla"],
+            "Block D Commercial Market": ["4 Marla", "8 Marla"],
+            "Block H Commercial Market": ["4 Marla", "6 Marla"],
+            "Sector Shops EME": ["2 Marla"]
+        }
+    }
 }
 
-# 5. Smart Extraction & Classification Engine
+# -------------------------------------------------------------
+# 5. ADVANCED MULTIMODAL EXTRACTION ENGINE (WITH MAP KEYWORDS)
+# -------------------------------------------------------------
 def parse_property_text(text, current_selected_phase, current_selected_block):
     text_upper = text.upper()
     
     # 1. Category Classification
     category = "Selling"
-    if any(w in text_upper for w in ["REQUIRED", "WANTED", "BUYING", "PURCHASE", "NEED"]):
+    if any(w in text_upper for w in ["REQUIRED", "WANTED", "BUYING", "PURCHASE", "NEED", "DEMANDING"]):
         category = "Buying"
-    elif any(w in text_upper for w in ["RENT", "TO LET", "TENANT"]):
+    elif any(w in text_upper for w in ["RENT", "TO LET", "TENANT", "LEASE"]):
         category = "Rental"
 
     # 2. Property Type Classification
     prop_type = "Residential"
-    if any(w in text_upper for w in ["COMMERCIAL", "COMM", "SHOP", "PLAZA", "OFFICE", "CCA", "BOUTIQUE", "RESTAURANT", "BANK"]):
+    if any(w in text_upper for w in ["COMMERCIAL", "COMM", "SHOP", "PLAZA", "OFFICE", "CCA", "BROADWAY", "OVAL", "BOUTIQUE", "CIVIC", "MARKET"]):
         prop_type = "Commercial"
-    elif "COMMERCIAL" in str(current_selected_block).upper():
+    elif "COMMERCIAL" in str(current_selected_block).upper() or "BROADWAY" in str(current_selected_block).upper() or "CCA" in str(current_selected_block).upper():
         prop_type = "Commercial"
 
     # 3. Phase Normalization
     phase = current_selected_phase
-    p_match = re.search(r'(?:PHASE|PH|P)[\s:-]*(\d{1,2}|I{1,3}|IV|V|VI|VII|VIII|IX|X)', text_upper)
-    if p_match:
-        val = p_match.group(1)
-        phase = f"DHA Phase {val}"
-    if "PRISM" in text_upper:
+    if "PRISM" in text_upper or "PHASE 9 PRISM" in text_upper or "9 PRISM" in text_upper:
         phase = "DHA Phase 9 Prism"
+    elif "TOWN" in text_upper or "PHASE 9 TOWN" in text_upper:
+        phase = "DHA Phase 9 Town"
+    elif "RAHBAR" in text_upper or "PHASE 11" in text_upper:
+        phase = "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"
+    elif "EME" in text_upper or "PHASE 12" in text_upper:
+        phase = "DHA Phase 12 (EME Sector)"
+    elif "IVY GREEN" in text_upper or "PHASE 8 Z" in text_upper or "SECTOR Z" in text_upper:
+        phase = "DHA Phase 8 (Ivy Green / Sector Z)"
+    elif "PARK VIEW" in text_upper:
+        phase = "DHA Phase 8 (Park View)"
+    elif "AIR AVENUE" in text_upper or "SECTOR AA" in text_upper:
+        phase = "DHA Phase 8 (Air Avenue / Sector AA)"
+    else:
+        p_match = re.search(r'(?:PHASE|PH|P)[\s:-]*(\d{1,2}|I{1,3}|IV|V|VI|VII|VIII|IX|X)', text_upper)
+        if p_match:
+            num = p_match.group(1)
+            roman_dict = {"1":"1","2":"2","3":"3","4":"4","5":"5","6":"6","7":"7","8":"8","9":"9","10":"10","I":"1","II":"2","III":"3","IV":"4","V":"5","VI":"6","VII":"7","VIII":"8","IX":"9","X":"10"}
+            norm_num = roman_dict.get(num, num)
+            phase = f"DHA Phase {norm_num}"
 
     # 4. Block Detection
     block = current_selected_block if (current_selected_block != "All Blocks" and not current_selected_block.startswith("---")) else "Block A"
-    b_match = re.search(r'(?:BLOCK|BLK)\s*[:.-]?\s*([A-Z]{1,2})', text_upper)
+    b_match = re.search(r'(?:BLOCK|BLK|SECTOR|SEC)\s*[:.-]?\s*([A-Z0-9-]{1,5})', text_upper)
     if b_match:
-        block = f"Block {b_match.group(1)}"
+        found_b = b_match.group(1)
+        block = f"Block {found_b}"
     else:
-        b_fallback = re.search(r'\b([A-Z]{1,2})\s*(BLOCK|BLK|CCA)', text_upper)
+        b_fallback = re.search(r'\b([A-Z]{1,2}|CCA|BROADWAY)\s*(BLOCK|BLK|CCA|SECTOR)', text_upper)
         if b_fallback:
             block = f"Block {b_fallback.group(1)}"
 
     # 5. Size Detection
     size = "1 Kanal"
-    s_match = re.search(r'(\d+\.?\d*)\s*(MARLA|KANAL|SQFT|YARD)', text_upper)
+    s_match = re.search(r'(\d+\.?\d*)\s*(MARLA|KANAL|M|K|SQFT|YARD|SQYD)', text_upper)
     if s_match:
-        size = f"{s_match.group(1)} {s_match.group(2)}"
+        val = s_match.group(1)
+        unit = s_match.group(2)
+        if unit in ["K", "KANAL"]:
+            size = f"{val} Kanal"
+        elif unit in ["M", "MARLA"]:
+            size = f"{val} Marla"
+        else:
+            size = f"{val} {unit}"
 
-    # 6. Feature Detection
+    # 6. Price / Demand Extraction
+    demand = "N/A"
+    price_match = re.search(r'(?:DEMAND|PRICE|OFFER|BUDGET|RATE)?\s*[:.-]?\s*(\d+\.?\d*)\s*(CRORE|CR|LAC|LACS|LAKH|LAKHS|MILLION|PKR)', text_upper)
+    if price_match:
+        demand = f"{price_match.group(1)} {price_match.group(2)}"
+    else:
+        direct_num = re.search(r'(\d+\.?\d*)\s*(CRORE|CR|LACS|LAKH)', text_upper)
+        if direct_num:
+            demand = f"{direct_num.group(1)} {direct_num.group(2)}"
+
+    # 7. Contact / Phone Number Extraction
+    phone = "N/A"
+    phone_match = re.search(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', text)
+    if phone_match:
+        phone = re.sub(r'[^0-9+]', '', phone_match.group(0))
+
+    # 8. Feature Attributes (Corner, Park Facing, Road Width)
     features = []
     if "CORNER" in text_upper: features.append("Corner")
     if "PARK" in text_upper or "FACING PARK" in text_upper: features.append("Park Facing")
     if "MAIN" in text_upper or "BOULEVARD" in text_upper or "MB" in text_upper: features.append("Main Boulevard")
     if "EXCESS" in text_upper: features.append("Excess Land")
-    road_match = re.search(r'(\d{2,3})\s*(FT|FEET|ROAD)', text_upper)
+    if "POSSESSION" in text_upper: features.append("Possession")
+    if "DIRECT" in text_upper: features.append("Direct Deal")
+    road_match = re.search(r'(\d{2,3})\s*(FT|FEET|ROAD|WIDE)', text_upper)
     if road_match: features.append(f"{road_match.group(0)} Road")
     feature_str = ", ".join(features) if features else "Standard Layout"
 
-    return category, phase, block, prop_type, size, feature_str
+    return category, phase, block, prop_type, size, demand, phone, feature_str
 
 # WhatsApp Share Link Formatter
 def create_wa_link(row_dict):
+    phone_to_target = row_dict.get('Phone Number', '')
+    clean_target = re.sub(r'\D', '', str(phone_to_target)) if phone_to_target != 'N/A' else ''
+    if clean_target.startswith('03'): clean_target = '92' + clean_target[1:]
+    
     msg = f"""🏢 *{st.session_state['office_name']}*
-📍 *DHA Property Update*
+📍 *DHA Lahore Verified Listing*
 • *Phase:* {row_dict.get('Phase', 'N/A')}
 • *Block:* {row_dict.get('Block', 'N/A')}
 • *Type:* {row_dict.get('Property Type', 'Residential')}
 • *Size:* {row_dict.get('Size', 'N/A')}
 • *Category:* {row_dict.get('Category', 'N/A')}
+• *Demand / Price:* {row_dict.get('Demand / Price', 'N/A')}
 • *Features:* {row_dict.get('Features', 'Standard')}
 📝 *Details:* {row_dict.get('Raw Listing Text', row_dict.get('Raw Listing', ''))}
 ---
-Direct Deal Inquiry"""
-    return f"https://wa.me/?text={urllib.parse.quote(msg)}"
+📞 Direct Contact: {phone_to_target if phone_to_target != 'N/A' else 'Wali Muhammad Associates'}"""
+    
+    base_url = f"https://wa.me/{clean_target}" if clean_target else "https://wa.me/"
+    return f"{base_url}?text={urllib.parse.quote(msg)}"
 
 # -------------------------------------------------------------
-# 6. UI LAYOUT & CONTROLS
+# 6. UI LAYOUT & LOCATION CONTROLS
 # -------------------------------------------------------------
 
 # Top Header Banner
@@ -221,7 +537,7 @@ st.markdown(f"""
     <div class="header-banner">
         <span class="office-badge">📍 {st.session_state['office_name']}</span>
         <h1 class="header-title">🏢 DHA Smart Property Engine</h1>
-        <div class="header-subtitle">Official Map Segregation: Residential & Commercial Inventory Dashboard</div>
+        <div class="header-subtitle">Official Map Segregation: Residential & Commercial Master Ingestion Portal</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -232,67 +548,90 @@ with st.expander("⚙️ Customize Agency Name & Settings"):
         st.session_state["office_name"] = new_office
         st.rerun()
 
-# Supreme Multi-Feature Search Bar
+# Supreme Multi-Feature Global Search Bar
 st.markdown("### 🔍 Supreme Global Property Search")
 search_query = st.text_input(
     "Search anything",
-    placeholder="🔎 e.g. DHA Phase 1 Block G Commercial, Block A Corner 1 Kanal, Main Boulevard, Facing Park...",
+    placeholder="🔎 e.g. 1 Kanal Block M Facing Park, 4 Marla Broadway Commercial, 5 Marla Rahbar 1, 10 Marla Prism...",
     label_visibility="collapsed"
 )
 
 st.markdown("---")
 
-# Cascading Phase & Block Selection Controls
-col_city, col_phase, col_block = st.columns([1.2, 1.8, 1.8])
+# Cascading Phase, Sector & Size Selection Controls
+col_city, col_phase, col_block, col_size = st.columns([1.1, 1.8, 1.8, 1.3])
 with col_city:
     selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Gujranwala", "Multan", "Bahawalpur", "Quetta", "Peshawar"])
 with col_phase:
-    selected_phase = st.selectbox("📍 DHA Phase", list(DHA_PHASE_BLOCKS.keys()), index=0)
+    phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
+    selected_phase = st.selectbox("📍 DHA Phase", phase_options, index=0)
+
+# Build block options dynamically for this Phase from Catalog
+phase_data = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
+res_blocks = list(phase_data.get("residential", {}).keys())
+comm_blocks = list(phase_data.get("commercial", {}).keys())
+
+dynamic_block_list = ["All Blocks"]
+if res_blocks:
+    dynamic_block_list.append("--- 🏡 Residential Sectors ---")
+    dynamic_block_list.extend([f"{b} (Residential)" for b in res_blocks])
+if comm_blocks:
+    dynamic_block_list.append("--- 🏢 Commercial Hubs ---")
+    dynamic_block_list.extend(comm_blocks)
+
 with col_block:
-    available_blocks = DHA_PHASE_BLOCKS.get(selected_phase, ["All Blocks", "Block A (Residential)"])
-    selected_block = st.selectbox(f"🧱 Block List ({selected_phase})", available_blocks)
+    selected_block = st.selectbox(f"🧱 Block List ({selected_phase})", dynamic_block_list)
+
+clean_filter_block = selected_block.replace("---", "").strip()
+
+# Dynamic sizes available for selected phase/block
+with col_size:
+    selected_size_filter = st.selectbox("📐 Size Filter", ["All Sizes", "5 Marla", "8 Marla", "10 Marla", "1 Kanal", "2 Kanal", "4 Marla", "8 Marla", "16 Marla"])
 
 st.markdown("---")
 
-# Clean filter block string
-clean_filter_block = selected_block.replace("---", "").strip()
-
-# 7. MULTIMODAL DATA INGESTION PANEL
+# 7. MULTIMODAL DATA INGESTION PANEL (TEXT / CAMERA / OCR)
 st.subheader(f"📥 Add Property Listing ({selected_phase})")
 tab_text, tab_camera = st.tabs(["📝 Text & File Ingestion", "📸 Live Camera Scanner"])
 
 with tab_text:
     c_in1, c_in2 = st.columns([2, 1])
     with c_in1:
-        source = st.selectbox("📌 Data Source", ["WhatsApp Group", "Newspaper Classified", "Direct Client", "Facebook"])
+        source = st.selectbox("📌 Data Source", ["WhatsApp Group", "Newspaper Classified", "Direct Client", "Facebook", "Call Log"])
         placeholder_blk = clean_filter_block if clean_filter_block != "All Blocks" else "Block A"
-        raw_text = st.text_area("📋 Paste Raw Listing Text", height=135, placeholder=f"Example: {selected_phase} {placeholder_blk} 1 Kanal plot for sale demand 4.50 crore...")
-        up_file = st.file_uploader("Or Upload .txt File", type=["txt"])
+        raw_text = st.text_area(
+            "📋 Paste Raw Property Text / Image OCR Output",
+            height=140,
+            placeholder=f"Example: {selected_phase} {placeholder_blk} 1 Kanal Corner Facing Park plot for sale demand 4.50 crore direct dealer 03209498044..."
+        )
+        up_file = st.file_uploader("Or Upload .txt / Picture OCR File", type=["txt"])
         if up_file: raw_text = str(up_file.read(), "utf-8")
         
     with c_in2:
         st.markdown("#### ⚡ Real-Time Auto Extraction")
         if raw_text.strip():
-            cat, ph, blk, p_type, sz, feat = parse_property_text(raw_text, selected_phase, clean_filter_block)
+            cat, ph, blk, p_type, sz, dem, phn, feat = parse_property_text(raw_text, selected_phase, clean_filter_block)
             st.write(f"**Target Sheet:** `{ph}`")
             st.write(f"**Category:** `{cat}`")
-            st.write(f"**Block:** `{blk}`")
-            st.write(f"**Property Type:** `{p_type}`")
+            st.write(f"**Block & Type:** `{blk}` ({p_type})")
             st.write(f"**Size:** `{sz}`")
+            st.write(f"**Demand / Price:** `{dem}`")
+            st.write(f"**Phone Number:** `{phn}`")
             st.write(f"**Features:** `{feat}`")
         else:
-            st.info(f"Select block & enter listing for {selected_phase}...")
+            st.info(f"Paste or scan any listing to preview auto-extracted details...")
 
     if st.button(f"💾 Save Listing to [{selected_phase}] Sheet", use_container_width=True):
         if raw_text.strip():
             try:
-                cat, ph, blk, p_type, sz, feat = parse_property_text(raw_text, selected_phase, clean_filter_block)
+                cat, ph, blk, p_type, sz, dem, phn, feat = parse_property_text(raw_text, selected_phase, clean_filter_block)
                 now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                 
-                row_payload = [now_str, source, cat, ph, blk, p_type, sz, feat, raw_text]
+                # Append full payload to phase sheet
+                row_payload = [now_str, source, cat, ph, blk, p_type, sz, dem, phn, feat, raw_text]
                 append_to_phase_sheet(workbook, ph, row_payload)
                 
-                st.success(f"✅ Saved into Google Sheet Tab: **[{ph}]** under **[{blk}]** ({p_type})!")
+                st.success(f"✅ Saved into Google Sheet Tab: **[{ph}]** under **[{blk}]** ({p_type}) | Demand: {dem}!")
                 st.balloons()
             except Exception as e:
                 st.error(f"Save Error: {e}")
@@ -314,21 +653,27 @@ try:
         data = []
 
     if len(data) > 1:
-        headers = ["Timestamp", "Source", "Category", "Phase", "Block", "Property Type", "Size", "Features", "Raw Listing Text"]
+        headers = ["Timestamp", "Source", "Category", "Phase", "Block", "Property Type", "Size", "Demand / Price", "Phone Number", "Features", "Raw Listing Text"]
         df = pd.DataFrame(data[1:], columns=headers[:len(data[1])])
         
-        # Dynamic Block & Property Type Filtering
+        # Dynamic Block Filtering
         if clean_filter_block != "All Blocks" and not clean_filter_block.startswith("---"):
-            core_block_letter = re.search(r'Block\s*([A-Z0-9]+)', clean_filter_block)
+            core_block_letter = re.search(r'Block\s*([A-Z0-9-]+)', clean_filter_block)
             search_token = core_block_letter.group(0) if core_block_letter else clean_filter_block
             df = df[df["Block"].str.contains(search_token, case=False, na=False) |
                     df["Raw Listing Text"].str.contains(search_token, case=False, na=False)]
+            
+        # Size Filtering
+        if selected_size_filter != "All Sizes":
+            df = df[df["Size"].str.contains(selected_size_filter, case=False, na=False) |
+                    df["Raw Listing Text"].str.contains(selected_size_filter, case=False, na=False)]
             
         # Global Search Filtering
         if search_query:
             df = df[df["Raw Listing Text"].str.contains(search_query, case=False, na=False) |
                     df["Features"].str.contains(search_query, case=False, na=False) |
-                    df["Block"].str.contains(search_query, case=False, na=False)]
+                    df["Block"].str.contains(search_query, case=False, na=False) |
+                    df["Demand / Price"].str.contains(search_query, case=False, na=False)]
 
         ts, tb, tr = st.tabs(["🔴 Available Inventory (Selling)", "🟢 Buyer Requirements (Buying)", "🔵 Rental & Leases"])
         
@@ -341,14 +686,17 @@ try:
                 c1, c2 = st.columns([4, 1.2])
                 with c1:
                     p_type_val = r.get('Property Type', 'Residential')
+                    dem_val = r.get('Demand / Price', 'N/A')
+                    phn_val = r.get('Phone Number', 'N/A')
                     st.markdown(f"""
                         <div class="property-card">
                             <span class="badge {badge_c}">{r.get('Category', '')}</span>
                             <span class="badge badge-type">{p_type_val}</span>
+                            <span class="badge badge-price">💰 {dem_val}</span>
                             <span class="badge badge-feature">{r.get('Features', '')}</span>
                             <b>{r.get('Phase', '')} {r.get('Block', '')} — {r.get('Size', '')}</b>
                             <p style="margin: 6px 0 0 0; color:#475569; font-size:14px;">{r.get('Raw Listing Text', '')}</p>
-                            <small style="color:#94A3B8;">Source: {r.get('Source', '')} | Added: {r.get('Timestamp', '')}</small>
+                            <small style="color:#94A3B8;">Source: {r.get('Source', '')} | Phone: {phn_val} | Added: {r.get('Timestamp', '')}</small>
                         </div>
                     """, unsafe_allow_html=True)
                 with c2:
@@ -360,4 +708,4 @@ try:
     else:
         st.info(f"Google Sheet tab **[{selected_phase}]** is active and connected. Add your first listing above to view records!")
 except Exception as e:
-    st.error(f"Load Error: {e}")
+    st.error(f"Data Load Error: {e}")
