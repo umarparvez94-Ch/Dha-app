@@ -13,37 +13,142 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Custom Stitch CSS
+# 2. Custom Stitch CSS — Light Blue & White Theme
 st.markdown("""
     <style>
-    .stApp { background-color: #F8FAFC; font-family: 'Inter', sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    .stApp {
+        background-color: #F0F7FF;
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* ── Header Banner ── */
     .header-banner {
-        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-        padding: 22px 26px; border-radius: 16px; color: white; margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        background: linear-gradient(135deg, #1E88E5 0%, #42A5F5 50%, #90CAF9 100%);
+        padding: 26px 30px;
+        border-radius: 18px;
+        color: white;
+        margin-bottom: 24px;
+        box-shadow: 0 6px 24px rgba(30, 136, 229, 0.25);
+        position: relative;
+        overflow: hidden;
     }
-    .header-title { font-size: 26px; font-weight: 800; margin: 0; color: #F8FAFC; }
+    .header-banner::before {
+        content: '';
+        position: absolute;
+        top: -40%;
+        right: -10%;
+        width: 260px;
+        height: 260px;
+        background: rgba(255,255,255,0.08);
+        border-radius: 50%;
+    }
+    .header-title {
+        font-size: 28px;
+        font-weight: 800;
+        margin: 0;
+        color: #FFFFFF;
+        letter-spacing: -0.3px;
+    }
     .office-badge {
-        background-color: #10B981; color: white; padding: 5px 14px;
-        border-radius: 20px; font-size: 13px; font-weight: 600; float: right;
+        background-color: rgba(255,255,255,0.22);
+        backdrop-filter: blur(6px);
+        color: white;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        float: right;
+        border: 1px solid rgba(255,255,255,0.3);
     }
+
+    /* ── Property Cards ── */
     .property-card {
-        background: white; border: 1px solid #E2E8F0; border-radius: 12px;
-        padding: 16px; margin-bottom: 12px;
+        background: #FFFFFF;
+        border: 1px solid #DBEAFE;
+        border-radius: 14px;
+        padding: 18px 20px;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 8px rgba(30, 136, 229, 0.06);
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
     }
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; margin-right: 6px; }
+    .property-card:hover {
+        box-shadow: 0 6px 20px rgba(30, 136, 229, 0.12);
+        transform: translateY(-1px);
+    }
+
+    /* ── Badges ── */
+    .badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        margin-right: 6px;
+        letter-spacing: 0.2px;
+    }
     .badge-selling { background-color: #FEE2E2; color: #DC2626; }
-    .badge-buying { background-color: #DCFCE7; color: #16A34A; }
-    .badge-rental { background-color: #E0F2FE; color: #0284C7; }
-    .badge-feature { background-color: #FEF3C7; color: #D97706; }
+    .badge-buying  { background-color: #DCFCE7; color: #16A34A; }
+    .badge-rental  { background-color: #DBEAFE; color: #1E88E5; }
+    .badge-feature { background-color: #FFF8E1; color: #F59E0B; }
+
+    /* ── Buttons ── */
     .stButton>button {
-        background: #059669 !important; color: white !important;
-        border-radius: 8px !important; font-weight: 600 !important; border: none !important;
+        background: linear-gradient(135deg, #1E88E5, #42A5F5) !important;
+        color: white !important;
+        border-radius: 10px !important;
+        font-weight: 700 !important;
+        border: none !important;
+        padding: 10px 20px !important;
+        box-shadow: 0 3px 10px rgba(30, 136, 229, 0.2) !important;
+        transition: all 0.2s ease !important;
     }
+    .stButton>button:hover {
+        box-shadow: 0 6px 18px rgba(30, 136, 229, 0.35) !important;
+        transform: translateY(-1px) !important;
+    }
+
+    /* ── WhatsApp Button ── */
     .wa-btn {
-        display: inline-block; background-color: #25D366; color: white !important;
-        padding: 8px 14px; border-radius: 8px; font-weight: 700; text-decoration: none;
-        font-size: 13px; text-align: center; width: 100%; box-sizing: border-box;
+        display: inline-block;
+        background: linear-gradient(135deg, #25D366, #20BD5A);
+        color: white !important;
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-weight: 700;
+        text-decoration: none;
+        font-size: 13px;
+        text-align: center;
+        width: 100%;
+        box-sizing: border-box;
+        box-shadow: 0 3px 10px rgba(37, 211, 102, 0.2);
+        transition: all 0.2s ease;
+    }
+    .wa-btn:hover {
+        box-shadow: 0 6px 18px rgba(37, 211, 102, 0.35);
+        transform: translateY(-1px);
+    }
+
+    /* ── Streamlit Overrides ── */
+    .stSelectbox label, .stTextInput label, .stTextArea label {
+        color: #1565C0 !important;
+        font-weight: 600 !important;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px 8px 0 0;
+        font-weight: 600;
+    }
+    div[data-testid="stExpander"] {
+        border: 1px solid #DBEAFE;
+        border-radius: 12px;
+        background: #FFFFFF;
+    }
+    hr {
+        border-color: #DBEAFE !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -132,7 +237,7 @@ st.markdown(f"""
     <div class="header-banner">
         <span class="office-badge">📍 {st.session_state['office_name']}</span>
         <h1 class="header-title">🏢 DHA Smart Property Engine</h1>
-        <div style="color: #94A3B8; font-size: 13px; margin-top: 4px;">Standardized DHA Phases & Block-Wise Ingestion Engine</div>
+        <div style="color: rgba(255,255,255,0.75); font-size: 13px; margin-top: 4px;">Standardized DHA Phases &amp; Block-Wise Ingestion Engine</div>
     </div>
 """, unsafe_allow_html=True)
 
