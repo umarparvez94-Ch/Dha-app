@@ -3,8 +3,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 import re
 import pandas as pd
+import os
+import json
+import urllib.parse
 from datetime import datetime
-<<<<<<< HEAD
 import io
 from PIL import Image
 
@@ -13,18 +15,11 @@ from PIL import Image
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="DHA Smart Property Engine | PropSync DHA",
-=======
-
-# 1. Page Configuration (Stitch UI Theme)
-st.set_page_config(
-    page_title="DHA Smart Property Engine",
->>>>>>> 1b0e929df7b746e0e01463b63fd35351777e7f6f
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-<<<<<<< HEAD
 LOCAL_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 LOCAL_CSV_PATH = os.path.join(LOCAL_DATA_DIR, "properties.csv")
 SECRETS_DIR = os.path.join(os.path.dirname(__file__), ".streamlit")
@@ -40,6 +35,24 @@ CSV_COLUMNS = [
     "Price", "Phone", "Agency", "Raw Listing Text"
 ]
 
+# Standardized DHA Phase Master List
+DHA_PHASES = [
+    "DHA Phase 1",
+    "DHA Phase 2",
+    "DHA Phase 3",
+    "DHA Phase 4",
+    "DHA Phase 5",
+    "DHA Phase 6",
+    "DHA Phase 7",
+    "DHA Phase 8",
+    "DHA Phase 9 Prism",
+    "DHA Phase 9 Town",
+    "DHA Phase 10",
+    "DHA Phase 11 (Rahwali)",
+    "DHA Phase 12 (EME)",
+    "DHA Phase 13"
+]
+
 # ---------------------------------------------------------
 # 2. Session State Initialization
 # ---------------------------------------------------------
@@ -50,7 +63,7 @@ if "agency_phone" not in st.session_state:
 if "selected_city" not in st.session_state:
     st.session_state["selected_city"] = "Lahore"
 if "active_phase" not in st.session_state:
-    st.session_state["active_phase"] = "Phase 6"
+    st.session_state["active_phase"] = "DHA Phase 6"
 
 # ---------------------------------------------------------
 # 3. Google Stitch UI Design Tokens & Styling CSS
@@ -156,19 +169,19 @@ st.markdown("""
         font-weight: 600;
         margin: 3px 4px 3px 0;
     }
-    .badge-cat-selling { background-color: #DCFCE7; color: #15803D; border: 1px solid #BBF7D0; }
-    .badge-cat-buying { background-color: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; }
-    .badge-cat-rental { background-color: #F3E8FF; color: #7E22CE; border: 1px solid #E9D5FF; }
-    .badge-phase { background-color: #E0F2FE; color: #0369A1; border: 1px solid #BAE6FD; }
-    .badge-block { background-color: #EDE9FE; color: #6D28D9; border: 1px solid #DDD6FE; }
-    .badge-type { background-color: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
-    .badge-size { background-color: #F1F5F9; color: #334155; border: 1px solid #E2E8F0; }
-    .badge-road { background-color: #FEF9C3; color: #854D0E; border: 1px solid #FEF08A; }
-    .badge-price { background-color: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; font-weight: 700; }
-    .badge-phone { background-color: #E0F2FE; color: #0284C7; border: 1px solid #BAE6FD; }
+    .badge-cat-buying { background-color: #FEF3C7; color: #B45309; }
+    .badge-cat-selling { background-color: #DCFCE7; color: #15803D; }
+    .badge-cat-rental { background-color: #F3E8FF; color: #7E22CE; }
+    .badge-phase { background-color: #E0F2FE; color: #0369A1; font-weight: 700; }
+    .badge-block { background-color: #EDE9FE; color: #6D28D9; }
+    .badge-type { background-color: #FEE2E2; color: #B91C1C; }
+    .badge-size { background-color: #F1F5F9; color: #334155; }
+    .badge-road { background-color: #FEF9C3; color: #854D0E; }
+    .badge-price { background-color: #ECFDF5; color: #047857; font-weight: 800; font-size: 13.5px; }
+    .badge-phone { background-color: #E0F2FE; color: #0284C7; }
     .badge-tag { background-color: #F8FAFC; color: #475569; border: 1px solid #CBD5E1; }
     
-    /* Action Buttons */
+    /* WhatsApp Action Button */
     .wa-btn {
         display: inline-flex;
         align-items: center;
@@ -191,26 +204,6 @@ st.markdown("""
         box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
     }
     
-    /* Phase Bar Pills */
-    .phase-pill {
-        display: inline-block;
-        padding: 8px 16px;
-        border-radius: 10px;
-        font-size: 13px;
-        font-weight: 600;
-        background: #FFFFFF;
-        border: 1px solid #CBD5E1;
-        color: #334155;
-        cursor: pointer;
-        margin: 2px;
-        transition: all 0.15s ease;
-    }
-    .phase-pill:hover {
-        border-color: #0EA5E9;
-        color: #0284C7;
-        background: #F0F9FF;
-    }
-    
     /* Streamlit widget tweaks */
     div.stButton > button {
         border-radius: 10px !important;
@@ -225,31 +218,10 @@ st.markdown("""
         border-radius: 10px 10px 0px 0px;
         font-weight: 600;
         padding: 0 20px;
-=======
-# Custom Styling
-st.markdown("""
-    <style>
-    .stApp { background-color: #F8FAFC; font-family: 'Inter', sans-serif; }
-    .header-banner {
-        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-        padding: 20px 24px; border-radius: 16px; color: white; margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
     }
-    .header-title { font-size: 26px; font-weight: 700; margin: 0; color: #F8FAFC; }
-    .office-badge {
-        background-color: #10B981; color: white; padding: 4px 12px;
-        border-radius: 20px; font-size: 13px; font-weight: 600; float: right;
-    }
-    .stButton>button {
-        background: #059669 !important; color: white !important;
-        border-radius: 8px !important; font-weight: 600 !important; border: none !important;
->>>>>>> 1b0e929df7b746e0e01463b63fd35351777e7f6f
-    }
-    .stButton>button:hover { background: #047857 !important; }
     </style>
 """, unsafe_allow_html=True)
 
-<<<<<<< HEAD
 # ---------------------------------------------------------
 # 4. Google Sheets Backend & Dynamic Block Routing
 # ---------------------------------------------------------
@@ -297,7 +269,7 @@ def save_local_data(df):
 def route_and_save_to_google_sheet(spreadsheet_obj, row_data, phase, block):
     """
     Dynamic Block Routing:
-    1. Determines target block tab name (e.g., 'Phase 6 - Block M' or 'Block M').
+    1. Determines target block tab name (e.g., 'DHA Phase 6 - Block M').
     2. Auto-creates worksheet if missing and injects standardized column headers.
     3. Appends structured row to the block worksheet tab.
     4. Also appends row to 'Master_Inventory' tab for unified search.
@@ -308,7 +280,7 @@ def route_and_save_to_google_sheet(spreadsheet_obj, row_data, phase, block):
     try:
         # Determine tab name
         clean_block = block.strip() if block and block != "N/A" else "General"
-        clean_phase = phase.strip() if phase and phase != "N/A" else "Phase General"
+        clean_phase = phase.strip() if phase and phase != "N/A" else "DHA Phase 6"
         target_tab_title = f"{clean_phase} - {clean_block}"[:30]
         
         existing_sheets = [ws.title for ws in spreadsheet_obj.worksheets()]
@@ -369,7 +341,7 @@ def save_property_entry(source, cat, p_type, city, phase, block, size, road_widt
     return True, sheet_synced, sync_msg
 
 # ---------------------------------------------------------
-# 5. Smart Regex Parser Engine v3.0
+# 5. Smart Regex Parser Engine v3.0 (Standardized DHA Formats)
 # ---------------------------------------------------------
 def parse_property_text(text):
     text_clean = text.strip()
@@ -414,25 +386,45 @@ def parse_property_text(text):
     elif "PESHAWAR" in text_upper:
         city = "Peshawar"
 
-    # --- D. Phase Detection ---
-    phase = "Phase 6"
-    if "PRISM" in text_upper or "PHASE 9 PRISM" in text_upper or "9 PRISM" in text_upper:
-        phase = "Phase 9 Prism"
-    elif "9 TOWN" in text_upper or "PHASE 9 TOWN" in text_upper:
-        phase = "Phase 9 Town"
-    elif "RAHBAR" in text_upper or "PHASE 11" in text_upper:
-        phase = "DHA Rahbar (Ph 11)"
-    elif "EME" in text_upper or "PHASE 12" in text_upper:
-        phase = "DHA EME (Ph 12)"
-    elif "RAHWALI" in text_upper:
-        phase = "DHA Rahwali"
+    # --- D. Phase Detection (Explicit Standard DHA Naming Format) ---
+    phase = "DHA Phase 6"
+    
+    # Priority multi-word & specific phases
+    if any(k in text_upper for k in ["9 PRISM", "PRISM", "PHASE 9 PRISM", "PH 9 PRISM", "P9 PRISM", "DHA 9 PRISM", "DHA PHASE 9 PRISM"]):
+        phase = "DHA Phase 9 Prism"
+    elif any(k in text_upper for k in ["9 TOWN", "PHASE 9 TOWN", "PH 9 TOWN", "P9 TOWN", "DHA 9 TOWN", "DHA PHASE 9 TOWN"]):
+        phase = "DHA Phase 9 Town"
+    elif any(k in text_upper for k in ["RAHWALI", "PHASE 11 (RAHWALI)", "PHASE 11 RAHWALI", "PH 11 RAHWALI", "PHASE 11", "PH 11", "P11", "P-11", "PH-11", "DHA 11", "RAHBAR"]):
+        phase = "DHA Phase 11 (Rahwali)"
+    elif any(k in text_upper for k in ["EME", "PHASE 12 (EME)", "PHASE 12 EME", "PH 12 EME", "PHASE 12", "PH 12", "P12", "P-12", "PH-12", "DHA 12"]):
+        phase = "DHA Phase 12 (EME)"
+    elif any(k in text_upper for k in ["PHASE 13", "PH 13", "P13", "P-13", "PH-13", "DHA 13", "DHA CITY"]):
+        phase = "DHA Phase 13"
+    elif any(k in text_upper for k in ["PHASE 10", "PH 10", "P10", "P-10", "PH-10", "DHA 10"]):
+        phase = "DHA Phase 10"
     else:
-        phase_pattern = re.search(r'(?:PHASE|PH|P)[\s:-]*(\d{1,2}|I{1,3}|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII)\b', text_upper)
+        # Matches patterns like "DHA Phase 6", "Phase 6", "Ph 6", "P6", "Ph-6", "Phase-6", "Phase VI", "P-6"
+        phase_pattern = re.search(r'(?:DHA\s*)?(?:PHASE|PH|P)[\s:-]*(\d{1,2}|I{1,3}|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII)\b', text_upper)
         if phase_pattern:
             p_val = phase_pattern.group(1)
-            roman_map = {"I": "1", "II": "2", "III": "3", "IV": "4", "V": "5", "VI": "6", "VII": "7", "VIII": "8", "IX": "9", "X": "10", "XI": "11", "XII": "12", "XIII": "13"}
-            p_clean = roman_map.get(p_val, p_val)
-            phase = f"Phase {p_clean}"
+            roman_map = {
+                "I": "1", "II": "2", "III": "3", "IV": "4", "V": "5",
+                "VI": "6", "VII": "7", "VIII": "8", "IX": "9", "X": "10",
+                "XI": "11", "XII": "12", "XIII": "13"
+            }
+            num = roman_map.get(p_val, p_val)
+            if num == "9":
+                phase = "DHA Phase 9 Prism" if "PRISM" in text_upper else ("DHA Phase 9 Town" if "TOWN" in text_upper else "DHA Phase 9 Prism")
+            elif num == "10":
+                phase = "DHA Phase 10"
+            elif num == "11":
+                phase = "DHA Phase 11 (Rahwali)"
+            elif num == "12":
+                phase = "DHA Phase 12 (EME)"
+            elif num == "13":
+                phase = "DHA Phase 13"
+            elif num in [str(i) for i in range(1, 9)]:
+                phase = f"DHA Phase {num}"
 
     # --- E. Block Detection ---
     block = "Block A"
@@ -449,66 +441,11 @@ def parse_property_text(text):
         block = "CCA"
     elif "COMMERCIAL BROADWAY" in text_upper or "BROADWAY" in text_upper:
         block = "Commercial Broadway"
-=======
-# 2. Google Workbook Connection
-@st.cache_resource
-def get_google_workbook():
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    gc = gspread.service_account_from_dict(creds_dict)
-    sheet_url = "https://docs.google.com/spreadsheets/d/14FCDh1QuLTTobH94d-cJ-DMGCQugnzoblnbFmJvyuDU/edit?gid=0#gid=0"
-    return gc.open_by_url(sheet_url)
-
-try:
-    workbook = get_google_workbook()
-except Exception as e:
-    st.error(f"Google Sheet Connection Failed: {e}")
-    st.stop()
-
-# Helper function to append row to specific block tab
-def append_to_block_sheet(workbook, block_name, row_data):
-    # Sanitize sheet title (max 100 chars, clean string)
-    tab_title = str(block_name).strip() if block_name and block_name != "N/A" else "General_Entries"
-    
-    try:
-        # Try fetching existing worksheet by block name
-        worksheet = workbook.worksheet(tab_title)
-    except gspread.exceptions.WorksheetNotFound:
-        # Create a new tab for this block if it doesn't exist
-        worksheet = workbook.add_worksheet(title=tab_title, rows=100, cols=10)
-        # Add Header row to the new sheet
-        worksheet.append_row(["Timestamp", "Source", "Category", "Phase", "Block", "Size", "Features", "Raw Listing Text"])
-        
-    worksheet.append_row(row_data)
-
-# Session State
-if "office_name" not in st.session_state:
-    st.session_state["office_name"] = "Wali Muhammad Associates"
-
-# 3. Smart Extraction Engine
-def parse_property_text(text):
-    text_upper = text.upper()
-    category = "Selling"
-    if any(w in text_upper for w in ["REQUIRED", "WANTED", "BUYING", "PURCHASE", "NEED"]):
-        category = "Buying"
-    elif any(w in text_upper for w in ["RENT", "TO LET", "TENANT"]):
-        category = "Rental"
-
-    phase = "N/A"
-    p_match = re.search(r'(PHASE|PH|P)[\s:-]*(\d{1,2}|I{1,3}|IV|V|VI|VII|VIII|IX|X)', text_upper)
-    if p_match:
-        phase = f"Phase {p_match.group(2)}"
-
-    block = "N/A"
-    b_match = re.search(r'(?:BLOCK|BLK)\s*[:.-]?\s*([A-Z]{1,2})', text_upper)
-    if b_match:
-        block = f"Block {b_match.group(1)}"
->>>>>>> 1b0e929df7b746e0e01463b63fd35351777e7f6f
     else:
-        b_fallback = re.search(r'\b([A-Z]{1,2})\s*(BLOCK|BLK|CCA)', text_upper)
+        b_fallback = re.search(r'\b([A-Z]{1,2})\s*(?:BLOCK|BLK)\b', text_upper)
         if b_fallback:
             block = f"Block {b_fallback.group(1)}"
 
-<<<<<<< HEAD
     # --- F. Size Detection ---
     size = "1 Kanal"
     size_match = re.search(r'(\d+(?:\.\d+)?)\s*(MARLA|KANAL|SQFT|SQ FT|SQFT\.|SQ YARD|SQ\. YARDS?|YARDS?|ACRE)', text_upper)
@@ -596,7 +533,6 @@ def parse_property_text(text):
 # ---------------------------------------------------------
 all_properties_df = load_local_data()
 
-# Header status pills
 sheet_status_badge = '<span style="color:#10B981; font-weight:700;">🟢 Cloud Active</span>' if spreadsheet is not None else '<span style="color:#F59E0B; font-weight:700;">🟡 Local Storage</span>'
 
 st.markdown(f"""
@@ -636,53 +572,9 @@ with m4:
 with m5:
     routing_status = "Dynamic Block Tabs" if spreadsheet is not None else "Local CSV Database"
     st.markdown(f'<div class="metric-card"><div class="metric-label">Target Routing</div><div class="metric-value" style="font-size:15px; color:#0284C7; margin-top:5px;">{routing_status}</div></div>', unsafe_allow_html=True)
-=======
-    size = "N/A"
-    s_match = re.search(r'(\d+\.?\d*)\s*(MARLA|KANAL|SQFT|YARD)', text_upper)
-    if s_match:
-        size = f"{s_match.group(1)} {s_match.group(2)}"
 
-    features = []
-    if "CORNER" in text_upper: features.append("Corner")
-    if "PARK" in text_upper or "FACING PARK" in text_upper: features.append("Park Facing")
-    if "MAIN" in text_upper or "BOULEVARD" in text_upper or "MB" in text_upper: features.append("Main Road")
-    if "EXCESS" in text_upper: features.append("Excess Land")
-    feature_str = ", ".join(features) if features else "Standard"
+st.markdown("<br>", unsafe_allow_html=True)
 
-    return category, phase, block, size, feature_str
-
-# 4. Header UI
-st.markdown(f"""
-    <div class="header-banner">
-        <span class="office-badge">📍 {st.session_state['office_name']}</span>
-        <h1 class="header-title">🏢 DHA Smart Property Engine</h1>
-        <p style="margin: 5px 0 0 0; color: #94A3B8; font-size: 13px;">Auto-Categorized Block-Wise Sheet Engine</p>
-    </div>
-""", unsafe_allow_html=True)
-
-with st.expander("⚙️ Change Office / Agency Name"):
-    new_office = st.text_input("Enter Office Name", value=st.session_state["office_name"])
-    if st.button("Update Office Name"):
-        st.session_state["office_name"] = new_office
-        st.rerun()
-
-# 5. Search Bar
-st.subheader("🔍 Search Property Records")
-search_query = st.text_input("🔎 Search across all block sheets by keyword, size, or feature")
->>>>>>> 1b0e929df7b746e0e01463b63fd35351777e7f6f
-
-# 6. Location Navigation Hierarchy
-st.markdown("---")
-c_col1, c_col2, c_col3 = st.columns([1, 2, 2])
-with c_col1:
-    selected_city = st.selectbox("🏙️ Select City", ["Lahore", "Karachi", "Islamabad", "Gujranwala", "Multan", "Bahawalpur", "Quetta", "Peshawar"])
-with c_col2:
-    selected_phase = st.selectbox("📍 Select Phase", [f"Phase {i}" for i in range(1, 14)] + ["DHA EME", "DHA Rahwali"])
-with c_col3:
-    blocks = [f"Block {chr(i)}" for i in range(65, 91)] + ["Block CCA", "Phase 9 Prism"]
-    selected_block = st.selectbox("🧱 Select Target Block Sheet", blocks)
-
-<<<<<<< HEAD
 # ---------------------------------------------------------
 # 7. Sidebar: Navigation & Agency Profile Settings
 # ---------------------------------------------------------
@@ -711,12 +603,11 @@ with st.sidebar:
     city_options = ["Lahore", "Islamabad", "Karachi", "Gujranwala", "Multan", "Bahawalpur", "Quetta", "Peshawar"]
     st.session_state["selected_city"] = st.selectbox("Active City", city_options, index=city_options.index(st.session_state["selected_city"]))
     
-    phase_options = ["Phase 1", "Phase 2", "Phase 3", "Phase 4", "Phase 5", "Phase 6", "Phase 7", "Phase 8", "Phase 9 Prism", "Phase 9 Town", "Phase 10", "DHA Rahbar (Ph 11)", "DHA EME (Ph 12)", "Phase 13", "DHA Rahwali"]
-    if st.session_state["active_phase"] in phase_options:
-        p_idx = phase_options.index(st.session_state["active_phase"])
+    if st.session_state["active_phase"] in DHA_PHASES:
+        p_idx = DHA_PHASES.index(st.session_state["active_phase"])
     else:
-        p_idx = 5
-    st.session_state["active_phase"] = st.selectbox("Active Phase", phase_options, index=p_idx)
+        p_idx = 5  # DHA Phase 6
+    st.session_state["active_phase"] = st.selectbox("Active Phase", DHA_PHASES, index=p_idx)
 
 # ---------------------------------------------------------
 # VIEW 1: 📥 MULTIMODAL DATA INGESTION
@@ -879,13 +770,13 @@ elif app_mode == "📊 3-Sheet Inventory Hub":
     # Location Filter Bar
     l1, l2, l3 = st.columns([1, 1, 1])
     with l1:
-        unique_cities = ["All Cities"] + list(df_all["City"].dropna().unique()) if len(df_all) > 0 else ["All Cities", "Lahore"]
+        unique_cities = ["All Cities"] + list(dict.fromkeys(list(df_all["City"].dropna().unique()) + ["Lahore", "Islamabad", "Karachi"]))
         filter_city = st.selectbox("Select City", unique_cities)
     with l2:
-        unique_phases = ["All Phases"] + list(df_all["Phase"].dropna().unique()) if len(df_all) > 0 else ["All Phases", "Phase 6"]
+        unique_phases = ["All Phases"] + DHA_PHASES
         filter_phase = st.selectbox("Select Phase", unique_phases)
     with l3:
-        unique_blocks = ["All Blocks"] + list(df_all["Block"].dropna().unique()) if len(df_all) > 0 else ["All Blocks", "Block M"]
+        unique_blocks = ["All Blocks"] + sorted(list(set(df_all["Block"].dropna().unique().tolist() + [f"Block {chr(i)}" for i in range(65, 91)] + ["CCA 1", "CCA 2"])))
         filter_block = st.selectbox("Select Block", unique_blocks)
 
     # Filter base dataset
@@ -957,7 +848,7 @@ elif app_mode == "🔎 Ultra-Smart Search":
     if len(df) > 0:
         s_col1, s_col2, s_col3, s_col4 = st.columns(4)
         with s_col1:
-            phase_opts = ["All"] + sorted([str(p) for p in df["Phase"].dropna().unique() if str(p) != "nan"])
+            phase_opts = ["All"] + DHA_PHASES
             s_phase = st.selectbox("Phase Filter", phase_opts)
         with s_col2:
             block_opts = ["All"] + sorted([str(b) for b in df["Block"].dropna().unique() if str(b) != "nan"])
@@ -994,7 +885,7 @@ elif app_mode == "🔎 Ultra-Smart Search":
                 st.markdown(f"""
                     <div style="background:white; border-radius:12px; padding:14px 18px; margin-bottom:10px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center;">
                         <div>
-                            <strong>📍 {row.get('City', 'Lahore')} • {row.get('Phase', 'Phase')} • {row.get('Block', 'Block')}</strong> | 
+                            <strong>📍 {row.get('City', 'Lahore')} • {row.get('Phase', 'DHA Phase 6')} • {row.get('Block', 'Block')}</strong> | 
                             <span>📏 {row.get('Size', 'N/A')}</span> | 
                             <span style="color:#047857; font-weight:700;">💰 {row.get('Price', 'N/A')}</span> | 
                             <span>🛣️ {row.get('Road Width', 'Standard')}</span> | 
@@ -1092,81 +983,3 @@ elif app_mode == "⚙️ Cloud & Agency Settings":
         2. Create a Service Account, generate a JSON Key, and upload it above.
         3. Open your Google Sheet and share it with the Service Account email (`client_email`) with **Editor** permissions.
     """)
-=======
-# 7. Input Entry (Block-Wise Save Engine)
-st.markdown("---")
-st.subheader("📥 Add New Listing (Auto-Saves to Block Tab)")
-
-col_in1, col_in2 = st.columns([2, 1])
-with col_in1:
-    source = st.selectbox("Data Source", ["WhatsApp Group", "Newspaper Advert", "Direct Client", "Facebook"])
-    raw_text = st.text_area("Paste Property Listing Text", height=150, placeholder="Example: DHA Phase 6 Block M 1 Kanal Corner plot for sale demand 4.5 crore...")
-    
-with col_in2:
-    st.markdown("### 🤖 Detected Metadata")
-    if raw_text.strip():
-        cat, ph, blk, sz, feat = parse_property_text(raw_text)
-        
-        # Override detected block if user specifically selected a block from dropdown
-        target_block = blk if blk != "N/A" else selected_block
-        
-        st.write(f"**Category:** `{cat}`")
-        st.write(f"**Phase:** `{ph}`")
-        st.write(f"**Target Sheet/Block:** `{target_block}`")
-        st.write(f"**Size:** `{sz}`")
-        st.write(f"**Features:** `{feat}`")
-
-if st.button("💾 Save to Block Sheet", use_container_width=True):
-    if raw_text.strip():
-        try:
-            cat, ph, blk, sz, feat = parse_property_text(raw_text)
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-            
-            # Determine sheet tab name
-            target_sheet_name = blk if blk != "N/A" else selected_block
-            
-            # Save into dedicated Block Sheet Tab
-            row_payload = [now_str, source, cat, ph, target_sheet_name, sz, feat, raw_text]
-            append_to_block_sheet(workbook, target_sheet_name, row_payload)
-            
-            st.success(f"✅ Data saved directly into Google Sheet Tab: **[{target_sheet_name}]**!")
-            st.balloons()
-        except Exception as e:
-            st.error(f"Block Save Error: {e}")
-
-# 8. View Selected Block Sheet Tabs
-st.markdown("---")
-st.subheader(f"📊 Viewing Sheet Tab: [{selected_block}]")
-
-try:
-    # Try fetching selected block sheet
-    try:
-        current_worksheet = workbook.worksheet(selected_block)
-        data = current_worksheet.get_all_values()
-    except gspread.exceptions.WorksheetNotFound:
-        data = []
-
-    if len(data) > 1:
-        cols = ["Timestamp", "Source", "Category", "Phase", "Block", "Size", "Features", "Raw Listing"]
-        df = pd.DataFrame(data[1:], columns=cols[:len(data[1])])
-        
-        if search_query:
-            df = df[df["Raw Listing"].str.contains(search_query, case=False, na=False) |
-                    df["Features"].str.contains(search_query, case=False, na=False)]
-
-        tab_sell, tab_buy, tab_rent = st.tabs(["🔴 Selling / Inventory", "🟢 Buying / Requirements", "🔵 Rental"])
-        
-        with tab_sell:
-            st.dataframe(df[df["Category"] == "Selling"] if "Category" in df.columns else df, use_container_width=True)
-            
-        with tab_buy:
-            st.dataframe(df[df["Category"] == "Buying"] if "Category" in df.columns else df, use_container_width=True)
-            
-        with tab_rent:
-            st.dataframe(df[df["Category"] == "Rental"] if "Category" in df.columns else df, use_container_width=True)
-    else:
-        st.info(f"No entries found yet in Google Sheet tab: **{selected_block}**. Add a new listing above to create this sheet automatically!")
-
-except Exception as e:
-    st.error(f"Error loading block data: {e}")
->>>>>>> 1b0e929df7b746e0e01463b63fd35351777e7f6f
