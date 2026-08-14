@@ -1,0 +1,9 @@
+ID,Module,Feature,Details,Priority,Status,Target File
+F-01,UI/UX & Branding,Google Stitch Header & Agency Settings,"Custom agency name modal/session state (e.g. Wali Muhammad Associates), real-time cloud sync pills, stats cards.",P0 (Critical),Planned / Ready to Implement,App.py
+F-02,Data Ingestion,Multimodal Input Portal,"Direct raw text box, rapid test preset buttons, st.camera_input for newspaper ads snapping, and file uploader.",P0 (Critical),Planned / Ready to Implement,App.py
+F-03,NLP / Extraction,Smart Regex Parser Engine v3.0,"Extract Category (Selling/Buying/Rental), Property Type, Phase, Block, Size, Road Width (40ft-MB), Price, Phone, Tags.",P0 (Critical),Planned / Ready to Implement,App.py
+F-04,Backend & Cloud,Dynamic Google Sheets Block Routing,"Inspect Google Workbook, auto-create block-specific worksheet tabs (e.g. Block A, Block M) if missing, inject headers, append row.",P0 (Critical),Planned / Ready to Implement,App.py
+F-05,Database Views,Categorized 3-Sheet Database View,"Dedicated synchronized views per block: 1. Selling (Available), 2. Buying (Requirements), 3. Rental (Leases).",P0 (Critical),Planned / Ready to Implement,App.py
+F-06,Search & Filters,Supreme Ultra-Smart Multi-Filter Search,"Filter by City, Phase, Block, Size, Road Width, Tags (Corner, Park Facing, Excess Land, Direct Owner).",P1 (High),Planned / Ready to Implement,App.py
+F-07,CRM & Fast Action,One-Click Copy Listing & Direct WhatsApp,Generate formatted WhatsApp text with agency branding and 1-click wa.me link with pre-filled inquiry message.,P1 (High),Planned / Ready to Implement,App.py
+F-08,Storage & Settings,Google Service Account Setup Manager,Upload or paste service_account.json with automated validation and credential storage in .streamlit/secrets.toml.,P1 (High),Planned / Ready to Implement,App.py

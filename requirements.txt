@@ -1,5 +1,7 @@
 streamlit
 gspread
+google-auth
 pandas
+Pillow
 openpyxl
 
