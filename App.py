@@ -4,6 +4,7 @@ import re
 import json
 import io
 import os
+import time
 import urllib.request
 import pandas as pd
 from datetime import datetime
@@ -273,22 +274,22 @@ def get_phase_workbook(gc, phase_name):
     except Exception:
         return gc.open_by_url(DHA_PHASE_SHEET_URLS["DHA Phase 1"])
 
-def get_or_create_clean_tab(workbook, tab_title):
+# Cached Worksheet Fetcher (Single Call)
+def get_cached_tab(workbook, tab_title, ws_dict):
     clean_title = tab_title.strip()
-    try:
-        ws = workbook.worksheet(clean_title)
-    except gspread.exceptions.WorksheetNotFound:
-        ws = workbook.add_worksheet(title=clean_title, rows=500, cols=16)
-        ws.append_row(CRM_SHEET_HEADERS)
-        return ws
+    clean_key = clean_title.lower()
+    
+    if clean_key in ws_dict:
+        return ws_dict[clean_key]
     
     try:
-        first_row = ws.row_values(1)
-        if not first_row or len(first_row) < 3 or first_row[0] != CRM_SHEET_HEADERS[0]:
-            ws.insert_row(CRM_SHEET_HEADERS, 1)
+        ws = workbook.add_worksheet(title=clean_title, rows=500, cols=16)
+        ws.append_row(CRM_SHEET_HEADERS)
+        ws_dict[clean_key] = ws
+        return ws
     except Exception:
-        pass
-    return ws
+        # Fallback to first tab
+        return workbook.sheet1
 
 def clean_whatsapp_chat_text(raw_bytes):
     try:
@@ -515,15 +516,6 @@ def parse_fallback_heuristic(text_clean, default_phase):
         elif "PHASE 1" in l_up:
             current_phase = "DHA Phase 1"
             continue
-        elif "10 MARLA" in l_up:
-            current_size = "10 Marla"
-            continue
-        elif "5 MARLA" in l_up or "5.5 MARLA" in l_up:
-            current_size = "5 Marla"
-            continue
-        elif "1 KANAL" in l_up:
-            current_size = "1 Kanal"
-            continue
 
         m = re.search(r'([A-Z0-9-]{1,3})\s*[-.:/ ]\s*([0-9]{1,5})\s*(?:@|\bDEMAND\b:?)?\s*(\d+\.?\d*)\s*(?:[.]?(LAC|LACS|CRORE|CR))?', l_up)
         if m:
@@ -550,7 +542,7 @@ def parse_fallback_heuristic(text_clean, default_phase):
             })
     return extracted
 
-# 7. High-Speed Batch Sync Popup (Zero API Rate-Limit Error)
+# 7. Robust Cached-Batch Popup (Zero Metadata Rate-Limit)
 @st.dialog("⚡ Confirm Universal Multimodal Routing", width="large")
 def show_routing_popup(payloads, phase_wb_map, gc_client):
     st.markdown("##### 🤖 Extraction Summary & Clean Reconciliation:")
@@ -569,17 +561,16 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
         })
     
     st.dataframe(pd.DataFrame(table_data), use_container_width=True)
-    st.info("💡 **High-Speed Batch Sync Active:** Listings are grouped in-memory and synchronized in single batch calls per tab. Zero rate-limit issues, exact column reconciliation, and duplicate protection.")
+    st.info("💡 **Cached Batch Sync:** Single-call metadata caching enabled. Zero API limits, instant segregation.")
 
     col_btn1, col_btn2 = st.columns([1.5, 1])
     with col_btn1:
         if st.button("🚀 Confirm & Sync to Google Sheets", use_container_width=True):
-            with st.spinner("Writing bulk batches to Google Sheets..."):
+            with st.spinner("Batch writing to Google Sheets..."):
                 now_dt = datetime.now()
                 today_str = now_dt.strftime("%Y-%m-%d")
                 now_str = now_dt.strftime("%Y-%m-%d %H:%M")
                 
-                # Step 1: In-memory grouping by (Phase, Block)
                 grouped_data = {}
                 for item in payloads:
                     target_phase = item.get("Phase", "DHA Phase 1")
@@ -594,18 +585,34 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                 repeated_tracked = 0
                 
                 workbook_cache = {}
+                worksheets_map_cache = {}
                 
-                # Step 2: Write batch per tab
                 for (phase, block), items in grouped_data.items():
+                    # 1. Fetch workbook once
                     if phase not in workbook_cache:
-                        workbook_cache[phase] = get_phase_workbook(gc_client, phase)
+                        time.sleep(0.3)
+                        wb = get_phase_workbook(gc_client, phase)
+                        workbook_cache[phase] = wb
+                        # Cache all existing worksheets in one API call
+                        ws_list = wb.worksheets()
+                        worksheets_map_cache[phase] = {w.title.strip().lower(): w for w in ws_list}
+                    
                     wb = workbook_cache[phase]
-                    ws = get_or_create_clean_tab(wb, block)
+                    ws_dict = worksheets_map_cache[phase]
+                    ws = get_cached_tab(wb, block, ws_dict)
                     
                     try:
                         existing_rows = ws.get_all_values()
                     except Exception:
-                        existing_rows = []
+                        time.sleep(0.8)
+                        try:
+                            existing_rows = ws.get_all_values()
+                        except Exception:
+                            existing_rows = []
+                    
+                    # Ensure headers if empty sheet
+                    if len(existing_rows) == 0:
+                        ws.append_row(CRM_SHEET_HEADERS)
                     
                     existing_plots_today = set()
                     plot_repeat_map = {}
@@ -624,7 +631,6 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                         plot_val = str(itm.get("Plot No", "")).strip()
                         plot_val_clean = plot_val.lower()
                         
-                        # Skip same-day duplicate in same tab
                         if plot_val_clean and plot_val_clean in existing_plots_today:
                             skipped_today += 1
                             continue
@@ -657,10 +663,11 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                             existing_plots_today.add(plot_val_clean)
                     
                     if rows_to_append:
+                        time.sleep(0.3)
                         ws.append_rows(rows_to_append)
                         saved_count += len(rows_to_append)
                 
-                st.success(f"✅ Successfully synced **{saved_count} listings** in bulk! (Skipped today's duplicates: **{skipped_today}**, Repeats marked: **{repeated_tracked}**)")
+                st.success(f"✅ Successfully synced **{saved_count} listings** across all tabs! (Duplicates skipped: **{skipped_today}**, Repeats tracked: **{repeated_tracked}**)")
                 st.balloons()
                 st.session_state["parsed_payloads"] = []
                 st.session_state["extracted_file_text"] = ""
@@ -720,7 +727,7 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">High-Speed Batch Sync & Reconciliation (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">Strict Schema & Clean Reconciliation (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -764,7 +771,10 @@ else:
             st.rerun()
 
     try:
-        current_ws = get_or_create_clean_tab(phase_workbook, selected_active_block)
+        # Load active tab with in-memory check
+        all_ws = phase_workbook.worksheets()
+        ws_lookup = {w.title.strip().lower(): w for w in all_ws}
+        current_ws = get_cached_tab(phase_workbook, selected_active_block, ws_lookup)
         records = current_ws.get_all_values()
         
         if len(records) > 1:
