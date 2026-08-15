@@ -554,67 +554,101 @@ def parse_fallback_heuristic(text_clean, default_phase):
             })
     return extracted
 
-# 7. Safe Chunking Popup with ETA & Quota Protection
-@st.dialog("⚡ Confirm Universal Multimodal Routing", width="large")
+# 7. Interactive Editable Popup Dialog with Specific Phase / Block Selector
+@st.dialog("⚡ Confirm & Filter DHA Ingestion Inventory", width="large")
 def show_routing_popup(payloads, phase_wb_map, gc_client):
-    total_items = len(payloads)
+    total_raw_items = len(payloads)
     
-    # 1. Calculate Estimated Sync Time
-    # Group estimation
-    grouped_preview = {}
+    st.markdown("##### 🔍 Target Phase & Block Selective Extractor:")
+    
+    # 1. Prepare Initial DataFrame
+    base_data = []
     for item in payloads:
-        k = (item.get("Phase", "DHA Phase 1"), item.get("Block", "Block A"))
-        grouped_preview[k] = grouped_preview.get(k, 0) + 1
-    
-    num_unique_tabs = len(grouped_preview)
-    # Estimate: ~1.2s per unique block tab (metadata + safe append delay)
-    estimated_seconds = max(5, int(num_unique_tabs * 1.3 + (total_items / 100) * 1.5))
-    est_min = estimated_seconds // 60
-    est_sec = estimated_seconds % 60
-    eta_str = f"{est_min}m {est_sec}s" if est_min > 0 else f"{est_sec} seconds"
+        base_data.append({
+            "Target Phase": str(item.get("Phase", "DHA Phase 1")),
+            "Target Tab": str(item.get("Block", "Block A")),
+            "Plot No": str(item.get("Plot No", "")),
+            "Size": str(item.get("Size", "")),
+            "Demand / Price": str(item.get("Demand / Price", "")),
+            "Contact No": str(item.get("Contact No", "")),
+            "Category": str(item.get("Category", "Selling")),
+            "Plot Features": str(item.get("Plot Features", "")),
+            "Source Text": str(item.get("Raw Listing & Source Material", ""))
+        })
+    df_all = pd.DataFrame(base_data)
 
-    st.markdown("##### 🤖 Extraction Summary & Quota-Safe Batch Engine:")
-    st.write(f"Analyzed **{total_items} distinct listings** across **{num_unique_tabs} block tabs**.")
+    # 2. Dropdowns for Specific Phase & Specific Block Filtering
+    col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 1.2])
     
+    unique_phases_in_data = ["All Phases (Everything)"] + sorted(list(df_all["Target Phase"].unique()))
+    with col_f1:
+        chosen_phase_filter = st.selectbox("🎯 Filter by Target Phase:", unique_phases_in_data, index=0)
+    
+    # Block options based on chosen phase
+    if chosen_phase_filter == "All Phases (Everything)":
+        df_phase_filtered = df_all
+        unique_blocks = ["All Blocks / CCAs"] + sorted(list(df_all["Target Tab"].unique()))
+    else:
+        df_phase_filtered = df_all[df_all["Target Phase"] == chosen_phase_filter]
+        unique_blocks = ["All Blocks / CCAs"] + sorted(list(df_phase_filtered["Target Tab"].unique()))
+    
+    with col_f2:
+        chosen_block_filter = st.selectbox("🧱 Filter by Block / Tab:", unique_blocks, index=0)
+    
+    if chosen_block_filter != "All Blocks / CCAs":
+        df_filtered = df_phase_filtered[df_phase_filtered["Target Tab"] == chosen_block_filter]
+    else:
+        df_filtered = df_phase_filtered
+
+    with col_f3:
+        st.metric(label="Filtered Plots", value=f"{len(df_filtered)}", delta=f"of {total_raw_items} Total")
+
+    st.markdown("---")
+    
+    # 3. Interactive Data Editor for the Filtered Selection
+    st.info("💡 **Live Sheet Table Active:** You can edit any value, check boxes to delete rows, or adjust prices. Only displayed rows will sync.")
+
+    edited_df = st.data_editor(
+        df_filtered,
+        use_container_width=True,
+        num_rows="dynamic",
+        height=320,
+        key="popup_filtered_data_editor"
+    )
+
+    final_count = len(edited_df)
+    unique_tabs_count = edited_df[["Target Phase", "Target Tab"]].drop_duplicates().shape[0] if final_count > 0 else 0
+    est_seconds = max(3, int(unique_tabs_count * 1.2 + (final_count / 50) * 0.8))
+    e_min = est_seconds // 60
+    e_sec = est_seconds % 60
+    eta_label = f"{e_min}m {e_sec}s" if e_min > 0 else f"{e_sec} seconds"
+
     st.markdown(f"""
         <div class="eta-box">
-            ⏱️ <b>Estimated Sync Time:</b> ~{eta_str}<br>
-            🛡️ <b>Safe Quota Chunking Active:</b> Data is dispatched in micro-batches with automatic rate-limit throttling to prevent Google Quota (429) errors.
+            📊 <b>Ready to Sync:</b> {final_count} plots across {unique_tabs_count} block tabs | ⏱️ <b>Estimated Sync Time:</b> ~{eta_label}
         </div>
     """, unsafe_allow_html=True)
 
-    table_data = []
-    for idx, item in enumerate(payloads[:100]):  # Fast preview of first 100
-        table_data.append({
-            "Target Phase": item.get("Phase", ""),
-            "Target Tab": item.get("Block", ""),
-            "Plot": item.get("Plot No", ""),
-            "Verified Size": item.get("Size", "") if item.get("Size") else "—",
-            "Demand": item.get("Demand / Price", ""),
-            "Phone": item.get("Contact No", ""),
-            "Source Text": item.get("Raw Listing & Source Material", "")
-        })
-    
-    st.dataframe(pd.DataFrame(table_data), use_container_width=True)
-    if total_items > 100:
-        st.caption(f"Showing first 100 listings of total {total_items} parsed items.")
-
     col_btn1, col_btn2 = st.columns([1.5, 1])
     with col_btn1:
-        if st.button("🚀 Start Safe Chunked Sync to Google Sheets", use_container_width=True):
+        if st.button(f"🚀 Sync ({final_count} Selected Plots) to Google Sheets", use_container_width=True):
+            if final_count == 0:
+                st.warning("No listings currently selected to sync.")
+                return
+            
             now_dt = datetime.now()
             today_str = now_dt.strftime("%Y-%m-%d")
             now_str = now_dt.strftime("%Y-%m-%d %H:%M")
             
-            # Step 1: In-memory grouping
+            # Step 1: Group edited records by (Phase, Block)
             grouped_data = {}
-            for item in payloads:
-                target_phase = item.get("Phase", "DHA Phase 1")
-                target_block = item.get("Block", "Block A")
+            for _, row in edited_df.iterrows():
+                target_phase = str(row.get("Target Phase", "DHA Phase 1")).strip()
+                target_block = str(row.get("Target Tab", "Block A")).strip()
                 key = (target_phase, target_block)
                 if key not in grouped_data:
                     grouped_data[key] = []
-                grouped_data[key].append(item)
+                grouped_data[key].append(row)
             
             saved_count = 0
             skipped_today = 0
@@ -627,11 +661,10 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
             progress_bar = st.progress(0)
             status_placeholder = st.empty()
             
-            for idx, ((phase, block), items) in enumerate(grouped_data.items()):
+            for idx, ((phase, block), rows_list) in enumerate(grouped_data.items()):
                 pct = int(((idx + 1) / total_groups) * 100)
                 status_placeholder.markdown(f"⏳ **Syncing:** `[{phase} ➔ {block}]` — ({idx+1}/{total_groups} tabs) • **{pct}% Complete**")
                 
-                # Fetch workbook with retry
                 if phase not in workbook_cache:
                     wb = get_phase_workbook(gc_client, phase)
                     workbook_cache[phase] = wb
@@ -663,8 +696,8 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                                 existing_plots_today.add(r_plot)
                 
                 rows_to_append = []
-                for itm in items:
-                    plot_val = str(itm.get("Plot No", "")).strip()
+                for row in rows_list:
+                    plot_val = str(row.get("Plot No", "")).strip()
                     plot_val_clean = plot_val.lower()
                     
                     if plot_val_clean and plot_val_clean in existing_plots_today:
@@ -672,46 +705,46 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                         continue
                     
                     repeat_count = plot_repeat_map.get(plot_val_clean, 0)
-                    notes_txt = itm.get("Last Conversation / Notes", "Direct WhatsApp Ingestion")
+                    notes_txt = "Direct WhatsApp Ingestion"
                     if repeat_count > 0:
                         repeated_tracked += 1
                         notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
                     
                     row_data = [
                         str(now_str),
-                        str(itm.get("Category", "Selling")),
+                        str(row.get("Category", "Selling")),
                         str(phase),
                         str(block),
                         str(plot_val),
-                        str(itm.get("Size", "")),
-                        str(itm.get("Plot Features", "")),
-                        str(itm.get("Demand / Price", "")),
-                        str(itm.get("Seller Type", "Dealer")),
-                        str(itm.get("Seller / Dealer Name", "")),
-                        str(itm.get("Contact No", "")),
-                        str(itm.get("Office / Agency", st.session_state['office_name'])),
-                        str(itm.get("Deal Status", "Available")),
+                        str(row.get("Size", "")),
+                        str(row.get("Plot Features", "")),
+                        str(row.get("Demand / Price", "")),
+                        "Dealer",
+                        "",
+                        str(row.get("Contact No", "")),
+                        str(st.session_state['office_name']),
+                        "Available",
                         str(notes_txt),
-                        f"[AI Ingest] {str(itm.get('Raw Listing & Source Material', ''))}"
+                        f"[AI Ingest] {str(row.get('Source Text', ''))}"
                     ]
                     rows_to_append.append(row_data)
                     if plot_val_clean:
                         existing_plots_today.add(plot_val_clean)
                 
-                # Chunked write per tab (Max 50 rows per chunk to strictly protect 429 quota)
+                # Chunked write to protect 429 quota
                 CHUNK_SIZE = 50
                 for i in range(0, len(rows_to_append), CHUNK_SIZE):
                     chunk_slice = rows_to_append[i:i + CHUNK_SIZE]
                     safe_gspread_call(ws.append_rows, chunk_slice, value_input_option="USER_ENTERED")
                     saved_count += len(chunk_slice)
-                    time.sleep(0.5)  # Safe quota relief delay
+                    time.sleep(0.4)
                 
                 progress_bar.progress((idx + 1) / total_groups)
-                time.sleep(0.4)
+                time.sleep(0.3)
             
             status_placeholder.empty()
             progress_bar.empty()
-            st.success(f"🎉 **Chunked Sync Complete!** Successfully saved **{saved_count} listings** across all tabs! (Skipped duplicates today: **{skipped_today}**, Repeats marked: **{repeated_tracked}**)")
+            st.success(f"🎉 **Targeted Sync Complete!** Successfully saved **{saved_count} listings** to `{chosen_phase_filter}`! (Duplicates skipped: **{skipped_today}**, Repeats marked: **{repeated_tracked}**)")
             st.balloons()
             st.session_state["parsed_payloads"] = []
             st.session_state["extracted_file_text"] = ""
@@ -771,7 +804,7 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Enterprise Fault-Tolerant Engine (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">Targeted Filtering & Safe Batch Sync (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -952,7 +985,7 @@ else:
     if st.button("🚀 Process, Segregate & Route to Block Tabs", use_container_width=True):
         final_input_text = raw_text.strip()
         if final_input_text:
-            with st.spinner("🧠 AI Engine is extracting listings and preparing zero-rate-limit batch sync..."):
+            with st.spinner("🧠 AI Engine is extracting listings and preparing interactive batch editor..."):
                 payloads = parse_with_strict_gemini_schema(final_input_text, selected_phase)
                 if payloads:
                     st.session_state["parsed_payloads"] = payloads
