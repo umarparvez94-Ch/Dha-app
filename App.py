@@ -21,7 +21,7 @@ except ImportError:
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="DHA Property CRM & Multimodal Data Systems",
+    page_title="DHA Property CRM & AI Data Systems",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -40,11 +40,13 @@ if "extracted_file_text" not in st.session_state:
     st.session_state["extracted_file_text"] = ""
 
 # Setup Official Google Gemini AI Engine
-if HAS_GENAI and "GEMINI_API_KEY" in st.secrets:
+gemini_active = False
+if HAS_GENAI and "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        gemini_active = True
     except Exception:
-        pass
+        gemini_active = False
 
 # 2. CSS Injection
 st.markdown("""
@@ -72,7 +74,8 @@ st.markdown("""
     .badge-rental { background-color: #E0F2FE; color: #0284C7; }
     .badge-feature { background-color: #FEF3C7; color: #D97706; }
     .badge-price { background-color: #ECFDF5; color: #059669; font-weight: 800; }
-    .ai-badge { background: #EEF2FF; border: 1px solid #C7D2FE; color: #3730A3; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-bottom: 8px; }
+    .ai-badge-active { background: #DCFCE7; border: 1px solid #86EFAC; color: #15803D; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
+    .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -271,24 +274,25 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
 
     return ""
 
-def parse_multimodal_gemini(raw_text, default_phase):
+def parse_with_strict_gemini_schema(raw_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     
     prompt = f"""You are an expert DHA Lahore Real Estate CRM extraction engine.
 Parse the provided real estate text/data into a clean JSON list of individual property listings.
 
-CRITICAL DISAMBIGUATION RULES:
+CRITICAL DISAMBIGUATION & EXTRACTION RULES:
 1. DHA Lahore phases share common block letters (e.g. Block A is in Phase 1, Phase 5, Phase 6, Phase 8, Phase 9 Prism, Phase 9 Town, Phase 12 EME).
 2. NEVER mix up Block A of Phase 1 with Block A of Phase 5 or Phase 6. Maintain strict contextual parent Phase hierarchy.
 3. Official Phase Names: 'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
 4. If Phase is not mentioned in a local group, use active context or fallback to default: '{default_phase}'.
 5. Block names MUST strictly match catalog: {catalog_json_str}.
-6. Extract Size, Plot No, Features (Corner, Park Facing, Pair, 60ft/100ft road, NDC Ready, Direct Owner), Demand / Price with unit (e.g. 550 Lac, 6.25 Crore), Contact No, Dealer/Agency Name.
+6. Detect exact Size: '5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '13 Marla', '28 Marla', '6.74 Marla', '4 Marla', '8 Marla'.
+7. Extract Plot No (e.g. 'Plot 398', 'Plot 1473', 'Plot 399+400 Pair'), Features (Corner, Park Facing, Pair, 60ft/100ft road, NDC Ready, Direct Owner), Demand / Price with unit (e.g. '720 Lac', '550 Lac', '6.25 Crore'), Contact No, Dealer/Agency Name.
 
 Input Raw Text:
 {raw_text}
 
-Return ONLY a valid JSON Array:
+Return ONLY a valid JSON Array with format:
 [
   {{
     "Category": "Selling",
@@ -303,7 +307,7 @@ Return ONLY a valid JSON Array:
     "Contact No": "N/A",
     "Office / Agency": "Wali Muhammad Associates",
     "Deal Status": "Available",
-    "Last Conversation / Notes": "Parsed via Google Gemini Multimodal",
+    "Last Conversation / Notes": "Parsed via Google Gemini Strict Schema",
     "Raw Listing & Source Material": "398 U 720 Lac 28 Marla"
   }}
 ]"""
@@ -520,7 +524,7 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Universal Multi-Format File Reader & Ingestion Box (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">AI Multi-Source Data Extraction Engine (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -619,12 +623,15 @@ else:
 
     st.markdown("---")
 
-    # Ingestion Box
-    st.markdown("""
-        <div class="ai-badge">🤖 Universal Ingestion (Text, Excel, JSON, PDF, Images & Live Camera)</div>
-    """, unsafe_allow_html=True)
-    
-    st.subheader("📥 Ingest Listings via Direct Paste, File Upload or Live Camera Snapshot")
+    # ==========================================================================
+    # 3. BOTTOM SECTION: AI MULTI-SOURCE DATA EXTRACTION ENGINE
+    # ==========================================================================
+    if gemini_active:
+        st.markdown('<div class="ai-badge-active">🟢 Google Gemini AI Extraction Engine: Connected & Active</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="ai-badge-inactive">🟡 Gemini API Key Missing — Operating on Fallback Pattern Parser (Add GEMINI_API_KEY to Secrets for full AI power)</div>', unsafe_allow_html=True)
+
+    st.subheader("🧠 AI Multi-Source Data Extraction Engine")
     
     col_u1, col_u2 = st.columns([1.7, 1.3])
     
@@ -635,14 +642,14 @@ else:
             uploaded_file = st.file_uploader(
                 "Upload Excel, JSON, PDF, or Image:",
                 type=["xlsx", "xls", "json", "csv", "pdf", "txt", "png", "jpg", "jpeg", "webp"],
-                help="Spreadsheets, WhatsApp flyers, rate sheets or documents"
+                help="Upload property spreadsheets, JSON lists, flyers, or rate cards to auto-extract text."
             )
             if uploaded_file is not None:
-                with st.spinner(f"Extracting raw data from `{uploaded_file.name}`..."):
+                with st.spinner(f"Extracting data from `{uploaded_file.name}`..."):
                     extracted_content = extract_text_from_any_file_or_image(uploaded_file, is_camera=False)
                     if extracted_content:
                         st.session_state["extracted_file_text"] = extracted_content
-                        st.success(f"✅ Successfully transcribed `{uploaded_file.name}` into the box!")
+                        st.success(f"✅ Successfully transcribed `{uploaded_file.name}` into the extraction box!")
         
         with tab_camera:
             camera_photo = st.camera_input("Take a photo of a property document / map / flyer:")
@@ -651,23 +658,23 @@ else:
                     camera_text = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
                     if camera_text:
                         st.session_state["extracted_file_text"] = camera_text
-                        st.success("✅ Camera photo transcribed into the text box below!")
+                        st.success("✅ Camera photo transcribed into the extraction box below!")
 
     with col_u1:
         default_box_value = st.session_state.get("extracted_file_text", "")
         
         raw_text = st.text_area(
-            "📋 Ingestion Text Box (Auto-Populated from Camera / Files or Type Manually):",
+            "📋 Raw Real Estate Data Ingestion (Auto-Populated from Files/Camera or Paste Free Text):",
             value=default_box_value,
             height=200,
-            placeholder="Data transcribed from camera or uploaded files will appear here automatically.\nYou can also type or paste directly:\n\n*398 U 720 Lac 28 Marla*\n*Phase 7*\n*18 CCA 2 @ 900 Lac*\n*Prism*\n*1473 R 155 Lac 6.74 Marla*\n*1772 J 78 Lac*"
+            placeholder="Paste ANY mixed WhatsApp deals, OCR data, or multi-phase listings here...\nExample:\n*398 U 720 Lac 28 Marla*\n*Phase 7*\n*18 CCA 2 @ 900 Lac*\n*Prism*\n*1473 R 155 Lac 6.74 Marla*\n*1772 J 78 Lac*"
         )
 
     if st.button("🚀 Process, Segregate & Route to Block Tabs", use_container_width=True):
         final_input_text = raw_text.strip()
         if final_input_text:
-            with st.spinner("🧠 AI Engine is analyzing and segregating listings into respective DHA Phases & Blocks..."):
-                payloads = parse_multimodal_gemini(final_input_text, selected_phase)
+            with st.spinner("🧠 AI Engine is reading, disambiguating and segregating listings into respective DHA Phases & Blocks..."):
+                payloads = parse_with_strict_gemini_schema(final_input_text, selected_phase)
                 if payloads:
                     st.session_state["parsed_payloads"] = payloads
                     show_routing_popup(payloads, DHA_PHASE_SHEET_URLS, gc_client)
