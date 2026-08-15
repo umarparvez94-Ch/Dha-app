@@ -3,6 +3,7 @@ import gspread
 import re
 import json
 import io
+import os
 import pandas as pd
 from datetime import datetime
 from PIL import Image
@@ -13,8 +14,10 @@ try:
 except ImportError:
     HAS_PYPDF = False
 
+# New Official Google GenAI SDK
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
     HAS_GENAI = True
 except ImportError:
     HAS_GENAI = False
@@ -39,11 +42,14 @@ if "parsed_payloads" not in st.session_state:
 if "extracted_file_text" not in st.session_state:
     st.session_state["extracted_file_text"] = ""
 
-# Setup Official Google Gemini AI Engine
+# Setup Official Google Gemini AI Client
+gemini_client = None
 gemini_active = False
-if HAS_GENAI and "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
+
+api_key_val = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+if HAS_GENAI and api_key_val:
     try:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        gemini_client = genai.Client(api_key=api_key_val)
         gemini_active = True
     except Exception:
         gemini_active = False
@@ -207,6 +213,35 @@ DHA_PHASE_BLOCK_CATALOG = {
     }
 }
 
+def clean_whatsapp_chat_text(raw_bytes):
+    try:
+        decoded_text = raw_bytes.decode('utf-8', errors='ignore')
+    except Exception:
+        decoded_text = str(raw_bytes)
+
+    # WhatsApp date-time patterns removal
+    chat_patterns = [
+        r'^\s*\[?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\]?\s*-?\s*[^:]+:\s*',
+        r'^\s*\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*-\s*[^:]+:\s*'
+    ]
+
+    cleaned_lines = []
+    for line in decoded_text.splitlines():
+        line_str = line.strip()
+        if not line_str:
+            continue
+        if "Messages and calls are end-to-end encrypted" in line_str or "<Media omitted>" in line_str:
+            continue
+        
+        for pat in chat_patterns:
+            line_str = re.sub(pat, '', line_str)
+        
+        line_str = line_str.strip()
+        if line_str and len(line_str) > 2:
+            cleaned_lines.append(line_str)
+
+    return "\n".join(cleaned_lines)
+
 def extract_text_from_any_file_or_image(file_obj, is_camera=False):
     if file_obj is None:
         return ""
@@ -214,14 +249,16 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
     file_bytes = file_obj.getvalue()
     
     if is_camera or (hasattr(file_obj, 'name') and any(file_obj.name.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"])):
-        if HAS_GENAI and "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
+        if gemini_active and gemini_client:
             try:
-                model = genai.GenerativeModel("gemini-2.5-flash")
                 img = Image.open(io.BytesIO(file_bytes))
-                res = model.generate_content([
-                    "You are a real estate OCR assistant. Transcribe and extract all property listing text, prices, phases, blocks, plot numbers, features, and phone numbers from this image clearly as readable text:",
-                    img
-                ])
+                res = gemini_client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=[
+                        "You are a real estate OCR assistant. Transcribe and extract all property listing text, prices, phases, blocks, plot numbers, features, and phone numbers from this image clearly as readable text:",
+                        img
+                    ]
+                )
                 return res.text.strip()
             except Exception as e:
                 return f"[Image OCR extraction error: {e}]"
@@ -267,17 +304,20 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
             return "[pypdf library not installed. Please add pypdf to requirements.txt]"
 
     elif fname.endswith(".txt"):
-        try:
-            return file_bytes.decode('utf-8', errors='ignore')
-        except Exception as e:
-            return f"[Error reading Text file: {e}]"
+        return clean_whatsapp_chat_text(file_bytes)
 
     return ""
 
 def parse_with_strict_gemini_schema(raw_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     
-    prompt = f"""You are an expert DHA Lahore Real Estate CRM extraction engine.
+    # Split text into chunks if it exceeds 15,000 characters to process large WhatsApp chats effortlessly
+    chunk_size = 15000
+    text_chunks = [raw_text[i:i+chunk_size] for i in range(0, len(raw_text), chunk_size)]
+    all_results = []
+
+    for chunk in text_chunks:
+        prompt = f"""You are an expert DHA Lahore Real Estate CRM extraction engine.
 Parse the provided real estate text/data into a clean JSON list of individual property listings.
 
 CRITICAL DISAMBIGUATION & EXTRACTION RULES:
@@ -290,7 +330,7 @@ CRITICAL DISAMBIGUATION & EXTRACTION RULES:
 7. Extract Plot No (e.g. 'Plot 398', 'Plot 1473', 'Plot 399+400 Pair'), Features (Corner, Park Facing, Pair, 60ft/100ft road, NDC Ready, Direct Owner), Demand / Price with unit (e.g. '720 Lac', '550 Lac', '6.25 Crore'), Contact No, Dealer/Agency Name.
 
 Input Raw Text:
-{raw_text}
+{chunk}
 
 Return ONLY a valid JSON Array with format:
 [
@@ -312,23 +352,28 @@ Return ONLY a valid JSON Array with format:
   }}
 ]"""
 
-    if HAS_GENAI and "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
-        try:
-            model = genai.GenerativeModel("gemini-2.5-flash")
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    response_mime_type="application/json",
-                    temperature=0.1
+        chunk_parsed = False
+        if gemini_active and gemini_client:
+            try:
+                response = gemini_client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.1
+                    )
                 )
-            )
-            parsed = json.loads(response.text)
-            if isinstance(parsed, list) and len(parsed) > 0:
-                return parsed
-        except Exception:
-            pass
+                parsed = json.loads(response.text)
+                if isinstance(parsed, list):
+                    all_results.extend(parsed)
+                    chunk_parsed = True
+            except Exception:
+                pass
 
-    return parse_fallback_heuristic(raw_text, default_phase)
+        if not chunk_parsed:
+            all_results.extend(parse_fallback_heuristic(chunk, default_phase))
+
+    return all_results
 
 def parse_fallback_heuristic(text_clean, default_phase):
     lines = [l.strip() for l in text_clean.split('\n') if l.strip()]
@@ -642,10 +687,10 @@ else:
             uploaded_file = st.file_uploader(
                 "Upload Excel, JSON, PDF, or Image:",
                 type=["xlsx", "xls", "json", "csv", "pdf", "txt", "png", "jpg", "jpeg", "webp"],
-                help="Upload property spreadsheets, JSON lists, flyers, or rate cards to auto-extract text."
+                help="Upload property spreadsheets, JSON lists, flyers, or WhatsApp exported chats."
             )
             if uploaded_file is not None:
-                with st.spinner(f"Extracting data from `{uploaded_file.name}`..."):
+                with st.spinner(f"Extracting & cleaning data from `{uploaded_file.name}`..."):
                     extracted_content = extract_text_from_any_file_or_image(uploaded_file, is_camera=False)
                     if extracted_content:
                         st.session_state["extracted_file_text"] = extracted_content
@@ -667,7 +712,7 @@ else:
             "📋 Raw Real Estate Data Ingestion (Auto-Populated from Files/Camera or Paste Free Text):",
             value=default_box_value,
             height=200,
-            placeholder="Paste ANY mixed WhatsApp deals, OCR data, or multi-phase listings here...\nExample:\n*398 U 720 Lac 28 Marla*\n*Phase 7*\n*18 CCA 2 @ 900 Lac*\n*Prism*\n*1473 R 155 Lac 6.74 Marla*\n*1772 J 78 Lac*"
+            placeholder="Paste ANY mixed WhatsApp deals, OCR data, or multi-phase listings here..."
         )
 
     if st.button("🚀 Process, Segregate & Route to Block Tabs", use_container_width=True):
