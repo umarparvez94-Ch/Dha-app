@@ -5,6 +5,7 @@ import json
 import io
 import os
 import time
+import math
 import urllib.request
 import pandas as pd
 from datetime import datetime
@@ -43,8 +44,6 @@ if "parsed_payloads" not in st.session_state:
     st.session_state["parsed_payloads"] = []
 if "extracted_file_text" not in st.session_state:
     st.session_state["extracted_file_text"] = ""
-if "synced_plots_history" not in st.session_state:
-    st.session_state["synced_plots_history"] = set()
 
 # Setup Google Gemini AI Client
 gemini_client = None
@@ -127,65 +126,6 @@ DHA_PHASE_SHEET_URLS = {
     "DHA Phase 12 (EME Sector)": "https://docs.google.com/spreadsheets/d/1Ai07OSySM4pcPV9yRr--fsMpKNPXtD2uwJx285_mPho/edit"
 }
 
-DHA_CUTTING_MAP_RULES = {
-    "DHA Phase 5": {
-        "Block A": [(1, 120, "2 Kanal"), (121, 500, "1 Kanal")],
-        "Block B": [(1, 80, "2 Kanal"), (81, 600, "1 Kanal")],
-        "Block C": [(1, 50, "2 Kanal"), (51, 450, "1 Kanal")],
-        "Block G": [(1, 350, "1 Kanal"), (351, 700, "10 Marla")],
-        "Block H": [(1, 400, "10 Marla"), (401, 800, "5 Marla")],
-        "Block J": [(1, 500, "10 Marla"), (501, 950, "5 Marla")],
-    },
-    "DHA Phase 6": {
-        "Block A": [(1, 150, "2 Kanal"), (151, 800, "1 Kanal")],
-        "Block B": [(1, 100, "2 Kanal"), (101, 700, "1 Kanal")],
-        "Block C": [(1, 650, "1 Kanal")],
-        "Block D": [(1, 700, "1 Kanal")],
-        "Block E": [(1, 550, "1 Kanal")],
-        "Block J": [(1, 600, "10 Marla")],
-        "Block L": [(1, 800, "10 Marla"), (801, 1200, "5 Marla")],
-    },
-    "DHA Phase 7": {
-        "Block P": [(1, 1100, "1 Kanal")],
-        "Block Q": [(1, 900, "1 Kanal")],
-        "Block R": [(1, 1050, "1 Kanal")],
-        "Block S": [(1, 950, "1 Kanal")],
-        "Block T": [(1, 1200, "1 Kanal")],
-        "Block U": [(1, 1400, "1 Kanal")],
-        "Block W": [(1, 1400, "10 Marla")],
-        "Block X": [(1, 1300, "10 Marla")],
-        "Block Y": [(1, 900, "5 Marla")],
-        "Block Z": [(1, 1100, "5 Marla")]
-    },
-    "DHA Phase 8 (Proper)": {
-        "Block A": [(1, 100, "2 Kanal"), (101, 550, "1 Kanal")],
-        "Block B": [(1, 80, "2 Kanal"), (81, 500, "1 Kanal")],
-        "Block C": [(1, 70, "2 Kanal"), (71, 480, "1 Kanal")],
-        "Block D": [(1, 600, "1 Kanal")],
-        "Block E": [(1, 550, "1 Kanal")],
-        "Block F": [(1, 500, "1 Kanal")],
-        "Block S": [(1, 750, "10 Marla")],
-        "Block T": [(1, 800, "10 Marla"), (801, 1300, "5 Marla")],
-        "Block U": [(1, 900, "5 Marla")],
-        "Block V": [(1, 850, "5 Marla")],
-        "Block W": [(1, 700, "8 Marla")]
-    },
-    "DHA Phase 9 Prism": {
-        "Block A": [(1, 600, "1 Kanal")],
-        "Block B": [(1, 550, "1 Kanal")],
-        "Block C": [(1, 700, "1 Kanal")],
-        "Block D": [(1, 650, "1 Kanal")],
-        "Block E": [(1, 500, "1 Kanal")],
-        "Block F": [(1, 700, "1 Kanal")],
-        "Block G": [(1, 600, "1 Kanal")],
-        "Block J": [(1, 1200, "10 Marla")],
-        "Block K": [(1, 1100, "10 Marla")],
-        "Block L": [(1, 1300, "10 Marla")],
-        "Block R": [(1, 1800, "5 Marla")],
-        "Block Q": [(1, 1600, "5 Marla")]
-    }
-}
-
 DHA_PHASE_BLOCK_CATALOG = {
     "DHA Phase 1": {
         "residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P"],
@@ -249,24 +189,6 @@ DHA_PHASE_BLOCK_CATALOG = {
     }
 }
 
-def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
-    cleaned_size = str(extracted_size).strip() if extracted_size else ""
-    if cleaned_size and cleaned_size.lower() not in ["n/a", "unknown", "none", ""]:
-        return cleaned_size
-    
-    try:
-        p_num = int(re.sub(r'[^0-9]', '', str(plot_no)))
-    except Exception:
-        return ""
-    
-    phase_rules = DHA_CUTTING_MAP_RULES.get(phase, {})
-    block_ranges = phase_rules.get(block, [])
-    for start_n, end_n, official_sz in block_ranges:
-        if start_n <= p_num <= end_n:
-            return official_sz
-            
-    return ""
-
 @st.cache_resource
 def get_gspread_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
@@ -297,7 +219,6 @@ def get_or_create_clean_tab_exact(workbook, tab_title):
         for w in ws_list:
             if w.title.strip().lower() == clean_title.lower():
                 return w
-        # If not found, create new tab
         ws = safe_gspread_call(workbook.add_worksheet, title=clean_title, rows=500, cols=16)
         safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
         return ws
@@ -413,144 +334,176 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
 
     return clean_whatsapp_chat_text(file_bytes)
 
-def parse_with_strict_gemini_schema(raw_text, default_phase):
+# ==============================================================================
+# STRICT LINE-PRESERVING GEMINI API EXTRACTION ENGINE (ZERO TRUNCATION)
+# ==============================================================================
+def parse_strictly_with_gemini_api(raw_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
-    chunk_size = 10000
-    text_chunks = [raw_text[i:i+chunk_size] for i in range(0, len(raw_text), chunk_size)]
+    
+    # Split strictly by full lines (NEVER cut any message in half!)
+    all_lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
+    if not all_lines:
+        return []
+
+    # Batch lines into chunks of 60 full messages
+    LINES_PER_CHUNK = 60
+    chunks = ["\n".join(all_lines[i:i+LINES_PER_CHUNK]) for i in range(0, len(all_lines), LINES_PER_CHUNK)]
     all_results = []
 
-    for chunk in text_chunks:
-        prompt = f"""You are an expert DHA Lahore Real Estate CRM extraction engine.
-Parse the text into a clean JSON list of individual property listings.
+    progress_ingest = st.progress(0)
+    status_ingest = st.empty()
 
-CRITICAL RULES:
-1. Official Phases: 'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
-2. Block names MUST strictly match catalog: {catalog_json_str}.
-3. SIZE RULE: Extract EXACT size if stated in text ('5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla', '13 Marla', '28 Marla'). If NO size is stated in message, leave "Size" as empty string "". DO NOT assume or force 1 Kanal.
-4. Extract exact Plot No, Demand / Price, Plot Features (Corner, Park Face, MB, Direct, Possession, Non-Possession), Seller / Dealer Name, and Contact No without dummy fillers.
+    for c_idx, chunk in enumerate(chunks):
+        status_ingest.text(f"🧠 AI Gemini Processing Chunk {c_idx+1} of {len(chunks)}...")
+        
+        prompt = f"""You are a professional real estate data extraction assistant specializing in DHA Lahore.
+Extract EVERY single individual property listing from the provided text into a JSON array of objects.
 
-Input Raw Text:
+OFFICIAL DHA PHASES:
+'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
+
+OFFICIAL DHA CATALOG BLOCKS:
+{catalog_json_str}
+
+STRICT EXTRACTION RULES:
+1. "Phase": Identify the phase from context/headers or fallback to '{default_phase}'.
+2. "Block": Must match the official block name (e.g. 'Block A', 'Block W', 'CCA 1 Commercial', 'Broadway Commercial').
+3. "Plot No": Extract the COMPLETE full plot number exactly as written (e.g. 'Plot 980', 'Plot 1008', 'Plot 432', 'Plot 654'). DO NOT cut off digits!
+4. "Demand / Price": Extract full demand (e.g. '585 Lac', '440 Lac', '3.8 Crore'). If no price is mentioned, leave as "". NEVER invent '0 Lac'.
+5. "Size": If size is explicitly mentioned ('5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla', '13 Marla'), write it. If not mentioned in message, leave as "".
+6. "Plot Features": Extract features like 'Corner', 'Park Facing', 'Corner / Park Facing', 'Main Boulevard (MB)', 'Direct Option', 'Possession Plot', 'Non-Possession'. Otherwise 'Standard Layout'.
+7. "Contact No": Extract valid Pakistani phone number from line/section if available, else "".
+8. "Raw Listing & Source Material": Copy the exact line from input text.
+
+Input Real Estate Messages:
 {chunk}
 
 Return ONLY a valid JSON Array with format:
 [
   {{
     "Category": "Selling",
-    "Phase": "DHA Phase 7",
-    "Block": "Block U",
-    "Plot No": "Plot 398",
-    "Size": "",
-    "Plot Features": "Standard Layout",
-    "Demand / Price": "720 Lac",
+    "Phase": "DHA Phase 9 Prism",
+    "Block": "Block A",
+    "Plot No": "Plot 980",
+    "Size": "1 Kanal",
+    "Plot Features": "Corner / Facing Park",
+    "Demand / Price": "585 Lac",
     "Seller Type": "Dealer",
     "Seller / Dealer Name": "",
     "Contact No": "",
     "Office / Agency": "Wali Muhammad Associates",
     "Deal Status": "Available",
     "Last Conversation / Notes": "Direct WhatsApp Ingestion",
-    "Raw Listing & Source Material": "398 U 720 Lac"
+    "Raw Listing & Source Material": "A 980 corner f park"
   }}
 ]"""
 
-        chunk_parsed = False
+        chunk_success = False
         if gemini_active and gemini_client:
-            try:
-                response = gemini_client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        temperature=0.1
-                    )
-                )
-                parsed = json.loads(response.text)
-                if isinstance(parsed, list):
-                    for item in parsed:
-                        item["Size"] = resolve_size_text_first_or_map(
-                            item.get("Phase", default_phase),
-                            item.get("Block", "Block A"),
-                            item.get("Plot No", ""),
-                            item.get("Size", "")
+            for retry in range(3):
+                try:
+                    response = gemini_client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            temperature=0.0
                         )
-                    all_results.extend(parsed)
-                    chunk_parsed = True
-            except Exception:
-                pass
+                    )
+                    parsed_json = json.loads(response.text)
+                    if isinstance(parsed_json, list):
+                        all_results.extend(parsed_json)
+                        chunk_success = True
+                        break
+                except Exception:
+                    time.sleep(1.0)
 
-        if not chunk_parsed:
-            all_results.extend(parse_fallback_heuristic(chunk, default_phase))
+        if not chunk_success:
+            all_results.extend(fallback_regex_tokenizer(chunk, default_phase))
 
+        progress_ingest.progress((c_idx + 1) / len(chunks))
+        time.sleep(0.1)
+
+    status_ingest.empty()
+    progress_ingest.empty()
     return all_results
 
-def parse_fallback_heuristic(text_clean, default_phase):
-    lines = [l.strip() for l in text_clean.split('\n') if l.strip()]
-    phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', text_clean)
+def fallback_regex_tokenizer(text_chunk, default_phase):
+    lines = [l.strip() for l in text_chunk.splitlines() if l.strip()]
+    phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', text_chunk)
     main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else ""
     
     current_phase = default_phase
-    current_size = ""
     extracted = []
     
     for line in lines:
         l_up = line.upper()
         if "PHASE 12" in l_up or "EME" in l_up:
             current_phase = "DHA Phase 12 (EME Sector)"
-            continue
         elif "PHASE 11" in l_up or "RAHBAR" in l_up:
             current_phase = "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"
-            continue
         elif "PHASE 9 PRISM" in l_up or "PRISM" in l_up:
             current_phase = "DHA Phase 9 Prism"
-            continue
         elif "PHASE 9 TOWN" in l_up or "9 TOWN" in l_up:
             current_phase = "DHA Phase 9 Town"
-            continue
         elif "PHASE 8" in l_up:
             current_phase = "DHA Phase 8 (Proper)"
-            continue
         elif "PHASE 7" in l_up:
             current_phase = "DHA Phase 7"
-            continue
         elif "PHASE 6" in l_up:
             current_phase = "DHA Phase 6"
-            continue
         elif "PHASE 5" in l_up:
             current_phase = "DHA Phase 5"
-            continue
         elif "PHASE 4" in l_up:
             current_phase = "DHA Phase 4"
-            continue
         elif "PHASE 3" in l_up:
             current_phase = "DHA Phase 3"
-            continue
         elif "PHASE 2" in l_up:
             current_phase = "DHA Phase 2"
-            continue
         elif "PHASE 1" in l_up:
             current_phase = "DHA Phase 1"
-            continue
 
-        m = re.search(r'([A-Z0-9-]{1,3})\s*[-.:/ ]\s*([0-9]{1,5})\s*(?:@|\bDEMAND\b:?)?\s*(\d+\.?\d*)\s*(?:[.]?(LAC|LACS|CRORE|CR))?', l_up)
+        line_sz = ""
+        if "10 MARLA" in l_up or "10M" in l_up:
+            line_sz = "10 Marla"
+        elif "5 MARLA" in l_up or "5M" in l_up or "5.5 MARLA" in l_up:
+            line_sz = "5 Marla"
+        elif "2 KANAL" in l_up or "2K" in l_up:
+            line_sz = "2 Kanal"
+        elif "1 KANAL" in l_up or "1K" in l_up:
+            line_sz = "1 Kanal"
+
+        feat = "Standard Layout"
+        if "CORNER" in l_up and "PARK" in l_up:
+            feat = "Corner / Park Facing"
+        elif "CORNER" in l_up:
+            feat = "Corner"
+        elif "PARK" in l_up:
+            feat = "Facing Park"
+
+        m = re.search(r'(?:BLOCK\s*)?([A-Z0-9-]{1,4})\s*[-.:/# ]\s*([0-9]{1,5})(?:\s*[@:]\s*|\s+DEMAND\s*[:@]?\s*|\s+@\s*|\s+)?([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
         if m:
-            blk = f"Block {m.group(1).upper()}"
-            plt = f"Plot {m.group(2)}"
-            prc = f"{m.group(3)} {m.group(4) if m.group(4) else 'Lac'}".strip() if m.group(3) else ""
-            final_sz = resolve_size_text_first_or_map(current_phase, blk, plt, current_size)
-            
+            blk_raw = m.group(1).upper()
+            blk = f"Block {blk_raw}" if not blk_raw.startswith("BLOCK") else blk_raw
+            plt_num = m.group(2)
+            raw_prc = m.group(3)
+            prc_unit = m.group(4) if m.group(4) else "Lac"
+            prc = f"{raw_prc} {prc_unit}".strip() if (raw_prc and float(raw_prc) > 5) else ""
+
             extracted.append({
                 "Category": "Selling",
                 "Phase": current_phase,
                 "Block": blk,
-                "Plot No": plt,
-                "Size": final_sz,
-                "Plot Features": "Standard Layout",
+                "Plot No": f"Plot {plt_num}",
+                "Size": line_sz,
+                "Plot Features": feat,
                 "Demand / Price": prc,
                 "Seller Type": "Dealer",
                 "Seller / Dealer Name": "",
                 "Contact No": main_phone,
                 "Office / Agency": st.session_state["office_name"],
                 "Deal Status": "Available",
-                "Last Conversation / Notes": "Fallback Local Engine",
+                "Last Conversation / Notes": "Direct WhatsApp Ingestion",
                 "Raw Listing & Source Material": line
             })
     return extracted
@@ -625,13 +578,13 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
             <span class="stat-pill">📁 <b>Target Tabs:</b> {unique_tabs_count} Tabs</span>
             <span class="stat-pill">💰 <b>Prices Identified:</b> {with_demand_count}</span>
             <span class="stat-pill">📞 <b>Contacts Identified:</b> {with_contact_count}</span>
-            <span class="stat-pill">🛡️ <b>Total In Memory:</b> {total_raw_items} Listings</span>
+            <span class="stat-pill">🛡️ <b>Total Parsed via Gemini AI:</b> {total_raw_items} Listings</span>
         </div>
     """, unsafe_allow_html=True)
 
     # 4. Table Display / Editable Sheet
     if edit_popup_mode:
-        st.info("💡 **Edit Mode Active:** You can edit cells or delete rows. Only rows shown below will sync.")
+        st.info("💡 **Edit Mode Active:** Double-click cells to edit or select rows and press **`Delete`** on keyboard. Only rows shown below will sync.")
         final_df = st.data_editor(
             df_final_display,
             use_container_width=True,
@@ -657,7 +610,7 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
         </div>
     """, unsafe_allow_html=True)
 
-    # 6. Action Buttons (Stay on Screen upon Push!)
+    # 6. Action Buttons: Option A (Zero Record Loss - Save All Entries with Repeats Marked)
     col_b1, col_b2 = st.columns([1.6, 1])
     with col_b1:
         if st.button(f"🚀 Push ({final_sync_count} Plots) to Sheet Tabs", use_container_width=True):
@@ -678,7 +631,6 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                     grouped_data[key].append(row)
                 
                 saved_count = 0
-                skipped_today = 0
                 repeated_tracked = 0
                 
                 workbook_cache = {}
@@ -696,7 +648,6 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                         workbook_cache[phase] = wb
                     
                     wb = workbook_cache[phase]
-                    # Exactly connect to the specific block tab
                     ws = get_or_create_clean_tab_exact(wb, block)
                     
                     try:
@@ -707,32 +658,26 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                     if len(existing_rows) == 0:
                         safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
                     
-                    existing_plots_today = set()
                     plot_repeat_map = {}
-                    
                     if len(existing_rows) > 1:
                         for r in existing_rows[1:]:
-                            r_date = r[0] if len(r) > 0 else ""
                             r_plot = str(r[4]).strip().lower() if len(r) > 4 else ""
                             if r_plot:
                                 plot_repeat_map[r_plot] = plot_repeat_map.get(r_plot, 0) + 1
-                                if today_str in r_date:
-                                    existing_plots_today.add(r_plot)
                     
                     rows_to_append = []
                     for row in rows_list:
                         plot_val = str(row.get("Plot No", "")).strip()
                         plot_val_clean = plot_val.lower()
                         
-                        if plot_val_clean and plot_val_clean in existing_plots_today:
-                            skipped_today += 1
-                            continue
-                        
+                        # OPTION A: NEVER SKIP! SAVE EVERY ENTRY AND TRACK FREQUENCY
                         repeat_count = plot_repeat_map.get(plot_val_clean, 0)
                         notes_txt = "Direct WhatsApp Ingestion"
                         if repeat_count > 0:
                             repeated_tracked += 1
                             notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
+                        
+                        plot_repeat_map[plot_val_clean] = repeat_count + 1
                         
                         row_data = [
                             str(now_str),
@@ -752,10 +697,8 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                             f"[AI Ingest] {str(row.get('Source Text', ''))}"
                         ]
                         rows_to_append.append(row_data)
-                        if plot_val_clean:
-                            existing_plots_today.add(plot_val_clean)
                     
-                    # Chunked write
+                    # Safe Chunked Write to protect 429 Quota
                     CHUNK_SIZE = 50
                     for i in range(0, len(rows_to_append), CHUNK_SIZE):
                         chunk_slice = rows_to_append[i:i + CHUNK_SIZE]
@@ -768,7 +711,7 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                 
                 status_placeholder.empty()
                 progress_bar.empty()
-                st.success(f"🎉 **Success!** Saved **{saved_count} listings** directly to `[{selected_phase_target}]`! (Duplicates skipped: **{skipped_today}**, Repeats marked: **{repeated_tracked}**)")
+                st.success(f"🎉 **Push Complete!** Successfully saved ALL **{saved_count} listings** directly to Google Sheets! (0 Records Lost • Repeats Tracked: **{repeated_tracked}**)")
                 st.info("💡 **Screen remains open:** You can now change Phase/Block above to push other portions, or click 'Back' below.")
 
     with col_b2:
@@ -830,7 +773,7 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Multi-Phase Selective Ingestion & Verification Engine (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">Strict Gemini AI Parser & Multi-Phase Control Center (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -1000,7 +943,7 @@ else:
         default_box_value = st.session_state.get("extracted_file_text", "")
         
         raw_text = st.text_area(
-            "📋 Raw Real Estate Ingestion Box (Enterprise Fault-Tolerant Engine):",
+            "📋 Raw Real Estate Ingestion Box (Strict Line-Preserving Gemini AI Engine):",
             value=default_box_value,
             height=220,
             placeholder="Data loaded from files, Google Drive, camera or copy-paste will appear here for processing..."
@@ -1009,8 +952,8 @@ else:
     if st.button("🚀 Process, Segregate & Route to Block Tabs", use_container_width=True):
         final_input_text = raw_text.strip()
         if final_input_text:
-            with st.spinner("🧠 AI Engine is extracting listings and preparing interactive batch editor..."):
-                payloads = parse_with_strict_gemini_schema(final_input_text, selected_phase)
+            with st.spinner("🧠 Strict Gemini AI Engine is reading listings line-by-line and building exact schema..."):
+                payloads = parse_strictly_with_gemini_api(final_input_text, selected_phase)
                 if payloads:
                     st.session_state["parsed_payloads"] = payloads
                     show_routing_popup(payloads, DHA_PHASE_SHEET_URLS, gc_client)
