@@ -5,7 +5,6 @@ import json
 import io
 import os
 import time
-import math
 import urllib.request
 import pandas as pd
 from datetime import datetime
@@ -44,6 +43,8 @@ if "parsed_payloads" not in st.session_state:
     st.session_state["parsed_payloads"] = []
 if "extracted_file_text" not in st.session_state:
     st.session_state["extracted_file_text"] = ""
+if "synced_plots_history" not in st.session_state:
+    st.session_state["synced_plots_history"] = set()
 
 # Setup Google Gemini AI Client
 gemini_client = None
@@ -285,22 +286,20 @@ def safe_gspread_call(func, *args, **kwargs):
 
 def get_phase_workbook(gc, phase_name):
     target_url = DHA_PHASE_SHEET_URLS.get(phase_name)
-    try:
-        return safe_gspread_call(gc.open_by_url, target_url)
-    except Exception:
-        return safe_gspread_call(gc.open_by_url, DHA_PHASE_SHEET_URLS["DHA Phase 1"])
+    if not target_url:
+        target_url = DHA_PHASE_SHEET_URLS["DHA Phase 1"]
+    return safe_gspread_call(gc.open_by_url, target_url)
 
-def get_cached_tab(workbook, tab_title, ws_dict):
+def get_or_create_clean_tab_exact(workbook, tab_title):
     clean_title = tab_title.strip()
-    clean_key = clean_title.lower()
-    
-    if clean_key in ws_dict:
-        return ws_dict[clean_key]
-    
     try:
+        ws_list = safe_gspread_call(workbook.worksheets)
+        for w in ws_list:
+            if w.title.strip().lower() == clean_title.lower():
+                return w
+        # If not found, create new tab
         ws = safe_gspread_call(workbook.add_worksheet, title=clean_title, rows=500, cols=16)
         safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
-        ws_dict[clean_key] = ws
         return ws
     except Exception:
         return workbook.sheet1
@@ -556,8 +555,8 @@ def parse_fallback_heuristic(text_clean, default_phase):
             })
     return extracted
 
-# 7. Interactive Summary Report & Selective Phase/Block Cascade Ingestion
-@st.dialog("⚡ DHA AI Extraction Summary & Routing Control Panel", width="large")
+# 7. Persistent Summary Routing Control Panel with Exact Sheet Synchronization
+@st.dialog("⚡ DHA Extraction Summary & Multi-Phase Push Center", width="large")
 def show_routing_popup(payloads, phase_wb_map, gc_client):
     total_raw_items = len(payloads)
     
@@ -583,7 +582,6 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
     with col_t1:
         edit_popup_mode = st.toggle("✏️ Edit Mode (ON / OFF)", value=False, key="toggle_popup_edit_mode")
 
-    # Dropdown: Phase Cascade Selector
     all_dha_phases = ["All Phases (Everything)"] + list(DHA_PHASE_BLOCK_CATALOG.keys())
     with col_t2:
         selected_phase_target = st.selectbox(
@@ -593,7 +591,6 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
             key="popup_target_phase_select"
         )
 
-    # Dropdown: Block / CCA Tabs Cascade Selector
     if selected_phase_target == "All Phases (Everything)":
         available_tabs = ["All Block Tabs / CCAs"] + sorted(list(df_all["Target Tab"].unique()))
         df_filtered_phase = df_all
@@ -611,7 +608,6 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
             key="popup_target_block_select"
         )
 
-    # Filter Application
     if selected_block_target != "All Block Tabs / CCAs":
         df_final_display = df_filtered_phase[df_filtered_phase["Target Tab"] == selected_block_target]
     else:
@@ -625,17 +621,17 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
 
     st.markdown(f"""
         <div class="summary-card">
-            <span class="stat-pill">📊 <b>Selected:</b> {num_selected} Plots</span>
+            <span class="stat-pill">📊 <b>Selected View:</b> {num_selected} Plots</span>
             <span class="stat-pill">📁 <b>Target Tabs:</b> {unique_tabs_count} Tabs</span>
-            <span class="stat-pill">💰 <b>Demands Extracted:</b> {with_demand_count}</span>
-            <span class="stat-pill">📞 <b>Contacts Extracted:</b> {with_contact_count}</span>
-            <span class="stat-pill">🛡️ <b>Total Source Parsed:</b> {total_raw_items} Listings</span>
+            <span class="stat-pill">💰 <b>Prices Identified:</b> {with_demand_count}</span>
+            <span class="stat-pill">📞 <b>Contacts Identified:</b> {with_contact_count}</span>
+            <span class="stat-pill">🛡️ <b>Total In Memory:</b> {total_raw_items} Listings</span>
         </div>
     """, unsafe_allow_html=True)
 
     # 4. Table Display / Editable Sheet
     if edit_popup_mode:
-        st.info("💡 **Edit Mode Active:** Double-click cells to edit or select rows and press **`Delete`** on keyboard. Only rows currently visible below will be synced.")
+        st.info("💡 **Edit Mode Active:** You can edit cells or delete rows. Only rows shown below will sync.")
         final_df = st.data_editor(
             df_final_display,
             use_container_width=True,
@@ -657,130 +653,123 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
 
     st.markdown(f"""
         <div class="eta-box">
-            🚀 <b>Ready for Sync:</b> {final_sync_count} listings across {unique_tabs_count} tabs | ⏱️ <b>Estimated Sync Time:</b> ~{eta_label} (Safe Quota Chunking Active)
+            🚀 <b>Ready for Sync:</b> {final_sync_count} listings across {unique_tabs_count} tabs | ⏱️ <b>Estimated Sync Time:</b> ~{eta_label}
         </div>
     """, unsafe_allow_html=True)
 
-    # 6. Action Buttons: Confirm & Push + Back to Main Dashboard
+    # 6. Action Buttons (Stay on Screen upon Push!)
     col_b1, col_b2 = st.columns([1.6, 1])
     with col_b1:
         if st.button(f"🚀 Push ({final_sync_count} Plots) to Sheet Tabs", use_container_width=True):
             if final_sync_count == 0:
                 st.warning("No listings in current selection to sync.")
-                return
-            
-            now_dt = datetime.now()
-            today_str = now_dt.strftime("%Y-%m-%d")
-            now_str = now_dt.strftime("%Y-%m-%d %H:%M")
-            
-            grouped_data = {}
-            for _, row in final_df.iterrows():
-                target_phase = str(row.get("Target Phase", "DHA Phase 1")).strip()
-                target_block = str(row.get("Target Tab", "Block A")).strip()
-                key = (target_phase, target_block)
-                if key not in grouped_data:
-                    grouped_data[key] = []
-                grouped_data[key].append(row)
-            
-            saved_count = 0
-            skipped_today = 0
-            repeated_tracked = 0
-            
-            workbook_cache = {}
-            worksheets_map_cache = {}
-            total_groups = len(grouped_data)
-            
-            progress_bar = st.progress(0)
-            status_placeholder = st.empty()
-            
-            for idx, ((phase, block), rows_list) in enumerate(grouped_data.items()):
-                pct = int(((idx + 1) / total_groups) * 100)
-                status_placeholder.markdown(f"⏳ **Syncing:** `[{phase} ➔ {block}]` — ({idx+1}/{total_groups} tabs) • **{pct}% Complete**")
+            else:
+                now_dt = datetime.now()
+                today_str = now_dt.strftime("%Y-%m-%d")
+                now_str = now_dt.strftime("%Y-%m-%d %H:%M")
                 
-                if phase not in workbook_cache:
-                    wb = get_phase_workbook(gc_client, phase)
-                    workbook_cache[phase] = wb
-                    ws_list = safe_gspread_call(wb.worksheets)
-                    worksheets_map_cache[phase] = {w.title.strip().lower(): w for w in ws_list}
+                grouped_data = {}
+                for _, row in final_df.iterrows():
+                    target_phase = str(row.get("Target Phase", "DHA Phase 1")).strip()
+                    target_block = str(row.get("Target Tab", "Block A")).strip()
+                    key = (target_phase, target_block)
+                    if key not in grouped_data:
+                        grouped_data[key] = []
+                    grouped_data[key].append(row)
                 
-                wb = workbook_cache[phase]
-                ws_dict = worksheets_map_cache[phase]
-                ws = get_cached_tab(wb, block, ws_dict)
+                saved_count = 0
+                skipped_today = 0
+                repeated_tracked = 0
                 
-                try:
-                    existing_rows = safe_gspread_call(ws.get_all_values)
-                except Exception:
-                    existing_rows = []
+                workbook_cache = {}
+                total_groups = len(grouped_data)
                 
-                if len(existing_rows) == 0:
-                    safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
+                progress_bar = st.progress(0)
+                status_placeholder = st.empty()
                 
-                existing_plots_today = set()
-                plot_repeat_map = {}
-                
-                if len(existing_rows) > 1:
-                    for r in existing_rows[1:]:
-                        r_date = r[0] if len(r) > 0 else ""
-                        r_plot = str(r[4]).strip().lower() if len(r) > 4 else ""
-                        if r_plot:
-                            plot_repeat_map[r_plot] = plot_repeat_map.get(r_plot, 0) + 1
-                            if today_str in r_date:
-                                existing_plots_today.add(r_plot)
-                
-                rows_to_append = []
-                for row in rows_list:
-                    plot_val = str(row.get("Plot No", "")).strip()
-                    plot_val_clean = plot_val.lower()
+                for idx, ((phase, block), rows_list) in enumerate(grouped_data.items()):
+                    pct = int(((idx + 1) / total_groups) * 100)
+                    status_placeholder.markdown(f"⏳ **Syncing:** `[{phase} ➔ {block}]` — ({idx+1}/{total_groups} tabs) • **{pct}% Complete**")
                     
-                    if plot_val_clean and plot_val_clean in existing_plots_today:
-                        skipped_today += 1
-                        continue
+                    if phase not in workbook_cache:
+                        wb = get_phase_workbook(gc_client, phase)
+                        workbook_cache[phase] = wb
                     
-                    repeat_count = plot_repeat_map.get(plot_val_clean, 0)
-                    notes_txt = "Direct WhatsApp Ingestion"
-                    if repeat_count > 0:
-                        repeated_tracked += 1
-                        notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
+                    wb = workbook_cache[phase]
+                    # Exactly connect to the specific block tab
+                    ws = get_or_create_clean_tab_exact(wb, block)
                     
-                    row_data = [
-                        str(now_str),
-                        str(row.get("Category", "Selling")),
-                        str(phase),
-                        str(block),
-                        str(plot_val),
-                        str(row.get("Size", "")),
-                        str(row.get("Plot Features", "Standard Layout")),
-                        str(row.get("Demand / Price", "")),
-                        "Dealer",
-                        "",
-                        str(row.get("Contact No", "")),
-                        str(st.session_state['office_name']),
-                        "Available",
-                        str(notes_txt),
-                        f"[AI Ingest] {str(row.get('Source Text', ''))}"
-                    ]
-                    rows_to_append.append(row_data)
-                    if plot_val_clean:
-                        existing_plots_today.add(plot_val_clean)
+                    try:
+                        existing_rows = safe_gspread_call(ws.get_all_values)
+                    except Exception:
+                        existing_rows = []
+                    
+                    if len(existing_rows) == 0:
+                        safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
+                    
+                    existing_plots_today = set()
+                    plot_repeat_map = {}
+                    
+                    if len(existing_rows) > 1:
+                        for r in existing_rows[1:]:
+                            r_date = r[0] if len(r) > 0 else ""
+                            r_plot = str(r[4]).strip().lower() if len(r) > 4 else ""
+                            if r_plot:
+                                plot_repeat_map[r_plot] = plot_repeat_map.get(r_plot, 0) + 1
+                                if today_str in r_date:
+                                    existing_plots_today.add(r_plot)
+                    
+                    rows_to_append = []
+                    for row in rows_list:
+                        plot_val = str(row.get("Plot No", "")).strip()
+                        plot_val_clean = plot_val.lower()
+                        
+                        if plot_val_clean and plot_val_clean in existing_plots_today:
+                            skipped_today += 1
+                            continue
+                        
+                        repeat_count = plot_repeat_map.get(plot_val_clean, 0)
+                        notes_txt = "Direct WhatsApp Ingestion"
+                        if repeat_count > 0:
+                            repeated_tracked += 1
+                            notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
+                        
+                        row_data = [
+                            str(now_str),
+                            str(row.get("Category", "Selling")),
+                            str(phase),
+                            str(block),
+                            str(plot_val),
+                            str(row.get("Size", "")),
+                            str(row.get("Plot Features", "Standard Layout")),
+                            str(row.get("Demand / Price", "")),
+                            "Dealer",
+                            "",
+                            str(row.get("Contact No", "")),
+                            str(st.session_state['office_name']),
+                            "Available",
+                            str(notes_txt),
+                            f"[AI Ingest] {str(row.get('Source Text', ''))}"
+                        ]
+                        rows_to_append.append(row_data)
+                        if plot_val_clean:
+                            existing_plots_today.add(plot_val_clean)
+                    
+                    # Chunked write
+                    CHUNK_SIZE = 50
+                    for i in range(0, len(rows_to_append), CHUNK_SIZE):
+                        chunk_slice = rows_to_append[i:i + CHUNK_SIZE]
+                        safe_gspread_call(ws.append_rows, chunk_slice, value_input_option="USER_ENTERED")
+                        saved_count += len(chunk_slice)
+                        time.sleep(0.4)
+                    
+                    progress_bar.progress((idx + 1) / total_groups)
+                    time.sleep(0.3)
                 
-                # Chunked write to protect 429 quota
-                CHUNK_SIZE = 50
-                for i in range(0, len(rows_to_append), CHUNK_SIZE):
-                    chunk_slice = rows_to_append[i:i + CHUNK_SIZE]
-                    safe_gspread_call(ws.append_rows, chunk_slice, value_input_option="USER_ENTERED")
-                    saved_count += len(chunk_slice)
-                    time.sleep(0.4)
-                
-                progress_bar.progress((idx + 1) / total_groups)
-                time.sleep(0.3)
-            
-            status_placeholder.empty()
-            progress_bar.empty()
-            st.success(f"🎉 **Push Complete!** Successfully saved **{saved_count} listings** to `{selected_phase_target}`! (Skipped today's duplicates: **{skipped_today}**, Repeats marked: **{repeated_tracked}**)")
-            st.balloons()
-            st.session_state["parsed_payloads"] = []
-            st.session_state["extracted_file_text"] = ""
-            st.rerun()
+                status_placeholder.empty()
+                progress_bar.empty()
+                st.success(f"🎉 **Success!** Saved **{saved_count} listings** directly to `[{selected_phase_target}]`! (Duplicates skipped: **{skipped_today}**, Repeats marked: **{repeated_tracked}**)")
+                st.info("💡 **Screen remains open:** You can now change Phase/Block above to push other portions, or click 'Back' below.")
 
     with col_b2:
         if st.button("⬅️ Back to Main Screen", use_container_width=True):
@@ -841,7 +830,7 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Targeted Filtering & Safe Batch Sync (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">Multi-Phase Selective Ingestion & Verification Engine (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -850,7 +839,7 @@ else:
         selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
     with col_phase:
         phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
-        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook View)", phase_options, index=6)
+        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook View)", phase_options, index=11)
 
     try:
         phase_workbook = get_phase_workbook(gc_client, selected_phase)
@@ -885,9 +874,7 @@ else:
             st.rerun()
 
     try:
-        all_ws = safe_gspread_call(phase_workbook.worksheets)
-        ws_lookup = {w.title.strip().lower(): w for w in all_ws}
-        current_ws = get_cached_tab(phase_workbook, selected_active_block, ws_lookup)
+        current_ws = get_or_create_clean_tab_exact(phase_workbook, selected_active_block)
         records = safe_gspread_call(current_ws.get_all_values)
         
         if len(records) > 1:
