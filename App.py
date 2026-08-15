@@ -14,7 +14,7 @@ try:
 except ImportError:
     HAS_PYPDF = False
 
-# New Official Google GenAI SDK
+# Google GenAI SDK
 try:
     from google import genai
     from google.genai import types
@@ -42,7 +42,7 @@ if "parsed_payloads" not in st.session_state:
 if "extracted_file_text" not in st.session_state:
     st.session_state["extracted_file_text"] = ""
 
-# Setup Official Google Gemini AI Client
+# Setup Google Gemini AI Client
 gemini_client = None
 gemini_active = False
 
@@ -54,7 +54,7 @@ if HAS_GENAI and api_key_val:
     except Exception:
         gemini_active = False
 
-# 2. CSS Injection
+# 2. CSS Styling
 st.markdown("""
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -217,9 +217,11 @@ def clean_whatsapp_chat_text(raw_bytes):
     try:
         decoded_text = raw_bytes.decode('utf-8', errors='ignore')
     except Exception:
-        decoded_text = str(raw_bytes)
+        try:
+            decoded_text = raw_bytes.decode('latin-1', errors='ignore')
+        except Exception:
+            decoded_text = str(raw_bytes)
 
-    # WhatsApp date-time patterns removal
     chat_patterns = [
         r'^\s*\[?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\]?\s*-?\s*[^:]+:\s*',
         r'^\s*\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*-\s*[^:]+:\s*'
@@ -310,9 +312,7 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
 
 def parse_with_strict_gemini_schema(raw_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
-    
-    # Split text into chunks if it exceeds 15,000 characters to process large WhatsApp chats effortlessly
-    chunk_size = 15000
+    chunk_size = 12000
     text_chunks = [raw_text[i:i+chunk_size] for i in range(0, len(raw_text), chunk_size)]
     all_results = []
 
@@ -320,14 +320,12 @@ def parse_with_strict_gemini_schema(raw_text, default_phase):
         prompt = f"""You are an expert DHA Lahore Real Estate CRM extraction engine.
 Parse the provided real estate text/data into a clean JSON list of individual property listings.
 
-CRITICAL DISAMBIGUATION & EXTRACTION RULES:
-1. DHA Lahore phases share common block letters (e.g. Block A is in Phase 1, Phase 5, Phase 6, Phase 8, Phase 9 Prism, Phase 9 Town, Phase 12 EME).
-2. NEVER mix up Block A of Phase 1 with Block A of Phase 5 or Phase 6. Maintain strict contextual parent Phase hierarchy.
-3. Official Phase Names: 'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
-4. If Phase is not mentioned in a local group, use active context or fallback to default: '{default_phase}'.
-5. Block names MUST strictly match catalog: {catalog_json_str}.
-6. Detect exact Size: '5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '13 Marla', '28 Marla', '6.74 Marla', '4 Marla', '8 Marla'.
-7. Extract Plot No (e.g. 'Plot 398', 'Plot 1473', 'Plot 399+400 Pair'), Features (Corner, Park Facing, Pair, 60ft/100ft road, NDC Ready, Direct Owner), Demand / Price with unit (e.g. '720 Lac', '550 Lac', '6.25 Crore'), Contact No, Dealer/Agency Name.
+CRITICAL RULES:
+1. Extract every single property listing into a separate dictionary.
+2. Official Phase Names: 'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
+3. If Phase is not mentioned in a local group, use active context or fallback to default: '{default_phase}'.
+4. Block names MUST strictly match catalog: {catalog_json_str}.
+5. Extract Plot No, Size ('5 Marla', '10 Marla', '1 Kanal', '2 Kanal', etc.), Plot Features, Demand / Price, Contact No, Dealer Name.
 
 Input Raw Text:
 {chunk}
@@ -678,47 +676,57 @@ else:
 
     st.subheader("🧠 AI Multi-Source Data Extraction Engine")
     
-    col_u1, col_u2 = st.columns([1.7, 1.3])
+    col_u1, col_u2 = st.columns([1.6, 1.4])
     
     with col_u2:
-        tab_upload, tab_camera = st.tabs(["📎 Upload File / Image", "📸 Live Camera Snapshot"])
+        tab_upload, tab_camera, tab_direct = st.tabs(["📎 Upload File / Image", "📸 Live Camera", "📋 Direct Paste"])
         
         with tab_upload:
             uploaded_file = st.file_uploader(
-                "Upload Excel, JSON, PDF, or Image:",
-                type=["xlsx", "xls", "json", "csv", "pdf", "txt", "png", "jpg", "jpeg", "webp"],
+                "Upload TXT, Excel, JSON, PDF, or Image:",
+                type=["txt", "xlsx", "xls", "json", "csv", "pdf", "png", "jpg", "jpeg", "webp"],
                 help="Upload property spreadsheets, JSON lists, flyers, or WhatsApp exported chats."
             )
             if uploaded_file is not None:
-                with st.spinner(f"Extracting & cleaning data from `{uploaded_file.name}`..."):
-                    extracted_content = extract_text_from_any_file_or_image(uploaded_file, is_camera=False)
-                    if extracted_content:
-                        st.session_state["extracted_file_text"] = extracted_content
-                        st.success(f"✅ Successfully transcribed `{uploaded_file.name}` into the extraction box!")
+                with st.spinner(f"Reading `{uploaded_file.name}`..."):
+                    try:
+                        extracted_content = extract_text_from_any_file_or_image(uploaded_file, is_camera=False)
+                        if extracted_content:
+                            st.session_state["extracted_file_text"] = extracted_content
+                            st.success(f"✅ Successfully loaded `{uploaded_file.name}` into the extraction box!")
+                    except Exception as e:
+                        st.error(f"Error reading file: {e}")
         
         with tab_camera:
             camera_photo = st.camera_input("Take a photo of a property document / map / flyer:")
             if camera_photo is not None:
-                with st.spinner("🧠 Scanning & transcribing document via Google Vision OCR..."):
+                with st.spinner("🧠 Scanning document via Google Vision OCR..."):
                     camera_text = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
                     if camera_text:
                         st.session_state["extracted_file_text"] = camera_text
                         st.success("✅ Camera photo transcribed into the extraction box below!")
 
+        with tab_direct:
+            pasted_txt = st.text_area("Paste large WhatsApp exports or text blocks directly:", height=130, placeholder="Paste text here...")
+            if st.button("📥 Load Pasted Text"):
+                if pasted_txt.strip():
+                    st.session_state["extracted_file_text"] = pasted_txt.strip()
+                    st.success("✅ Text loaded into extraction box below!")
+
     with col_u1:
         default_box_value = st.session_state.get("extracted_file_text", "")
         
         raw_text = st.text_area(
-            "📋 Raw Real Estate Data Ingestion (Auto-Populated from Files/Camera or Paste Free Text):",
+            "📋 Raw Real Estate Data Ingestion (Ready for AI Processing):",
             value=default_box_value,
-            height=200,
-            placeholder="Paste ANY mixed WhatsApp deals, OCR data, or multi-phase listings here..."
+            height=220,
+            placeholder="Data loaded from files, camera or copy-paste will appear here for processing..."
         )
 
     if st.button("🚀 Process, Segregate & Route to Block Tabs", use_container_width=True):
         final_input_text = raw_text.strip()
         if final_input_text:
-            with st.spinner("🧠 AI Engine is reading, disambiguating and segregating listings into respective DHA Phases & Blocks..."):
+            with st.spinner("🧠 AI Engine is segregating listings into respective DHA Phases & Blocks..."):
                 payloads = parse_with_strict_gemini_schema(final_input_text, selected_phase)
                 if payloads:
                     st.session_state["parsed_payloads"] = payloads
