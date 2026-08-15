@@ -1,7 +1,8 @@
 streamlit
 gspread
-google-auth
 pandas
-Pillow
 openpyxl
-
+xlrd
+pypdf
+Pillow
+google-generativeai
