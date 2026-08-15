@@ -5,7 +5,13 @@ import json
 import urllib.parse
 import pandas as pd
 from datetime import datetime
-import google.generativeai as genai
+
+# Optional Google Gemini Generative AI Engine
+try:
+    import google.generativeai as genai
+    HAS_GENAI = True
+except ImportError:
+    HAS_GENAI = False
 
 # 1. Page Configuration
 st.set_page_config(
@@ -26,8 +32,11 @@ if "parsed_payloads" not in st.session_state:
     st.session_state["parsed_payloads"] = []
 
 # Setup Official Google Gemini AI Engine
-if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+if HAS_GENAI and "GEMINI_API_KEY" in st.secrets:
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    except Exception:
+        pass
 
 # ==============================================================================
 # 2. EXACT GOOGLE STITCH ROYAL BLUE CSS INJECTION
@@ -262,11 +271,9 @@ def parse_with_google_gemini(raw_text, default_phase):
     if not text_clean:
         return []
 
-    # Check if Gemini API key exists
-    if "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
+    if HAS_GENAI and "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
         try:
             model = genai.GenerativeModel("gemini-2.5-flash")
-            
             prompt = f"""
             You are an expert DHA Lahore Real Estate CRM parser.
             Parse the following raw real estate text into a clean JSON list of individual property listings.
@@ -282,7 +289,7 @@ def parse_with_google_gemini(raw_text, default_phase):
             Input Raw Text:
             \"\"\"{text_clean}\"\"\"
 
-            Return ONLY valid JSON array with objects with keys:
+            Return ONLY valid JSON array:
             [
               {{
                 "Category": "Selling",
@@ -302,7 +309,6 @@ def parse_with_google_gemini(raw_text, default_phase):
               }}
             ]
             """
-            
             response = model.generate_content(
                 prompt,
                 generation_config=genai.types.GenerationConfig(
@@ -310,14 +316,12 @@ def parse_with_google_gemini(raw_text, default_phase):
                     temperature=0.1
                 )
             )
-            
             parsed_data = json.loads(response.text)
             if isinstance(parsed_data, list) and len(parsed_data) > 0:
                 return parsed_data
-        except Exception as e:
-            st.warning(f"Gemini API returned an error, falling back to heuristic engine: {e}")
+        except Exception:
+            pass
 
-    # Fallback heuristic parser
     return parse_fallback_heuristic(text_clean, default_phase)
 
 def parse_fallback_heuristic(text_clean, default_phase):
@@ -325,23 +329,36 @@ def parse_fallback_heuristic(text_clean, default_phase):
     phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', text_clean)
     main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else "N/A"
     
+    agency_match = re.search(r'\*?([A-Za-z0-9 ]+(?:Real Estate|Estate|Associates|Properties|Realtors|Consultants))\*?', text_clean, re.IGNORECASE)
+    main_agency = agency_match.group(1).strip() if agency_match else st.session_state["office_name"]
+
     current_phase = default_phase
     current_size = "1 Kanal"
     extracted = []
     
     for line in lines:
         l_up = line.upper()
-        if "PHASE 6" in l_up: current_phase = "DHA Phase 6"; continue
+        if "PHASE 12" in l_up or "EME" in l_up: current_phase = "DHA Phase 12 (EME Sector)"; continue
+        elif "PHASE 11" in l_up or "RAHBAR" in l_up: current_phase = "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"; continue
+        elif "PHASE 9 PRISM" in l_up or "PRISM" in l_up or "9-PRISM" in l_up or "9 - PRISM" in l_up: current_phase = "DHA Phase 9 Prism"; continue
+        elif "PHASE 9 TOWN" in l_up or "9 TOWN" in l_up: current_phase = "DHA Phase 9 Town"; continue
+        elif "PHASE 8" in l_up: current_phase = "DHA Phase 8 (Proper)"; continue
         elif "PHASE 7" in l_up: current_phase = "DHA Phase 7"; continue
-        elif "PHASE 9 PRISM" in l_up or "9-PRISM" in l_up: current_phase = "DHA Phase 9 Prism"; continue
+        elif "PHASE 6" in l_up: current_phase = "DHA Phase 6"; continue
+        elif "PHASE 5" in l_up: current_phase = "DHA Phase 5"; continue
         elif "10 MARLA" in l_up: current_size = "10 Marla"; continue
-        elif "5 MARLA" in l_up: current_size = "5 Marla"; continue
-        
-        m = re.search(r'([A-Z0-9-]{1,3})\s*[-.:/]\s*([0-9]{1,5}(?:[\+/][0-9A-Za-z]+)?)\s*(?:@|\bDEMAND\b:?)?\s*(\d+\.?\d*)\s*(?:[.]?(LAC|LACS|CRORE|CR))?', l_up)
+        elif "5 MARLA" in l_up or "5.5 MARLA" in l_up: current_size = "5 Marla"; continue
+        elif "1 KANAL" in l_up: current_size = "1 Kanal"; continue
+
+        if any(w in l_up for w in ["REAL ESTATE", "ESTATE", "ASSOCIATES", "0300", "0321", "0322", "0333", "0345", "HUNJRA", "FOR BOOKING"]):
+            continue
+
+        m = re.search(r'(?:BLOCK\s*([A-Z0-9-]{1,3})|([A-Z0-9-]{1,3}))\s*[-.:/]\s*([0-9]{1,5}(?:[\+/][0-9A-Za-z]+)?)\s*(?:@|\bDEMAND\b:?|\bPRICE\b:?)?\s*(\d+\.?\d*)\s*(?:[.]?(LAC|LACS|LAKH|CRORE|CR))?', l_up)
         if m:
-            blk = f"Block {m.group(1).upper()}"
-            plt = f"Plot {m.group(2)}"
-            prc = f"{m.group(3)} {m.group(4) if m.group(4) else 'Lac'}".strip() if m.group(3) else "N/A"
+            letter = m.group(1) if m.group(1) else m.group(2)
+            blk = f"Block {letter.upper()}"
+            plt = f"Plot {m.group(3)}"
+            prc = f"{m.group(4)} {m.group(5) if m.group(5) else 'Lac'}".strip() if m.group(4) else "N/A"
             extracted.append({
                 "Category": "Selling",
                 "Phase": current_phase,
@@ -351,11 +368,11 @@ def parse_fallback_heuristic(text_clean, default_phase):
                 "Plot Features": "Standard Layout",
                 "Demand / Price": prc,
                 "Seller Type": "Dealer",
-                "Seller / Dealer Name": "Direct Associate",
+                "Seller / Dealer Name": main_agency,
                 "Contact No": main_phone,
-                "Office / Agency": st.session_state["office_name"],
+                "Office / Agency": main_agency,
                 "Deal Status": "Available",
-                "Last Conversation / Notes": "Fallback Ingestion",
+                "Last Conversation / Notes": "Extracted via Heuristic Fallback",
                 "Raw Listing & Source Material": line
             })
     return extracted
@@ -365,25 +382,25 @@ def parse_fallback_heuristic(text_clean, default_phase):
 # ==============================================================================
 @st.dialog("⚡ Confirm Google AI Multi-Listing Cloud Routing", width="large")
 def show_routing_popup(payloads, phase_wb_map, gc_client):
-    st.markdown("##### 🤖 Google Gemini AI Extraction Summary:")
-    st.write(f"Google AI Model has parsed **{len(payloads)} distinct listings** from your raw message:")
+    st.markdown("##### 🤖 Extraction Summary:")
+    st.write(f"Parsed **{len(payloads)} distinct listings** from your raw message:")
 
     table_data = []
     for idx, item in enumerate(payloads):
         table_data.append({
-            "Target Phase": item["Phase"],
-            "Target Tab": item["Block"],
-            "Plot": item["Plot No"],
-            "Size": item["Size"],
-            "Features": item.get("Plot Features", "Standard"),
-            "Demand": item["Demand / Price"],
+            "Target Phase": item.get("Phase", "N/A"),
+            "Target Tab": item.get("Block", "N/A"),
+            "Plot": item.get("Plot No", "N/A"),
+            "Size": item.get("Size", "1 Kanal"),
+            "Features": item.get("Plot Features", "Standard Layout"),
+            "Demand": item.get("Demand / Price", "N/A"),
             "Phone": item.get("Contact No", "N/A"),
             "Agency": item.get("Office / Agency", "N/A")
         })
     
     st.dataframe(pd.DataFrame(table_data), use_container_width=True)
 
-    st.info("💡 **Backend Google Action:** Each listing will be automatically saved into its respective DHA Phase Google Sheet and Block Tab!")
+    st.info("💡 **Backend Action:** Each listing will be automatically saved into its respective DHA Phase Google Sheet and Block Tab!")
 
     col_btn1, col_btn2 = st.columns([1.5, 1])
     with col_btn1:
@@ -392,14 +409,222 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                 now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                 saved_count = 0
                 for item in payloads:
-                    target_phase = item["Phase"]
-                    target_block = item["Block"]
+                    target_phase = item.get("Phase", "DHA Phase 1")
+                    target_block = item.get("Block", "Block A")
                     wb = get_phase_workbook(gc_client, target_phase)
                     ws = get_or_create_clean_tab(wb, target_block)
                     
                     row_data = [
-                        now_str, item.get("Category", "Selling"), target_phase, target_block,
-                        item.get("Plot No", "N/A"), item.get("Size", "1 Kanal"), item.get("Plot Features", "Standard Layout"),
-                        item.get("Demand / Price", "N/A"), item.get("Seller Type", "Dealer"), item.get("Seller / Dealer Name", "Direct Party"),
-                        item.get("Contact No", "N/A"), item.get("Office / Agency", st.session_state['office_name']), item.get("Deal Status", "Available"),
-                        i
+                        now_str,
+                        item.get("Category", "Selling"),
+                        target_phase,
+                        target_block,
+                        item.get("Plot No", "N/A"),
+                        item.get("Size", "1 Kanal"),
+                        item.get("Plot Features", "Standard Layout"),
+                        item.get("Demand / Price", "N/A"),
+                        item.get("Seller Type", "Dealer"),
+                        item.get("Seller / Dealer Name", "Direct Party"),
+                        item.get("Contact No", "N/A"),
+                        item.get("Office / Agency", st.session_state['office_name']),
+                        item.get("Deal Status", "Available"),
+                        item.get("Last Conversation / Notes", "Extracted via System"),
+                        f"[System Ingest] {item.get('Raw Listing & Source Material', '')}"
+                    ]
+                    ws.append_row(row_data)
+                    saved_count += 1
+                
+                st.success(f"✅ Successfully saved all **{saved_count} listings** into their respective Block tabs!")
+                st.balloons()
+                st.session_state["parsed_payloads"] = []
+                st.rerun()
+
+# ==============================================================================
+# 7. LOGIN SCREEN
+# ==============================================================================
+if not st.session_state["authenticated"]:
+    st.markdown("""
+        <div class="stitch-navbar">
+            <div class="stitch-logo-text">
+                <span class="material-symbols-outlined" style="color:#00113A; font-size:26px;">dataset</span>
+                <span>DHA Property Data Systems</span>
+            </div>
+            <div style="color: #757682; font-size: 13px; font-weight: 500;">
+                <span class="material-symbols-outlined" style="vertical-align:middle; font-size:18px; color:#006B5E;">lock</span>
+                Secure Access
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col_l1, col_center, col_l2 = st.columns([1, 1.3, 1])
+    with col_center:
+        st.markdown("""
+            <div class="stitch-login-box">
+                <div class="stitch-avatar">
+                    <span class="material-symbols-outlined" style="font-size:30px;">apartment</span>
+                </div>
+                <div class="stitch-title">Welcome to DHA</div>
+                <div class="stitch-subtitle">Clinical & Property CRM Data Systems</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("stitch_login_form"):
+            email_in = st.text_input("WORK EMAIL ADDRESS", placeholder="name@wali-associates.pk")
+            pass_in = st.text_input("PASSWORD", type="password", placeholder="••••••••")
+            submit_login = st.form_submit_button("SIGN IN →")
+            if submit_login:
+                st.session_state["authenticated"] = True
+                st.session_state["user_email"] = email_in if email_in.strip() else "authorized.agent@dha.pk"
+                st.rerun()
+
+        st.markdown("<div style='text-align:center; margin: 10px 0; color:#757682; font-size:12px;'>OR</div>", unsafe_allow_html=True)
+        if st.button("🔑 CONTINUE WITH SINGLE SIGN-ON (SSO)", use_container_width=True):
+            st.session_state["authenticated"] = True
+            st.session_state["user_email"] = "sso.agent@dha.pk"
+            st.rerun()
+
+# ==============================================================================
+# 8. MAIN DASHBOARD (TOP: LIVE DATA TABLE | BOTTOM: INGESTION BOX)
+# ==============================================================================
+else:
+    try:
+        gc_client = get_gspread_client()
+    except Exception as e:
+        st.error(f"⚠️ Google Sheets Authentication Error: {e}")
+        st.stop()
+
+    st.markdown(f"""
+        <div class="header-banner">
+            <span class="office-badge">📍 {st.session_state['office_name']}</span>
+            <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
+            <div class="header-subtitle">Google AI Multi-Phase Cloud Router (Active: {st.session_state['user_email']})</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # 1. Global Selectors
+    col_city, col_phase = st.columns([1.2, 2.5])
+    with col_city:
+        selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
+    with col_phase:
+        phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
+        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook View)", phase_options, index=6)
+
+    # Load Phase Workbook
+    try:
+        phase_workbook = get_phase_workbook(gc_client, selected_phase)
+    except Exception as e:
+        st.error(f"Could not open spreadsheet for {selected_phase}. Please share sheet with `dha-bot@dha-property-sync.iam.gserviceaccount.com` as Editor.")
+        st.stop()
+
+    # Blocks List
+    p_info = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
+    res_b = p_info.get("residential", [])
+    com_b = p_info.get("commercial", [])
+    all_phase_blocks = res_b + com_b
+
+    # ==========================================================================
+    # 2. TOP SECTION: INTERACTIVE BLOCK TABS & LIVE INVENTORY TABLE
+    # ==========================================================================
+    st.markdown(f"##### 🧱 Choose Block Sheet Tab for **[{selected_phase}]**:")
+    
+    selected_active_block = st.radio(
+        "Direct Block Switcher:",
+        options=all_phase_blocks,
+        horizontal=True,
+        key="block_feature_tab_bar"
+    )
+
+    sheet_link = DHA_PHASE_SHEET_URLS.get(selected_phase, "")
+    st.markdown(f"🔗 **Active Google Sheet:** [Open {selected_phase} in Google Sheets ↗]({sheet_link}) | Current Tab: **`{selected_active_block}`**")
+
+    st.subheader(f"📊 Live Inventory Table: [{selected_phase} ➔ Tab: `{selected_active_block}`]")
+    
+    col_t1, col_t2 = st.columns([2, 1])
+    with col_t1:
+        edit_mode = st.toggle("✏️ Enable Live Edit Mode (Edit Data on Screen)", value=False)
+    with col_t2:
+        if st.button("🔄 Refresh Table from Google Sheet"):
+            st.rerun()
+
+    try:
+        current_ws = get_or_create_clean_tab(phase_workbook, selected_active_block)
+        records = current_ws.get_all_values()
+        
+        if len(records) > 1:
+            df = pd.DataFrame(records[1:], columns=CRM_SHEET_HEADERS[:len(records[1])])
+            
+            if edit_mode:
+                st.info("💡 **Edit Mode ON:** Edit any cell below, add rows, or delete rows. Click **'Save Changes'** when done.")
+                edited_df = st.data_editor(
+                    df,
+                    use_container_width=True,
+                    num_rows="dynamic",
+                    height=320,
+                    key=f"editor_{selected_phase}_{selected_active_block}"
+                )
+                
+                if st.button("💾 Save Changes to Google Sheet", use_container_width=True):
+                    with st.spinner("Updating Google Sheet Tab..."):
+                        try:
+                            updated_values = [CRM_SHEET_HEADERS] + edited_df.fillna("").values.tolist()
+                            current_ws.clear()
+                            current_ws.update(updated_values)
+                            st.success(f"✅ Google Sheet Tab **[{selected_active_block}]** successfully updated!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Update error: {e}")
+            else:
+                st.dataframe(df, use_container_width=True, height=280)
+                
+                for idx, r in df.iterrows():
+                    dem_val = r.get('Demand / Price', 'N/A')
+                    phn_val = r.get('Contact No', 'N/A')
+                    plt_val = r.get('Plot No', 'N/A')
+                    sz_val = r.get('Size', 'N/A')
+                    feat_val = r.get('Plot Features', 'Standard Layout')
+                    cat_val = r.get('Category', 'Selling')
+                    raw_val = r.get('Raw Listing & Source Material', '')
+
+                    st.markdown(f"""
+                        <div class="property-card">
+                            <span class="badge badge-selling">{cat_val}</span>
+                            <span class="badge badge-price">💰 {dem_val}</span>
+                            <span class="badge badge-feature">⭐ {feat_val}</span>
+                            <b>{selected_phase} {selected_active_block} — {plt_val} ({sz_val})</b>
+                            <div style="margin-top: 5px; font-size: 13px; color: #475569;">📞 Contact: <b>{phn_val}</b> | Added: {r.get('Date / Timestamp', '')}</div>
+                            <div style="margin-top: 4px; font-size: 12px; color: #64748B; background: #F8FAFC; padding: 5px 8px; border-radius: 6px;">📝 {raw_val}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info(f"Tab **[{selected_active_block}]** is active in Google Sheets. Currently 0 entries found. Add listings in the box below to see them appear here!")
+    except Exception as e:
+        st.error(f"Error connecting to Tab [{selected_active_block}]: {e}")
+
+    st.markdown("---")
+
+    # ==========================================================================
+    # 3. BOTTOM SECTION: AI MULTI-LISTING INGESTION BOX
+    # ==========================================================================
+    st.markdown("""
+        <div class="ai-badge">🤖 Powered by Google Gemini AI & Multi-Phase Smart Router</div>
+    """, unsafe_allow_html=True)
+    
+    st.subheader(f"📥 Ingest Any Text, Multi-Phase WhatsApp Deals, OCR or Banner Material")
+    
+    raw_text = st.text_area(
+        "📋 Paste Raw Listings Below (Directly Interpreted & Segregated by AI):",
+        height=150,
+        placeholder="Paste ANY messy raw text here...\nExample:\nPhase 6\nC-845@600.lac\nM-399+400@1550.lac\n\nPhase 7\nS-443@550.lac\nQ-12@465.lac\n\n10 Marla\nY-3534/2@195.lac\n\n*Hunjra Real Estate*\n03009550559"
+    )
+
+    if st.button("💾 Save & Route via Google Gemini AI", use_container_width=True):
+        if raw_text.strip():
+            with st.spinner("🧠 AI is reading and extracting all properties..."):
+                payloads = parse_with_google_gemini(raw_text, selected_phase)
+                if payloads:
+                    st.session_state["parsed_payloads"] = payloads
+                    show_routing_popup(payloads, DHA_PHASE_SHEET_URLS, gc_client)
+                else:
+                    st.warning("Could not detect any valid plot listings in the text. Please check the format.")
+        else:
+            st.warning("Please paste listing material first.")
