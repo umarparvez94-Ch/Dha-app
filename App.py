@@ -84,7 +84,9 @@ st.markdown("""
     .badge-feature { background-color: #EEF2FF; color: #4338CA; font-weight: 600; }
     .ai-badge-active { background: #DCFCE7; border: 1px solid #86EFAC; color: #15803D; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
-    .eta-box { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 12px 16px; margin: 10px 0; color: #166534; font-size: 13.5px; }
+    .summary-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+    .stat-pill { background: #F1F5F9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #334155; display: inline-block; margin-right: 8px; margin-bottom: 6px; }
+    .eta-box { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 10px 14px; margin: 10px 0; color: #166534; font-size: 13px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -426,7 +428,7 @@ CRITICAL RULES:
 1. Official Phases: 'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
 2. Block names MUST strictly match catalog: {catalog_json_str}.
 3. SIZE RULE: Extract EXACT size if stated in text ('5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla', '13 Marla', '28 Marla'). If NO size is stated in message, leave "Size" as empty string "". DO NOT assume or force 1 Kanal.
-4. Extract exact Plot No, Demand / Price, Plot Features, Seller / Dealer Name, and Contact No without dummy fillers.
+4. Extract exact Plot No, Demand / Price, Plot Features (Corner, Park Face, MB, Direct, Possession, Non-Possession), Seller / Dealer Name, and Contact No without dummy fillers.
 
 Input Raw Text:
 {chunk}
@@ -439,7 +441,7 @@ Return ONLY a valid JSON Array with format:
     "Block": "Block U",
     "Plot No": "Plot 398",
     "Size": "",
-    "Plot Features": "",
+    "Plot Features": "Standard Layout",
     "Demand / Price": "720 Lac",
     "Seller Type": "Dealer",
     "Seller / Dealer Name": "",
@@ -542,7 +544,7 @@ def parse_fallback_heuristic(text_clean, default_phase):
                 "Block": blk,
                 "Plot No": plt,
                 "Size": final_sz,
-                "Plot Features": "",
+                "Plot Features": "Standard Layout",
                 "Demand / Price": prc,
                 "Seller Type": "Dealer",
                 "Seller / Dealer Name": "",
@@ -554,14 +556,12 @@ def parse_fallback_heuristic(text_clean, default_phase):
             })
     return extracted
 
-# 7. Interactive Editable Popup Dialog with Specific Phase / Block Selector
-@st.dialog("⚡ Confirm & Filter DHA Ingestion Inventory", width="large")
+# 7. Interactive Summary Report & Selective Phase/Block Cascade Ingestion
+@st.dialog("⚡ DHA AI Extraction Summary & Routing Control Panel", width="large")
 def show_routing_popup(payloads, phase_wb_map, gc_client):
     total_raw_items = len(payloads)
     
-    st.markdown("##### 🔍 Target Phase & Block Selective Extractor:")
-    
-    # 1. Prepare Initial DataFrame
+    # 1. Base Ingestion Dataframe
     base_data = []
     for item in payloads:
         base_data.append({
@@ -572,77 +572,109 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
             "Demand / Price": str(item.get("Demand / Price", "")),
             "Contact No": str(item.get("Contact No", "")),
             "Category": str(item.get("Category", "Selling")),
-            "Plot Features": str(item.get("Plot Features", "")),
+            "Plot Features": str(item.get("Plot Features", "Standard Layout")),
             "Source Text": str(item.get("Raw Listing & Source Material", ""))
         })
     df_all = pd.DataFrame(base_data)
 
-    # 2. Dropdowns for Specific Phase & Specific Block Filtering
-    col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 1.2])
+    # 2. Top Bar: Live Edit Mode Toggle + Dropdowns for Targeted Extraction
+    col_t1, col_t2, col_t3 = st.columns([1.2, 1.4, 1.4])
     
-    unique_phases_in_data = ["All Phases (Everything)"] + sorted(list(df_all["Target Phase"].unique()))
-    with col_f1:
-        chosen_phase_filter = st.selectbox("🎯 Filter by Target Phase:", unique_phases_in_data, index=0)
-    
-    # Block options based on chosen phase
-    if chosen_phase_filter == "All Phases (Everything)":
-        df_phase_filtered = df_all
-        unique_blocks = ["All Blocks / CCAs"] + sorted(list(df_all["Target Tab"].unique()))
+    with col_t1:
+        edit_popup_mode = st.toggle("✏️ Edit Mode (ON / OFF)", value=False, key="toggle_popup_edit_mode")
+
+    # Dropdown: Phase Cascade Selector
+    all_dha_phases = ["All Phases (Everything)"] + list(DHA_PHASE_BLOCK_CATALOG.keys())
+    with col_t2:
+        selected_phase_target = st.selectbox(
+            "📍 Target Phase Sheet:",
+            options=all_dha_phases,
+            index=0,
+            key="popup_target_phase_select"
+        )
+
+    # Dropdown: Block / CCA Tabs Cascade Selector
+    if selected_phase_target == "All Phases (Everything)":
+        available_tabs = ["All Block Tabs / CCAs"] + sorted(list(df_all["Target Tab"].unique()))
+        df_filtered_phase = df_all
     else:
-        df_phase_filtered = df_all[df_all["Target Phase"] == chosen_phase_filter]
-        unique_blocks = ["All Blocks / CCAs"] + sorted(list(df_phase_filtered["Target Tab"].unique()))
-    
-    with col_f2:
-        chosen_block_filter = st.selectbox("🧱 Filter by Block / Tab:", unique_blocks, index=0)
-    
-    if chosen_block_filter != "All Blocks / CCAs":
-        df_filtered = df_phase_filtered[df_phase_filtered["Target Tab"] == chosen_block_filter]
+        p_data = DHA_PHASE_BLOCK_CATALOG.get(selected_phase_target, {})
+        full_catalog_blocks = p_data.get("residential", []) + p_data.get("commercial", [])
+        available_tabs = ["All Block Tabs / CCAs"] + full_catalog_blocks
+        df_filtered_phase = df_all[df_all["Target Phase"] == selected_phase_target]
+
+    with col_t3:
+        selected_block_target = st.selectbox(
+            "🧱 Target Block Tab:",
+            options=available_tabs,
+            index=0,
+            key="popup_target_block_select"
+        )
+
+    # Filter Application
+    if selected_block_target != "All Block Tabs / CCAs":
+        df_final_display = df_filtered_phase[df_filtered_phase["Target Tab"] == selected_block_target]
     else:
-        df_filtered = df_phase_filtered
+        df_final_display = df_filtered_phase
 
-    with col_f3:
-        st.metric(label="Filtered Plots", value=f"{len(df_filtered)}", delta=f"of {total_raw_items} Total")
+    # 3. Summary Intelligence Metrics Card
+    num_selected = len(df_final_display)
+    unique_tabs_count = df_final_display[["Target Phase", "Target Tab"]].drop_duplicates().shape[0] if num_selected > 0 else 0
+    with_demand_count = df_final_display[df_final_display["Demand / Price"] != ""].shape[0]
+    with_contact_count = df_final_display[df_final_display["Contact No"] != ""].shape[0]
 
-    st.markdown("---")
+    st.markdown(f"""
+        <div class="summary-card">
+            <span class="stat-pill">📊 <b>Selected:</b> {num_selected} Plots</span>
+            <span class="stat-pill">📁 <b>Target Tabs:</b> {unique_tabs_count} Tabs</span>
+            <span class="stat-pill">💰 <b>Demands Extracted:</b> {with_demand_count}</span>
+            <span class="stat-pill">📞 <b>Contacts Extracted:</b> {with_contact_count}</span>
+            <span class="stat-pill">🛡️ <b>Total Source Parsed:</b> {total_raw_items} Listings</span>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # 4. Table Display / Editable Sheet
+    if edit_popup_mode:
+        st.info("💡 **Edit Mode Active:** Double-click cells to edit or select rows and press **`Delete`** on keyboard. Only rows currently visible below will be synced.")
+        final_df = st.data_editor(
+            df_final_display,
+            use_container_width=True,
+            num_rows="dynamic",
+            height=300,
+            key="popup_active_data_editor"
+        )
+    else:
+        final_df = df_final_display
+        st.dataframe(final_df, use_container_width=True, height=280)
+
+    final_sync_count = len(final_df)
     
-    # 3. Interactive Data Editor for the Filtered Selection
-    st.info("💡 **Live Sheet Table Active:** You can edit any value, check boxes to delete rows, or adjust prices. Only displayed rows will sync.")
-
-    edited_df = st.data_editor(
-        df_filtered,
-        use_container_width=True,
-        num_rows="dynamic",
-        height=320,
-        key="popup_filtered_data_editor"
-    )
-
-    final_count = len(edited_df)
-    unique_tabs_count = edited_df[["Target Phase", "Target Tab"]].drop_duplicates().shape[0] if final_count > 0 else 0
-    est_seconds = max(3, int(unique_tabs_count * 1.2 + (final_count / 50) * 0.8))
+    # 5. Dynamic ETA Calculator
+    est_seconds = max(3, int(unique_tabs_count * 1.2 + (final_sync_count / 50) * 0.8))
     e_min = est_seconds // 60
     e_sec = est_seconds % 60
     eta_label = f"{e_min}m {e_sec}s" if e_min > 0 else f"{e_sec} seconds"
 
     st.markdown(f"""
         <div class="eta-box">
-            📊 <b>Ready to Sync:</b> {final_count} plots across {unique_tabs_count} block tabs | ⏱️ <b>Estimated Sync Time:</b> ~{eta_label}
+            🚀 <b>Ready for Sync:</b> {final_sync_count} listings across {unique_tabs_count} tabs | ⏱️ <b>Estimated Sync Time:</b> ~{eta_label} (Safe Quota Chunking Active)
         </div>
     """, unsafe_allow_html=True)
 
-    col_btn1, col_btn2 = st.columns([1.5, 1])
-    with col_btn1:
-        if st.button(f"🚀 Sync ({final_count} Selected Plots) to Google Sheets", use_container_width=True):
-            if final_count == 0:
-                st.warning("No listings currently selected to sync.")
+    # 6. Action Buttons: Confirm & Push + Back to Main Dashboard
+    col_b1, col_b2 = st.columns([1.6, 1])
+    with col_b1:
+        if st.button(f"🚀 Push ({final_sync_count} Plots) to Sheet Tabs", use_container_width=True):
+            if final_sync_count == 0:
+                st.warning("No listings in current selection to sync.")
                 return
             
             now_dt = datetime.now()
             today_str = now_dt.strftime("%Y-%m-%d")
             now_str = now_dt.strftime("%Y-%m-%d %H:%M")
             
-            # Step 1: Group edited records by (Phase, Block)
             grouped_data = {}
-            for _, row in edited_df.iterrows():
+            for _, row in final_df.iterrows():
                 target_phase = str(row.get("Target Phase", "DHA Phase 1")).strip()
                 target_block = str(row.get("Target Tab", "Block A")).strip()
                 key = (target_phase, target_block)
@@ -717,7 +749,7 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                         str(block),
                         str(plot_val),
                         str(row.get("Size", "")),
-                        str(row.get("Plot Features", "")),
+                        str(row.get("Plot Features", "Standard Layout")),
                         str(row.get("Demand / Price", "")),
                         "Dealer",
                         "",
@@ -744,10 +776,15 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
             
             status_placeholder.empty()
             progress_bar.empty()
-            st.success(f"🎉 **Targeted Sync Complete!** Successfully saved **{saved_count} listings** to `{chosen_phase_filter}`! (Duplicates skipped: **{skipped_today}**, Repeats marked: **{repeated_tracked}**)")
+            st.success(f"🎉 **Push Complete!** Successfully saved **{saved_count} listings** to `{selected_phase_target}`! (Skipped today's duplicates: **{skipped_today}**, Repeats marked: **{repeated_tracked}**)")
             st.balloons()
             st.session_state["parsed_payloads"] = []
             st.session_state["extracted_file_text"] = ""
+            st.rerun()
+
+    with col_b2:
+        if st.button("⬅️ Back to Main Screen", use_container_width=True):
+            st.session_state["parsed_payloads"] = []
             st.rerun()
 
 # 8. Login Screen
