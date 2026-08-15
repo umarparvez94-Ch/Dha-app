@@ -404,4 +404,274 @@ def parse_fallback_heuristic(text_clean, default_phase):
                 "Last Conversation / Notes": "Fallback Local Engine",
                 "Raw Listing & Source Material": line
             })
- 
+    return extracted
+
+# 7. Popup Dialog
+@st.dialog("⚡ Confirm Universal Multimodal Routing", width="large")
+def show_routing_popup(payloads, phase_wb_map, gc_client):
+    st.markdown("##### 🤖 Extraction Summary:")
+    st.write(f"Parsed **{len(payloads)} distinct listings** from your input:")
+
+    table_data = []
+    for idx, item in enumerate(payloads):
+        table_data.append({
+            "Target Phase": item.get("Phase", "N/A"),
+            "Target Tab": item.get("Block", "N/A"),
+            "Plot": item.get("Plot No", "N/A"),
+            "Size": item.get("Size", "1 Kanal"),
+            "Features": item.get("Plot Features", "Standard Layout"),
+            "Demand": item.get("Demand / Price", "N/A"),
+            "Phone": item.get("Contact No", "N/A"),
+            "Agency": item.get("Office / Agency", "N/A")
+        })
+    
+    st.dataframe(pd.DataFrame(table_data), use_container_width=True)
+    st.info("💡 **Backend Action:** Each listing will be automatically segregated and saved into its respective DHA Phase Google Sheet and Block Tab!")
+
+    col_btn1, col_btn2 = st.columns([1.5, 1])
+    with col_btn1:
+        if st.button("🚀 Confirm & Sync to Google Sheets", use_container_width=True):
+            with st.spinner("Writing to Google Sheets..."):
+                now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                saved_count = 0
+                for item in payloads:
+                    target_phase = item.get("Phase", "DHA Phase 1")
+                    target_block = item.get("Block", "Block A")
+                    wb = get_phase_workbook(gc_client, target_phase)
+                    ws = get_or_create_clean_tab(wb, target_block)
+                    
+                    row_data = [
+                        now_str,
+                        item.get("Category", "Selling"),
+                        target_phase,
+                        target_block,
+                        item.get("Plot No", "N/A"),
+                        item.get("Size", "1 Kanal"),
+                        item.get("Plot Features", "Standard Layout"),
+                        item.get("Demand / Price", "N/A"),
+                        item.get("Seller Type", "Dealer"),
+                        item.get("Seller / Dealer Name", "Direct Party"),
+                        item.get("Contact No", "N/A"),
+                        item.get("Office / Agency", st.session_state['office_name']),
+                        item.get("Deal Status", "Available"),
+                        item.get("Last Conversation / Notes", "Extracted via Multimodal AI"),
+                        f"[AI Ingest] {item.get('Raw Listing & Source Material', '')}"
+                    ]
+                    ws.append_row(row_data)
+                    saved_count += 1
+                
+                st.success(f"✅ Successfully saved all **{saved_count} listings** into their respective Block tabs!")
+                st.balloons()
+                st.session_state["parsed_payloads"] = []
+                st.session_state["extracted_file_text"] = ""
+                st.rerun()
+
+# 8. Login Screen
+if not st.session_state["authenticated"]:
+    st.markdown("""
+        <div class="stitch-navbar">
+            <div class="stitch-logo-text">
+                <span class="material-symbols-outlined" style="color:#00113A; font-size:26px;">dataset</span>
+                <span>DHA Property Data Systems</span>
+            </div>
+            <div style="color: #757682; font-size: 13px; font-weight: 500;">
+                <span class="material-symbols-outlined" style="vertical-align:middle; font-size:18px; color:#006B5E;">lock</span>
+                Secure Access
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col_l1, col_center, col_l2 = st.columns([1, 1.3, 1])
+    with col_center:
+        st.markdown("""
+            <div class="stitch-login-box">
+                <div class="stitch-avatar">
+                    <span class="material-symbols-outlined" style="font-size:30px;">apartment</span>
+                </div>
+                <div class="stitch-title">Welcome to DHA</div>
+                <div class="stitch-subtitle">Clinical & Property CRM Data Systems</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("stitch_login_form"):
+            email_in = st.text_input("WORK EMAIL ADDRESS", placeholder="name@wali-associates.pk")
+            pass_in = st.text_input("PASSWORD", type="password", placeholder="••••••••")
+            submit_login = st.form_submit_button("SIGN IN →")
+            if submit_login:
+                st.session_state["authenticated"] = True
+                st.session_state["user_email"] = email_in if email_in.strip() else "authorized.agent@dha.pk"
+                st.rerun()
+
+        st.markdown("<div style='text-align:center; margin: 10px 0; color:#757682; font-size:12px;'>OR</div>", unsafe_allow_html=True)
+        if st.button("🔑 CONTINUE WITH SINGLE SIGN-ON (SSO)", use_container_width=True):
+            st.session_state["authenticated"] = True
+            st.session_state["user_email"] = "sso.agent@dha.pk"
+            st.rerun()
+
+# 9. Main Dashboard
+else:
+    try:
+        gc_client = get_gspread_client()
+    except Exception as e:
+        st.error(f"⚠️ Google Sheets Authentication Error: {e}")
+        st.stop()
+
+    st.markdown(f"""
+        <div class="header-banner">
+            <span class="office-badge">📍 {st.session_state['office_name']}</span>
+            <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
+            <div class="header-subtitle">Universal Multi-Format File Reader & Ingestion Box (Active: {st.session_state['user_email']})</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col_city, col_phase = st.columns([1.2, 2.5])
+    with col_city:
+        selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
+    with col_phase:
+        phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
+        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook View)", phase_options, index=6)
+
+    try:
+        phase_workbook = get_phase_workbook(gc_client, selected_phase)
+    except Exception as e:
+        st.error(f"Could not open spreadsheet for {selected_phase}. Please share sheet with `dha-bot@dha-property-sync.iam.gserviceaccount.com` as Editor.")
+        st.stop()
+
+    p_info = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
+    res_b = p_info.get("residential", [])
+    com_b = p_info.get("commercial", [])
+    all_phase_blocks = res_b + com_b
+
+    st.markdown(f"##### 🧱 Choose Block Sheet Tab for **[{selected_phase}]**:")
+    
+    selected_active_block = st.radio(
+        "Direct Block Switcher:",
+        options=all_phase_blocks,
+        horizontal=True,
+        key="block_feature_tab_bar"
+    )
+
+    sheet_link = DHA_PHASE_SHEET_URLS.get(selected_phase, "")
+    st.markdown(f"🔗 **Active Google Sheet:** [Open {selected_phase} in Google Sheets ↗]({sheet_link}) | Current Tab: **`{selected_active_block}`**")
+
+    st.subheader(f"📊 Live Inventory Table: [{selected_phase} ➔ Tab: `{selected_active_block}`]")
+    
+    col_t1, col_t2 = st.columns([2, 1])
+    with col_t1:
+        edit_mode = st.toggle("✏️ Enable Live Edit Mode (Edit Data on Screen)", value=False)
+    with col_t2:
+        if st.button("🔄 Refresh Table from Google Sheet"):
+            st.rerun()
+
+    try:
+        current_ws = get_or_create_clean_tab(phase_workbook, selected_active_block)
+        records = current_ws.get_all_values()
+        
+        if len(records) > 1:
+            df = pd.DataFrame(records[1:], columns=CRM_SHEET_HEADERS[:len(records[1])])
+            
+            if edit_mode:
+                st.info("💡 **Edit Mode ON:** Edit any cell below, add rows, or delete rows. Click **'Save Changes'** when done.")
+                edited_df = st.data_editor(
+                    df,
+                    use_container_width=True,
+                    num_rows="dynamic",
+                    height=320,
+                    key=f"editor_{selected_phase}_{selected_active_block}"
+                )
+                
+                if st.button("💾 Save Changes to Google Sheet", use_container_width=True):
+                    with st.spinner("Updating Google Sheet Tab..."):
+                        try:
+                            updated_values = [CRM_SHEET_HEADERS] + edited_df.fillna("").values.tolist()
+                            current_ws.clear()
+                            current_ws.update(updated_values)
+                            st.success(f"✅ Google Sheet Tab **[{selected_active_block}]** successfully updated!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Update error: {e}")
+            else:
+                st.dataframe(df, use_container_width=True, height=280)
+                
+                for idx, r in df.iterrows():
+                    dem_val = r.get('Demand / Price', 'N/A')
+                    phn_val = r.get('Contact No', 'N/A')
+                    plt_val = r.get('Plot No', 'N/A')
+                    sz_val = r.get('Size', 'N/A')
+                    feat_val = r.get('Plot Features', 'Standard Layout')
+                    cat_val = r.get('Category', 'Selling')
+                    raw_val = r.get('Raw Listing & Source Material', '')
+
+                    st.markdown(f"""
+                        <div class="property-card">
+                            <span class="badge badge-selling">{cat_val}</span>
+                            <span class="badge badge-price">💰 {dem_val}</span>
+                            <span class="badge badge-feature">⭐ {feat_val}</span>
+                            <b>{selected_phase} {selected_active_block} — {plt_val} ({sz_val})</b>
+                            <div style="margin-top: 5px; font-size: 13px; color: #475569;">📞 Contact: <b>{phn_val}</b> | Added: {r.get('Date / Timestamp', '')}</div>
+                            <div style="margin-top: 4px; font-size: 12px; color: #64748B; background: #F8FAFC; padding: 5px 8px; border-radius: 6px;">📝 {raw_val}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info(f"Tab **[{selected_active_block}]** is active in Google Sheets. Currently 0 entries found. Add listings in the box below to see them appear here!")
+    except Exception as e:
+        st.error(f"Error connecting to Tab [{selected_active_block}]: {e}")
+
+    st.markdown("---")
+
+    # Ingestion Box
+    st.markdown("""
+        <div class="ai-badge">🤖 Universal Ingestion (Text, Excel, JSON, PDF, Images & Live Camera)</div>
+    """, unsafe_allow_html=True)
+    
+    st.subheader("📥 Ingest Listings via Direct Paste, File Upload or Live Camera Snapshot")
+    
+    col_u1, col_u2 = st.columns([1.7, 1.3])
+    
+    with col_u2:
+        tab_upload, tab_camera = st.tabs(["📎 Upload File / Image", "📸 Live Camera Snapshot"])
+        
+        with tab_upload:
+            uploaded_file = st.file_uploader(
+                "Upload Excel, JSON, PDF, or Image:",
+                type=["xlsx", "xls", "json", "csv", "pdf", "txt", "png", "jpg", "jpeg", "webp"],
+                help="Spreadsheets, WhatsApp flyers, rate sheets or documents"
+            )
+            if uploaded_file is not None:
+                with st.spinner(f"Extracting raw data from `{uploaded_file.name}`..."):
+                    extracted_content = extract_text_from_any_file_or_image(uploaded_file, is_camera=False)
+                    if extracted_content:
+                        st.session_state["extracted_file_text"] = extracted_content
+                        st.success(f"✅ Successfully transcribed `{uploaded_file.name}` into the box!")
+        
+        with tab_camera:
+            camera_photo = st.camera_input("Take a photo of a property document / map / flyer:")
+            if camera_photo is not None:
+                with st.spinner("🧠 Scanning & transcribing document via Google Vision OCR..."):
+                    camera_text = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
+                    if camera_text:
+                        st.session_state["extracted_file_text"] = camera_text
+                        st.success("✅ Camera photo transcribed into the text box below!")
+
+    with col_u1:
+        default_box_value = st.session_state.get("extracted_file_text", "")
+        
+        raw_text = st.text_area(
+            "📋 Ingestion Text Box (Auto-Populated from Camera / Files or Type Manually):",
+            value=default_box_value,
+            height=200,
+            placeholder="Data transcribed from camera or uploaded files will appear here automatically.\nYou can also type or paste directly:\n\n*398 U 720 Lac 28 Marla*\n*Phase 7*\n*18 CCA 2 @ 900 Lac*\n*Prism*\n*1473 R 155 Lac 6.74 Marla*\n*1772 J 78 Lac*"
+        )
+
+    if st.button("🚀 Process, Segregate & Route to Block Tabs", use_container_width=True):
+        final_input_text = raw_text.strip()
+        if final_input_text:
+            with st.spinner("🧠 AI Engine is analyzing and segregating listings into respective DHA Phases & Blocks..."):
+                payloads = parse_multimodal_gemini(final_input_text, selected_phase)
+                if payloads:
+                    st.session_state["parsed_payloads"] = payloads
+                    show_routing_popup(payloads, DHA_PHASE_SHEET_URLS, gc_client)
+                else:
+                    st.warning("No valid property listings could be identified in the text.")
+        else:
+            st.warning("Please provide listing text, take a camera photo, or upload a file.")
