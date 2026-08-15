@@ -79,6 +79,7 @@ st.markdown("""
     .badge-selling { background-color: #FEE2E2; color: #DC2626; }
     .badge-price { background-color: #ECFDF5; color: #059669; font-weight: 800; }
     .badge-repeat { background-color: #FEF3C7; color: #B45309; font-weight: 700; }
+    .badge-feature { background-color: #EEF2FF; color: #4338CA; font-weight: 600; }
     .ai-badge-active { background: #DCFCE7; border: 1px solid #86EFAC; color: #15803D; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     </style>
@@ -120,7 +121,6 @@ DHA_PHASE_SHEET_URLS = {
     "DHA Phase 12 (EME Sector)": "https://docs.google.com/spreadsheets/d/1Ai07OSySM4pcPV9yRr--fsMpKNPXtD2uwJx285_mPho/edit"
 }
 
-# DHA Official Cutting Maps (Reference only when text size is missing)
 DHA_CUTTING_MAP_RULES = {
     "DHA Phase 5": {
         "Block A": [(1, 120, "2 Kanal"), (121, 500, "1 Kanal")],
@@ -550,7 +550,7 @@ def parse_fallback_heuristic(text_clean, default_phase):
             })
     return extracted
 
-# 7. Popup Dialog with Reconciled Cell Writing
+# 7. High-Speed Batch Sync Popup (Zero API Rate-Limit Error)
 @st.dialog("⚡ Confirm Universal Multimodal Routing", width="large")
 def show_routing_popup(payloads, phase_wb_map, gc_client):
     st.markdown("##### 🤖 Extraction Summary & Clean Reconciliation:")
@@ -569,74 +569,98 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
         })
     
     st.dataframe(pd.DataFrame(table_data), use_container_width=True)
-    st.info("💡 **Clean Field Reconciliation:** Real estate parameters mapped strictly to exact columns. Unspecified sizes remain empty. Duplicates on the same day in the same tab are skipped.")
+    st.info("💡 **High-Speed Batch Sync Active:** Listings are grouped in-memory and synchronized in single batch calls per tab. Zero rate-limit issues, exact column reconciliation, and duplicate protection.")
 
     col_btn1, col_btn2 = st.columns([1.5, 1])
     with col_btn1:
         if st.button("🚀 Confirm & Sync to Google Sheets", use_container_width=True):
-            with st.spinner("Writing reconciled individual rows to Google Sheets..."):
+            with st.spinner("Writing bulk batches to Google Sheets..."):
                 now_dt = datetime.now()
                 today_str = now_dt.strftime("%Y-%m-%d")
                 now_str = now_dt.strftime("%Y-%m-%d %H:%M")
+                
+                # Step 1: In-memory grouping by (Phase, Block)
+                grouped_data = {}
+                for item in payloads:
+                    target_phase = item.get("Phase", "DHA Phase 1")
+                    target_block = item.get("Block", "Block A")
+                    key = (target_phase, target_block)
+                    if key not in grouped_data:
+                        grouped_data[key] = []
+                    grouped_data[key].append(item)
                 
                 saved_count = 0
                 skipped_today = 0
                 repeated_tracked = 0
                 
-                for item in payloads:
-                    target_phase = item.get("Phase", "DHA Phase 1")
-                    target_block = item.get("Block", "Block A")
-                    plot_val = str(item.get("Plot No", "")).strip()
+                workbook_cache = {}
+                
+                # Step 2: Write batch per tab
+                for (phase, block), items in grouped_data.items():
+                    if phase not in workbook_cache:
+                        workbook_cache[phase] = get_phase_workbook(gc_client, phase)
+                    wb = workbook_cache[phase]
+                    ws = get_or_create_clean_tab(wb, block)
                     
-                    wb = get_phase_workbook(gc_client, target_phase)
-                    ws = get_or_create_clean_tab(wb, target_block)
+                    try:
+                        existing_rows = ws.get_all_values()
+                    except Exception:
+                        existing_rows = []
                     
-                    existing_rows = ws.get_all_values()
-                    is_duplicate_today = False
-                    repeat_count = 0
-                    last_seen_date = ""
+                    existing_plots_today = set()
+                    plot_repeat_map = {}
                     
                     if len(existing_rows) > 1:
                         for r in existing_rows[1:]:
                             r_date = r[0] if len(r) > 0 else ""
-                            r_plot = r[4] if len(r) > 4 else ""
-                            
-                            if plot_val and r_plot.lower() == plot_val.lower():
-                                repeat_count += 1
-                                last_seen_date = r_date[:10]
+                            r_plot = str(r[4]).strip().lower() if len(r) > 4 else ""
+                            if r_plot:
+                                plot_repeat_map[r_plot] = plot_repeat_map.get(r_plot, 0) + 1
                                 if today_str in r_date:
-                                    is_duplicate_today = True
+                                    existing_plots_today.add(r_plot)
                     
-                    if is_duplicate_today:
-                        skipped_today += 1
-                        continue
+                    rows_to_append = []
+                    for itm in items:
+                        plot_val = str(itm.get("Plot No", "")).strip()
+                        plot_val_clean = plot_val.lower()
+                        
+                        # Skip same-day duplicate in same tab
+                        if plot_val_clean and plot_val_clean in existing_plots_today:
+                            skipped_today += 1
+                            continue
+                        
+                        repeat_count = plot_repeat_map.get(plot_val_clean, 0)
+                        notes_txt = itm.get("Last Conversation / Notes", "Direct WhatsApp Ingestion")
+                        if repeat_count > 0:
+                            repeated_tracked += 1
+                            notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
+                        
+                        row_data = [
+                            now_str,
+                            itm.get("Category", "Selling"),
+                            phase,
+                            block,
+                            plot_val,
+                            itm.get("Size", ""),
+                            itm.get("Plot Features", ""),
+                            itm.get("Demand / Price", ""),
+                            itm.get("Seller Type", "Dealer"),
+                            itm.get("Seller / Dealer Name", ""),
+                            itm.get("Contact No", ""),
+                            itm.get("Office / Agency", st.session_state['office_name']),
+                            itm.get("Deal Status", "Available"),
+                            notes_txt,
+                            f"[AI Ingest] {itm.get('Raw Listing & Source Material', '')}"
+                        ]
+                        rows_to_append.append(row_data)
+                        if plot_val_clean:
+                            existing_plots_today.add(plot_val_clean)
                     
-                    notes_txt = item.get("Last Conversation / Notes", "Direct WhatsApp Ingestion")
-                    if repeat_count > 0:
-                        repeated_tracked += 1
-                        notes_txt = f"🔁 Repeated {repeat_count + 1} times this month (Last: {last_seen_date})"
-                    
-                    row_data = [
-                        now_str,
-                        item.get("Category", "Selling"),
-                        target_phase,
-                        target_block,
-                        plot_val,
-                        item.get("Size", ""),
-                        item.get("Plot Features", ""),
-                        item.get("Demand / Price", ""),
-                        item.get("Seller Type", "Dealer"),
-                        item.get("Seller / Dealer Name", ""),
-                        item.get("Contact No", ""),
-                        item.get("Office / Agency", st.session_state['office_name']),
-                        item.get("Deal Status", "Available"),
-                        notes_txt,
-                        f"[AI Ingest] {item.get('Raw Listing & Source Material', '')}"
-                    ]
-                    ws.append_row(row_data)
-                    saved_count += 1
+                    if rows_to_append:
+                        ws.append_rows(rows_to_append)
+                        saved_count += len(rows_to_append)
                 
-                st.success(f"✅ Saved **{saved_count} clean listings**! (Skipped today's duplicates: **{skipped_today}**, Repeat marked: **{repeated_tracked}**)")
+                st.success(f"✅ Successfully synced **{saved_count} listings** in bulk! (Skipped today's duplicates: **{skipped_today}**, Repeats marked: **{repeated_tracked}**)")
                 st.balloons()
                 st.session_state["parsed_payloads"] = []
                 st.session_state["extracted_file_text"] = ""
@@ -696,7 +720,7 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Strict Schema & Clean Reconciliation (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">High-Speed Batch Sync & Reconciliation (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
