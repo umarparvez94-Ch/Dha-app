@@ -4,6 +4,7 @@ import re
 import json
 import io
 import os
+import urllib.request
 import pandas as pd
 from datetime import datetime
 from PIL import Image
@@ -24,7 +25,7 @@ except ImportError:
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="DHA Property CRM & AI Data Systems",
+    page_title="DHA Enterprise CRM & Smart AI Engine",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -76,10 +77,8 @@ st.markdown("""
     .property-card { background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
     .badge { display: inline-block; padding: 3px 8px; border-radius: 5px; font-size: 11.5px; font-weight: 700; margin-right: 5px; }
     .badge-selling { background-color: #FEE2E2; color: #DC2626; }
-    .badge-buying { background-color: #DCFCE7; color: #16A34A; }
-    .badge-rental { background-color: #E0F2FE; color: #0284C7; }
-    .badge-feature { background-color: #FEF3C7; color: #D97706; }
     .badge-price { background-color: #ECFDF5; color: #059669; font-weight: 800; }
+    .badge-repeat { background-color: #FEF3C7; color: #B45309; font-weight: 700; }
     .ai-badge-active { background: #DCFCE7; border: 1px solid #86EFAC; color: #15803D; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     </style>
@@ -121,34 +120,65 @@ DHA_PHASE_SHEET_URLS = {
     "DHA Phase 12 (EME Sector)": "https://docs.google.com/spreadsheets/d/1Ai07OSySM4pcPV9yRr--fsMpKNPXtD2uwJx285_mPho/edit"
 }
 
-@st.cache_resource
-def get_gspread_client():
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    return gspread.service_account_from_dict(creds_dict)
-
-def get_phase_workbook(gc, phase_name):
-    target_url = DHA_PHASE_SHEET_URLS.get(phase_name)
-    try:
-        return gc.open_by_url(target_url)
-    except Exception:
-        return gc.open_by_url(DHA_PHASE_SHEET_URLS["DHA Phase 1"])
-
-def get_or_create_clean_tab(workbook, tab_title):
-    clean_title = tab_title.strip()
-    try:
-        ws = workbook.worksheet(clean_title)
-    except gspread.exceptions.WorksheetNotFound:
-        ws = workbook.add_worksheet(title=clean_title, rows=500, cols=16)
-        ws.append_row(CRM_SHEET_HEADERS)
-        return ws
-    
-    try:
-        first_row = ws.row_values(1)
-        if not first_row or len(first_row) < 3 or first_row[0] != CRM_SHEET_HEADERS[0]:
-            ws.insert_row(CRM_SHEET_HEADERS, 1)
-    except Exception:
-        pass
-    return ws
+# DHA Official Cutting Maps (Reference only when text size is missing)
+DHA_CUTTING_MAP_RULES = {
+    "DHA Phase 5": {
+        "Block A": [(1, 120, "2 Kanal"), (121, 500, "1 Kanal")],
+        "Block B": [(1, 80, "2 Kanal"), (81, 600, "1 Kanal")],
+        "Block C": [(1, 50, "2 Kanal"), (51, 450, "1 Kanal")],
+        "Block G": [(1, 350, "1 Kanal"), (351, 700, "10 Marla")],
+        "Block H": [(1, 400, "10 Marla"), (401, 800, "5 Marla")],
+        "Block J": [(1, 500, "10 Marla"), (501, 950, "5 Marla")],
+    },
+    "DHA Phase 6": {
+        "Block A": [(1, 150, "2 Kanal"), (151, 800, "1 Kanal")],
+        "Block B": [(1, 100, "2 Kanal"), (101, 700, "1 Kanal")],
+        "Block C": [(1, 650, "1 Kanal")],
+        "Block D": [(1, 700, "1 Kanal")],
+        "Block E": [(1, 550, "1 Kanal")],
+        "Block J": [(1, 600, "10 Marla")],
+        "Block L": [(1, 800, "10 Marla"), (801, 1200, "5 Marla")],
+    },
+    "DHA Phase 7": {
+        "Block P": [(1, 1100, "1 Kanal")],
+        "Block Q": [(1, 900, "1 Kanal")],
+        "Block R": [(1, 1050, "1 Kanal")],
+        "Block S": [(1, 950, "1 Kanal")],
+        "Block T": [(1, 1200, "1 Kanal")],
+        "Block U": [(1, 1400, "1 Kanal")],
+        "Block W": [(1, 1400, "10 Marla")],
+        "Block X": [(1, 1300, "10 Marla")],
+        "Block Y": [(1, 900, "5 Marla")],
+        "Block Z": [(1, 1100, "5 Marla")]
+    },
+    "DHA Phase 8 (Proper)": {
+        "Block A": [(1, 100, "2 Kanal"), (101, 550, "1 Kanal")],
+        "Block B": [(1, 80, "2 Kanal"), (81, 500, "1 Kanal")],
+        "Block C": [(1, 70, "2 Kanal"), (71, 480, "1 Kanal")],
+        "Block D": [(1, 600, "1 Kanal")],
+        "Block E": [(1, 550, "1 Kanal")],
+        "Block F": [(1, 500, "1 Kanal")],
+        "Block S": [(1, 750, "10 Marla")],
+        "Block T": [(1, 800, "10 Marla"), (801, 1300, "5 Marla")],
+        "Block U": [(1, 900, "5 Marla")],
+        "Block V": [(1, 850, "5 Marla")],
+        "Block W": [(1, 700, "8 Marla")]
+    },
+    "DHA Phase 9 Prism": {
+        "Block A": [(1, 600, "1 Kanal")],
+        "Block B": [(1, 550, "1 Kanal")],
+        "Block C": [(1, 700, "1 Kanal")],
+        "Block D": [(1, 650, "1 Kanal")],
+        "Block E": [(1, 500, "1 Kanal")],
+        "Block F": [(1, 700, "1 Kanal")],
+        "Block G": [(1, 600, "1 Kanal")],
+        "Block J": [(1, 1200, "10 Marla")],
+        "Block K": [(1, 1100, "10 Marla")],
+        "Block L": [(1, 1300, "10 Marla")],
+        "Block R": [(1, 1800, "5 Marla")],
+        "Block Q": [(1, 1600, "5 Marla")]
+    }
+}
 
 DHA_PHASE_BLOCK_CATALOG = {
     "DHA Phase 1": {
@@ -213,6 +243,53 @@ DHA_PHASE_BLOCK_CATALOG = {
     }
 }
 
+def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
+    cleaned_size = str(extracted_size).strip() if extracted_size else ""
+    if cleaned_size and cleaned_size.lower() not in ["n/a", "unknown", "none", ""]:
+        return cleaned_size
+    
+    try:
+        p_num = int(re.sub(r'[^0-9]', '', str(plot_no)))
+    except Exception:
+        return ""
+    
+    phase_rules = DHA_CUTTING_MAP_RULES.get(phase, {})
+    block_ranges = phase_rules.get(block, [])
+    for start_n, end_n, official_sz in block_ranges:
+        if start_n <= p_num <= end_n:
+            return official_sz
+            
+    return ""
+
+@st.cache_resource
+def get_gspread_client():
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    return gspread.service_account_from_dict(creds_dict)
+
+def get_phase_workbook(gc, phase_name):
+    target_url = DHA_PHASE_SHEET_URLS.get(phase_name)
+    try:
+        return gc.open_by_url(target_url)
+    except Exception:
+        return gc.open_by_url(DHA_PHASE_SHEET_URLS["DHA Phase 1"])
+
+def get_or_create_clean_tab(workbook, tab_title):
+    clean_title = tab_title.strip()
+    try:
+        ws = workbook.worksheet(clean_title)
+    except gspread.exceptions.WorksheetNotFound:
+        ws = workbook.add_worksheet(title=clean_title, rows=500, cols=16)
+        ws.append_row(CRM_SHEET_HEADERS)
+        return ws
+    
+    try:
+        first_row = ws.row_values(1)
+        if not first_row or len(first_row) < 3 or first_row[0] != CRM_SHEET_HEADERS[0]:
+            ws.insert_row(CRM_SHEET_HEADERS, 1)
+    except Exception:
+        pass
+    return ws
+
 def clean_whatsapp_chat_text(raw_bytes):
     try:
         decoded_text = raw_bytes.decode('utf-8', errors='ignore')
@@ -244,6 +321,25 @@ def clean_whatsapp_chat_text(raw_bytes):
 
     return "\n".join(cleaned_lines)
 
+def fetch_content_from_gdrive_url(drive_url):
+    file_id_match = re.search(r'[-\w]{25,}', drive_url)
+    if not file_id_match:
+        return "[Invalid Google Drive URL format]"
+    
+    file_id = file_id_match.group(0)
+    direct_download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    
+    try:
+        req = urllib.request.Request(
+            direct_download_url,
+            headers={'User-Agent': 'Mozilla/5.0'}
+        )
+        with urllib.request.urlopen(req) as response:
+            file_bytes = response.read()
+            return clean_whatsapp_chat_text(file_bytes)
+    except Exception as e:
+        return f"[Error fetching from Google Drive: {e}]"
+
 def extract_text_from_any_file_or_image(file_obj, is_camera=False):
     if file_obj is None:
         return ""
@@ -257,7 +353,7 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
                 res = gemini_client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=[
-                        "You are a real estate OCR assistant. Transcribe and extract all property listing text, prices, phases, blocks, plot numbers, features, and phone numbers from this image clearly as readable text:",
+                        "Extract all DHA Lahore property listings, phases, blocks, plot numbers, sizes, and demand prices from this image:",
                         img
                     ]
                 )
@@ -265,9 +361,9 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
             except Exception as e:
                 return f"[Image OCR extraction error: {e}]"
         else:
-            return "[Image loaded. Please configure GEMINI_API_KEY in secrets to extract live text.]"
+            return "[Image loaded. Add GEMINI_API_KEY to secrets to extract live OCR]"
 
-    fname = file_obj.name.lower()
+    fname = file_obj.name.lower() if hasattr(file_obj, 'name') else "file.txt"
     
     if fname.endswith(".xlsx") or fname.endswith(".xls"):
         try:
@@ -294,38 +390,30 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
         if HAS_PYPDF:
             try:
                 reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-                pdf_text = []
-                for page in reader.pages:
-                    txt = page.extract_text()
-                    if txt:
-                        pdf_text.append(txt)
+                pdf_text = [p.extract_text() for p in reader.pages if p.extract_text()]
                 return "\n".join(pdf_text)
             except Exception as e:
                 return f"[Error reading PDF: {e}]"
         else:
-            return "[pypdf library not installed. Please add pypdf to requirements.txt]"
+            return "[pypdf not installed]"
 
-    elif fname.endswith(".txt"):
-        return clean_whatsapp_chat_text(file_bytes)
-
-    return ""
+    return clean_whatsapp_chat_text(file_bytes)
 
 def parse_with_strict_gemini_schema(raw_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
-    chunk_size = 12000
+    chunk_size = 10000
     text_chunks = [raw_text[i:i+chunk_size] for i in range(0, len(raw_text), chunk_size)]
     all_results = []
 
     for chunk in text_chunks:
         prompt = f"""You are an expert DHA Lahore Real Estate CRM extraction engine.
-Parse the provided real estate text/data into a clean JSON list of individual property listings.
+Parse the text into a clean JSON list of individual property listings.
 
 CRITICAL RULES:
-1. Extract every single property listing into a separate dictionary.
-2. Official Phase Names: 'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
-3. If Phase is not mentioned in a local group, use active context or fallback to default: '{default_phase}'.
-4. Block names MUST strictly match catalog: {catalog_json_str}.
-5. Extract Plot No, Size ('5 Marla', '10 Marla', '1 Kanal', '2 Kanal', etc.), Plot Features, Demand / Price, Contact No, Dealer Name.
+1. Official Phases: 'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
+2. Block names MUST strictly match catalog: {catalog_json_str}.
+3. SIZE RULE: Extract EXACT size if stated in text ('5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla', '13 Marla', '28 Marla'). If NO size is stated in message, leave "Size" as empty string "". DO NOT assume or force 1 Kanal.
+4. Extract exact Plot No, Demand / Price, Plot Features, Seller / Dealer Name, and Contact No without dummy fillers.
 
 Input Raw Text:
 {chunk}
@@ -337,16 +425,16 @@ Return ONLY a valid JSON Array with format:
     "Phase": "DHA Phase 7",
     "Block": "Block U",
     "Plot No": "Plot 398",
-    "Size": "28 Marla",
-    "Plot Features": "Standard Layout",
+    "Size": "",
+    "Plot Features": "",
     "Demand / Price": "720 Lac",
     "Seller Type": "Dealer",
-    "Seller / Dealer Name": "Direct Associate",
-    "Contact No": "N/A",
+    "Seller / Dealer Name": "",
+    "Contact No": "",
     "Office / Agency": "Wali Muhammad Associates",
     "Deal Status": "Available",
-    "Last Conversation / Notes": "Parsed via Google Gemini Strict Schema",
-    "Raw Listing & Source Material": "398 U 720 Lac 28 Marla"
+    "Last Conversation / Notes": "Direct WhatsApp Ingestion",
+    "Raw Listing & Source Material": "398 U 720 Lac"
   }}
 ]"""
 
@@ -363,6 +451,13 @@ Return ONLY a valid JSON Array with format:
                 )
                 parsed = json.loads(response.text)
                 if isinstance(parsed, list):
+                    for item in parsed:
+                        item["Size"] = resolve_size_text_first_or_map(
+                            item.get("Phase", default_phase),
+                            item.get("Block", "Block A"),
+                            item.get("Plot No", ""),
+                            item.get("Size", "")
+                        )
                     all_results.extend(parsed)
                     chunk_parsed = True
             except Exception:
@@ -376,10 +471,10 @@ Return ONLY a valid JSON Array with format:
 def parse_fallback_heuristic(text_clean, default_phase):
     lines = [l.strip() for l in text_clean.split('\n') if l.strip()]
     phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', text_clean)
-    main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else "N/A"
+    main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else ""
     
     current_phase = default_phase
-    current_size = "1 Kanal"
+    current_size = ""
     extracted = []
     
     for line in lines:
@@ -434,17 +529,19 @@ def parse_fallback_heuristic(text_clean, default_phase):
         if m:
             blk = f"Block {m.group(1).upper()}"
             plt = f"Plot {m.group(2)}"
-            prc = f"{m.group(3)} {m.group(4) if m.group(4) else 'Lac'}".strip() if m.group(3) else "N/A"
+            prc = f"{m.group(3)} {m.group(4) if m.group(4) else 'Lac'}".strip() if m.group(3) else ""
+            final_sz = resolve_size_text_first_or_map(current_phase, blk, plt, current_size)
+            
             extracted.append({
                 "Category": "Selling",
                 "Phase": current_phase,
                 "Block": blk,
                 "Plot No": plt,
-                "Size": current_size,
-                "Plot Features": "Standard Layout",
+                "Size": final_sz,
+                "Plot Features": "",
                 "Demand / Price": prc,
                 "Seller Type": "Dealer",
-                "Seller / Dealer Name": "Direct Associate",
+                "Seller / Dealer Name": "",
                 "Contact No": main_phone,
                 "Office / Agency": st.session_state["office_name"],
                 "Deal Status": "Available",
@@ -453,61 +550,93 @@ def parse_fallback_heuristic(text_clean, default_phase):
             })
     return extracted
 
-# 7. Popup Dialog
+# 7. Popup Dialog with Reconciled Cell Writing
 @st.dialog("⚡ Confirm Universal Multimodal Routing", width="large")
 def show_routing_popup(payloads, phase_wb_map, gc_client):
-    st.markdown("##### 🤖 Extraction Summary:")
-    st.write(f"Parsed **{len(payloads)} distinct listings** from your input:")
+    st.markdown("##### 🤖 Extraction Summary & Clean Reconciliation:")
+    st.write(f"Analyzed **{len(payloads)} distinct listings**:")
 
     table_data = []
     for idx, item in enumerate(payloads):
         table_data.append({
-            "Target Phase": item.get("Phase", "N/A"),
-            "Target Tab": item.get("Block", "N/A"),
-            "Plot": item.get("Plot No", "N/A"),
-            "Size": item.get("Size", "1 Kanal"),
-            "Features": item.get("Plot Features", "Standard Layout"),
-            "Demand": item.get("Demand / Price", "N/A"),
-            "Phone": item.get("Contact No", "N/A"),
-            "Agency": item.get("Office / Agency", "N/A")
+            "Target Phase": item.get("Phase", ""),
+            "Target Tab": item.get("Block", ""),
+            "Plot": item.get("Plot No", ""),
+            "Verified Size": item.get("Size", "") if item.get("Size") else "—",
+            "Demand": item.get("Demand / Price", ""),
+            "Phone": item.get("Contact No", ""),
+            "Source Text": item.get("Raw Listing & Source Material", "")
         })
     
     st.dataframe(pd.DataFrame(table_data), use_container_width=True)
-    st.info("💡 **Backend Action:** Each listing will be automatically segregated and saved into its respective DHA Phase Google Sheet and Block Tab!")
+    st.info("💡 **Clean Field Reconciliation:** Real estate parameters mapped strictly to exact columns. Unspecified sizes remain empty. Duplicates on the same day in the same tab are skipped.")
 
     col_btn1, col_btn2 = st.columns([1.5, 1])
     with col_btn1:
         if st.button("🚀 Confirm & Sync to Google Sheets", use_container_width=True):
-            with st.spinner("Writing to Google Sheets..."):
-                now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+            with st.spinner("Writing reconciled individual rows to Google Sheets..."):
+                now_dt = datetime.now()
+                today_str = now_dt.strftime("%Y-%m-%d")
+                now_str = now_dt.strftime("%Y-%m-%d %H:%M")
+                
                 saved_count = 0
+                skipped_today = 0
+                repeated_tracked = 0
+                
                 for item in payloads:
                     target_phase = item.get("Phase", "DHA Phase 1")
                     target_block = item.get("Block", "Block A")
+                    plot_val = str(item.get("Plot No", "")).strip()
+                    
                     wb = get_phase_workbook(gc_client, target_phase)
                     ws = get_or_create_clean_tab(wb, target_block)
+                    
+                    existing_rows = ws.get_all_values()
+                    is_duplicate_today = False
+                    repeat_count = 0
+                    last_seen_date = ""
+                    
+                    if len(existing_rows) > 1:
+                        for r in existing_rows[1:]:
+                            r_date = r[0] if len(r) > 0 else ""
+                            r_plot = r[4] if len(r) > 4 else ""
+                            
+                            if plot_val and r_plot.lower() == plot_val.lower():
+                                repeat_count += 1
+                                last_seen_date = r_date[:10]
+                                if today_str in r_date:
+                                    is_duplicate_today = True
+                    
+                    if is_duplicate_today:
+                        skipped_today += 1
+                        continue
+                    
+                    notes_txt = item.get("Last Conversation / Notes", "Direct WhatsApp Ingestion")
+                    if repeat_count > 0:
+                        repeated_tracked += 1
+                        notes_txt = f"🔁 Repeated {repeat_count + 1} times this month (Last: {last_seen_date})"
                     
                     row_data = [
                         now_str,
                         item.get("Category", "Selling"),
                         target_phase,
                         target_block,
-                        item.get("Plot No", "N/A"),
-                        item.get("Size", "1 Kanal"),
-                        item.get("Plot Features", "Standard Layout"),
-                        item.get("Demand / Price", "N/A"),
+                        plot_val,
+                        item.get("Size", ""),
+                        item.get("Plot Features", ""),
+                        item.get("Demand / Price", ""),
                         item.get("Seller Type", "Dealer"),
-                        item.get("Seller / Dealer Name", "Direct Party"),
-                        item.get("Contact No", "N/A"),
+                        item.get("Seller / Dealer Name", ""),
+                        item.get("Contact No", ""),
                         item.get("Office / Agency", st.session_state['office_name']),
                         item.get("Deal Status", "Available"),
-                        item.get("Last Conversation / Notes", "Extracted via Multimodal AI"),
+                        notes_txt,
                         f"[AI Ingest] {item.get('Raw Listing & Source Material', '')}"
                     ]
                     ws.append_row(row_data)
                     saved_count += 1
                 
-                st.success(f"✅ Successfully saved all **{saved_count} listings** into their respective Block tabs!")
+                st.success(f"✅ Saved **{saved_count} clean listings**! (Skipped today's duplicates: **{skipped_today}**, Repeat marked: **{repeated_tracked}**)")
                 st.balloons()
                 st.session_state["parsed_payloads"] = []
                 st.session_state["extracted_file_text"] = ""
@@ -567,7 +696,7 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">AI Multi-Source Data Extraction Engine (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">Strict Schema & Clean Reconciliation (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -641,21 +770,27 @@ else:
                 st.dataframe(df, use_container_width=True, height=280)
                 
                 for idx, r in df.iterrows():
-                    dem_val = r.get('Demand / Price', 'N/A')
-                    phn_val = r.get('Contact No', 'N/A')
-                    plt_val = r.get('Plot No', 'N/A')
-                    sz_val = r.get('Size', 'N/A')
-                    feat_val = r.get('Plot Features', 'Standard Layout')
+                    dem_val = r.get('Demand / Price', '')
+                    phn_val = r.get('Contact No', '')
+                    plt_val = r.get('Plot No', '')
+                    sz_val = r.get('Size', '')
+                    sz_display = f"({sz_val})" if sz_val else ""
+                    feat_val = r.get('Plot Features', '')
+                    feat_badge = f'<span class="badge badge-feature">⭐ {feat_val}</span>' if feat_val else ""
                     cat_val = r.get('Category', 'Selling')
+                    notes_val = r.get('Last Conversation / Notes', '')
                     raw_val = r.get('Raw Listing & Source Material', '')
+
+                    repeat_badge = f'<span class="badge badge-repeat">{notes_val}</span>' if "Repeated" in notes_val else ""
 
                     st.markdown(f"""
                         <div class="property-card">
                             <span class="badge badge-selling">{cat_val}</span>
-                            <span class="badge badge-price">💰 {dem_val}</span>
-                            <span class="badge badge-feature">⭐ {feat_val}</span>
-                            <b>{selected_phase} {selected_active_block} — {plt_val} ({sz_val})</b>
-                            <div style="margin-top: 5px; font-size: 13px; color: #475569;">📞 Contact: <b>{phn_val}</b> | Added: {r.get('Date / Timestamp', '')}</div>
+                            <span class="badge badge-price">💰 {dem_val if dem_val else 'Demand N/A'}</span>
+                            {feat_badge}
+                            {repeat_badge}
+                            <b>{selected_phase} {selected_active_block} — {plt_val} {sz_display}</b>
+                            <div style="margin-top: 5px; font-size: 13px; color: #475569;">📞 Contact: <b>{phn_val if phn_val else '—'}</b> | Added: {r.get('Date / Timestamp', '')}</div>
                             <div style="margin-top: 4px; font-size: 12px; color: #64748B; background: #F8FAFC; padding: 5px 8px; border-radius: 6px;">📝 {raw_val}</div>
                         </div>
                     """, unsafe_allow_html=True)
@@ -667,19 +802,19 @@ else:
     st.markdown("---")
 
     # ==========================================================================
-    # 3. BOTTOM SECTION: AI MULTI-SOURCE DATA EXTRACTION ENGINE
+    # 3. BOTTOM SECTION: AI MULTI-SOURCE INGESTION & HIGH SPEED BATCH ROUTING
     # ==========================================================================
     if gemini_active:
         st.markdown('<div class="ai-badge-active">🟢 Google Gemini AI Extraction Engine: Connected & Active</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="ai-badge-inactive">🟡 Gemini API Key Missing — Operating on Fallback Pattern Parser (Add GEMINI_API_KEY to Secrets for full AI power)</div>', unsafe_allow_html=True)
 
-    st.subheader("🧠 AI Multi-Source Data Extraction Engine")
+    st.subheader("🧠 AI Multi-Source Data Ingestion Engine")
     
-    col_u1, col_u2 = st.columns([1.6, 1.4])
+    col_u1, col_u2 = st.columns([1.5, 1.5])
     
     with col_u2:
-        tab_upload, tab_camera, tab_direct = st.tabs(["📎 Upload File / Image", "📸 Live Camera", "📋 Direct Paste"])
+        tab_upload, tab_gdrive, tab_camera, tab_direct = st.tabs(["📎 Upload File", "☁️ G-Drive Link", "📸 Camera", "📋 Direct Paste"])
         
         with tab_upload:
             uploaded_file = st.file_uploader(
@@ -696,6 +831,20 @@ else:
                             st.success(f"✅ Successfully loaded `{uploaded_file.name}` into the extraction box!")
                     except Exception as e:
                         st.error(f"Error reading file: {e}")
+
+        with tab_gdrive:
+            gdrive_url_in = st.text_input("Paste Google Drive Shared Link (TXT / WhatsApp Chat):", placeholder="https://drive.google.com/file/d/1A2B3C.../view?usp=sharing")
+            if st.button("☁️ Push G-Drive File Data to Box", use_container_width=True):
+                if gdrive_url_in.strip():
+                    with st.spinner("Downloading, cleaning chat timestamps and loading into box..."):
+                        gdrive_content = fetch_content_from_gdrive_url(gdrive_url_in.strip())
+                        if gdrive_content and not gdrive_content.startswith("[Error"):
+                            st.session_state["extracted_file_text"] = gdrive_content
+                            st.success("✅ Cleaned WhatsApp data loaded into extraction box below!")
+                        else:
+                            st.error(gdrive_content)
+                else:
+                    st.warning("Please enter a valid Google Drive file link.")
         
         with tab_camera:
             camera_photo = st.camera_input("Take a photo of a property document / map / flyer:")
@@ -707,8 +856,8 @@ else:
                         st.success("✅ Camera photo transcribed into the extraction box below!")
 
         with tab_direct:
-            pasted_txt = st.text_area("Paste large WhatsApp exports or text blocks directly:", height=130, placeholder="Paste text here...")
-            if st.button("📥 Load Pasted Text"):
+            pasted_txt = st.text_area("Paste large WhatsApp exports or text blocks directly:", height=110, placeholder="Paste text here...")
+            if st.button("📥 Push Pasted Text to Box", use_container_width=True):
                 if pasted_txt.strip():
                     st.session_state["extracted_file_text"] = pasted_txt.strip()
                     st.success("✅ Text loaded into extraction box below!")
@@ -717,16 +866,16 @@ else:
         default_box_value = st.session_state.get("extracted_file_text", "")
         
         raw_text = st.text_area(
-            "📋 Raw Real Estate Data Ingestion (Ready for AI Processing):",
+            "📋 Raw Real Estate Ingestion Box (Text-First Precision & Reconciliation):",
             value=default_box_value,
             height=220,
-            placeholder="Data loaded from files, camera or copy-paste will appear here for processing..."
+            placeholder="Data loaded from files, Google Drive, camera or copy-paste will appear here for processing..."
         )
 
     if st.button("🚀 Process, Segregate & Route to Block Tabs", use_container_width=True):
         final_input_text = raw_text.strip()
         if final_input_text:
-            with st.spinner("🧠 AI Engine is segregating listings into respective DHA Phases & Blocks..."):
+            with st.spinner("🧠 AI Engine is extracting listings with text-first accuracy and resolving sheets routing..."):
                 payloads = parse_with_strict_gemini_schema(final_input_text, selected_phase)
                 if payloads:
                     st.session_state["parsed_payloads"] = payloads
