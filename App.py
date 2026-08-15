@@ -27,13 +27,13 @@ except ImportError:
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="DHA Enterprise CRM & Smart AI Engine",
+    page_title="DHA Enterprise CRM & Live AI Engine",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Initialize Session States
+# Initialize Persistent Session States
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 if "user_email" not in st.session_state:
@@ -44,6 +44,18 @@ if "parsed_payloads" not in st.session_state:
     st.session_state["parsed_payloads"] = []
 if "extracted_file_text" not in st.session_state:
     st.session_state["extracted_file_text"] = ""
+
+# Batch Processing & Pause/Resume State Machine
+if "extraction_active" not in st.session_state:
+    st.session_state["extraction_active"] = False
+if "extraction_paused" not in st.session_state:
+    st.session_state["extraction_paused"] = False
+if "all_chunks" not in st.session_state:
+    st.session_state["all_chunks"] = []
+if "current_chunk_idx" not in st.session_state:
+    st.session_state["current_chunk_idx"] = 0
+if "extraction_default_phase" not in st.session_state:
+    st.session_state["extraction_default_phase"] = "DHA Phase 9 Prism"
 
 # Setup Google Gemini AI Client
 gemini_client = None
@@ -87,6 +99,7 @@ st.markdown("""
     .summary-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
     .stat-pill { background: #F1F5F9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #334155; display: inline-block; margin-right: 8px; margin-bottom: 6px; }
     .eta-box { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 10px 14px; margin: 10px 0; color: #166534; font-size: 13px; }
+    .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 16px 20px; margin: 15px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.08); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -124,6 +137,65 @@ DHA_PHASE_SHEET_URLS = {
     "DHA Phase 9 Town": "https://docs.google.com/spreadsheets/d/1AfidqzYwWWTkouwBkGKosxyK3CzwAyG8AEilS8-Nd0w/edit",
     "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)": "https://docs.google.com/spreadsheets/d/1bVB4maSRNR_pzcqzVzYKPirePrm_I9Yhu1TqodBPypU/edit",
     "DHA Phase 12 (EME Sector)": "https://docs.google.com/spreadsheets/d/1Ai07OSySM4pcPV9yRr--fsMpKNPXtD2uwJx285_mPho/edit"
+}
+
+DHA_CUTTING_MAP_RULES = {
+    "DHA Phase 5": {
+        "Block A": [(1, 120, "2 Kanal"), (121, 500, "1 Kanal")],
+        "Block B": [(1, 80, "2 Kanal"), (81, 600, "1 Kanal")],
+        "Block C": [(1, 50, "2 Kanal"), (51, 450, "1 Kanal")],
+        "Block G": [(1, 350, "1 Kanal"), (351, 700, "10 Marla")],
+        "Block H": [(1, 400, "10 Marla"), (401, 800, "5 Marla")],
+        "Block J": [(1, 500, "10 Marla"), (501, 950, "5 Marla")],
+    },
+    "DHA Phase 6": {
+        "Block A": [(1, 150, "2 Kanal"), (151, 800, "1 Kanal")],
+        "Block B": [(1, 100, "2 Kanal"), (101, 700, "1 Kanal")],
+        "Block C": [(1, 650, "1 Kanal")],
+        "Block D": [(1, 700, "1 Kanal")],
+        "Block E": [(1, 550, "1 Kanal")],
+        "Block J": [(1, 600, "10 Marla")],
+        "Block L": [(1, 800, "10 Marla"), (801, 1200, "5 Marla")],
+    },
+    "DHA Phase 7": {
+        "Block P": [(1, 1100, "1 Kanal")],
+        "Block Q": [(1, 900, "1 Kanal")],
+        "Block R": [(1, 1050, "1 Kanal")],
+        "Block S": [(1, 950, "1 Kanal")],
+        "Block T": [(1, 1200, "1 Kanal")],
+        "Block U": [(1, 1400, "1 Kanal")],
+        "Block W": [(1, 1400, "10 Marla")],
+        "Block X": [(1, 1300, "10 Marla")],
+        "Block Y": [(1, 900, "5 Marla")],
+        "Block Z": [(1, 1100, "5 Marla")]
+    },
+    "DHA Phase 8 (Proper)": {
+        "Block A": [(1, 100, "2 Kanal"), (101, 550, "1 Kanal")],
+        "Block B": [(1, 80, "2 Kanal"), (81, 500, "1 Kanal")],
+        "Block C": [(1, 70, "2 Kanal"), (71, 480, "1 Kanal")],
+        "Block D": [(1, 600, "1 Kanal")],
+        "Block E": [(1, 550, "1 Kanal")],
+        "Block F": [(1, 500, "1 Kanal")],
+        "Block S": [(1, 750, "10 Marla")],
+        "Block T": [(1, 800, "10 Marla"), (801, 1300, "5 Marla")],
+        "Block U": [(1, 900, "5 Marla")],
+        "Block V": [(1, 850, "5 Marla")],
+        "Block W": [(1, 700, "8 Marla")]
+    },
+    "DHA Phase 9 Prism": {
+        "Block A": [(1, 600, "1 Kanal")],
+        "Block B": [(1, 550, "1 Kanal")],
+        "Block C": [(1, 700, "1 Kanal")],
+        "Block D": [(1, 650, "1 Kanal")],
+        "Block E": [(1, 500, "1 Kanal")],
+        "Block F": [(1, 700, "1 Kanal")],
+        "Block G": [(1, 600, "1 Kanal")],
+        "Block J": [(1, 1200, "10 Marla")],
+        "Block K": [(1, 1100, "10 Marla")],
+        "Block L": [(1, 1300, "10 Marla")],
+        "Block R": [(1, 1800, "5 Marla")],
+        "Block Q": [(1, 1600, "5 Marla")]
+    }
 }
 
 DHA_PHASE_BLOCK_CATALOG = {
@@ -188,6 +260,24 @@ DHA_PHASE_BLOCK_CATALOG = {
         "commercial": ["Civic Centre EME", "Block D Commercial", "Block H Commercial", "Sector Shops"]
     }
 }
+
+def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
+    cleaned_size = str(extracted_size).strip() if extracted_size else ""
+    if cleaned_size and cleaned_size.lower() not in ["n/a", "unknown", "none", ""]:
+        return cleaned_size
+    
+    try:
+        p_num = int(re.sub(r'[^0-9]', '', str(plot_no)))
+    except Exception:
+        return ""
+    
+    phase_rules = DHA_CUTTING_MAP_RULES.get(phase, {})
+    block_ranges = phase_rules.get(block, [])
+    for start_n, end_n, official_sz in block_ranges:
+        if start_n <= p_num <= end_n:
+            return official_sz
+            
+    return ""
 
 @st.cache_resource
 def get_gspread_client():
@@ -335,28 +425,11 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
     return clean_whatsapp_chat_text(file_bytes)
 
 # ==============================================================================
-# STRICT LINE-PRESERVING GEMINI API EXTRACTION ENGINE (ZERO TRUNCATION)
+# LINE-PRESERVING GEMINI AI EXTRACTION ENGINE (ZERO TRUNCATION)
 # ==============================================================================
-def parse_strictly_with_gemini_api(raw_text, default_phase):
+def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
-    
-    # Split strictly by full lines (NEVER cut any message in half!)
-    all_lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
-    if not all_lines:
-        return []
-
-    # Batch lines into chunks of 60 full messages
-    LINES_PER_CHUNK = 60
-    chunks = ["\n".join(all_lines[i:i+LINES_PER_CHUNK]) for i in range(0, len(all_lines), LINES_PER_CHUNK)]
-    all_results = []
-
-    progress_ingest = st.progress(0)
-    status_ingest = st.empty()
-
-    for c_idx, chunk in enumerate(chunks):
-        status_ingest.text(f"🧠 AI Gemini Processing Chunk {c_idx+1} of {len(chunks)}...")
-        
-        prompt = f"""You are a professional real estate data extraction assistant specializing in DHA Lahore.
+    prompt = f"""You are an expert DHA Lahore Real Estate CRM extraction engine.
 Extract EVERY single individual property listing from the provided text into a JSON array of objects.
 
 OFFICIAL DHA PHASES:
@@ -375,8 +448,8 @@ STRICT EXTRACTION RULES:
 7. "Contact No": Extract valid Pakistani phone number from line/section if available, else "".
 8. "Raw Listing & Source Material": Copy the exact line from input text.
 
-Input Real Estate Messages:
-{chunk}
+Input Text:
+{chunk_text}
 
 Return ONLY a valid JSON Array with format:
 [
@@ -398,35 +471,31 @@ Return ONLY a valid JSON Array with format:
   }}
 ]"""
 
-        chunk_success = False
-        if gemini_active and gemini_client:
-            for retry in range(3):
-                try:
-                    response = gemini_client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt,
-                        config=types.GenerateContentConfig(
-                            response_mime_type="application/json",
-                            temperature=0.0
-                        )
+    if gemini_active and gemini_client:
+        for retry in range(3):
+            try:
+                response = gemini_client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.0
                     )
-                    parsed_json = json.loads(response.text)
-                    if isinstance(parsed_json, list):
-                        all_results.extend(parsed_json)
-                        chunk_success = True
-                        break
-                except Exception:
-                    time.sleep(1.0)
+                )
+                parsed_json = json.loads(response.text)
+                if isinstance(parsed_json, list):
+                    for item in parsed_json:
+                        item["Size"] = resolve_size_text_first_or_map(
+                            item.get("Phase", default_phase),
+                            item.get("Block", "Block A"),
+                            item.get("Plot No", ""),
+                            item.get("Size", "")
+                        )
+                    return parsed_json
+            except Exception:
+                time.sleep(1.0)
 
-        if not chunk_success:
-            all_results.extend(fallback_regex_tokenizer(chunk, default_phase))
-
-        progress_ingest.progress((c_idx + 1) / len(chunks))
-        time.sleep(0.1)
-
-    status_ingest.empty()
-    progress_ingest.empty()
-    return all_results
+    return fallback_regex_tokenizer(chunk_text, default_phase)
 
 def fallback_regex_tokenizer(text_chunk, default_phase):
     lines = [l.strip() for l in text_chunk.splitlines() if l.strip()]
@@ -508,217 +577,6 @@ def fallback_regex_tokenizer(text_chunk, default_phase):
             })
     return extracted
 
-# 7. Persistent Summary Routing Control Panel with Exact Sheet Synchronization
-@st.dialog("⚡ DHA Extraction Summary & Multi-Phase Push Center", width="large")
-def show_routing_popup(payloads, phase_wb_map, gc_client):
-    total_raw_items = len(payloads)
-    
-    # 1. Base Ingestion Dataframe
-    base_data = []
-    for item in payloads:
-        base_data.append({
-            "Target Phase": str(item.get("Phase", "DHA Phase 1")),
-            "Target Tab": str(item.get("Block", "Block A")),
-            "Plot No": str(item.get("Plot No", "")),
-            "Size": str(item.get("Size", "")),
-            "Demand / Price": str(item.get("Demand / Price", "")),
-            "Contact No": str(item.get("Contact No", "")),
-            "Category": str(item.get("Category", "Selling")),
-            "Plot Features": str(item.get("Plot Features", "Standard Layout")),
-            "Source Text": str(item.get("Raw Listing & Source Material", ""))
-        })
-    df_all = pd.DataFrame(base_data)
-
-    # 2. Top Bar: Live Edit Mode Toggle + Dropdowns for Targeted Extraction
-    col_t1, col_t2, col_t3 = st.columns([1.2, 1.4, 1.4])
-    
-    with col_t1:
-        edit_popup_mode = st.toggle("✏️ Edit Mode (ON / OFF)", value=False, key="toggle_popup_edit_mode")
-
-    all_dha_phases = ["All Phases (Everything)"] + list(DHA_PHASE_BLOCK_CATALOG.keys())
-    with col_t2:
-        selected_phase_target = st.selectbox(
-            "📍 Target Phase Sheet:",
-            options=all_dha_phases,
-            index=0,
-            key="popup_target_phase_select"
-        )
-
-    if selected_phase_target == "All Phases (Everything)":
-        available_tabs = ["All Block Tabs / CCAs"] + sorted(list(df_all["Target Tab"].unique()))
-        df_filtered_phase = df_all
-    else:
-        p_data = DHA_PHASE_BLOCK_CATALOG.get(selected_phase_target, {})
-        full_catalog_blocks = p_data.get("residential", []) + p_data.get("commercial", [])
-        available_tabs = ["All Block Tabs / CCAs"] + full_catalog_blocks
-        df_filtered_phase = df_all[df_all["Target Phase"] == selected_phase_target]
-
-    with col_t3:
-        selected_block_target = st.selectbox(
-            "🧱 Target Block Tab:",
-            options=available_tabs,
-            index=0,
-            key="popup_target_block_select"
-        )
-
-    if selected_block_target != "All Block Tabs / CCAs":
-        df_final_display = df_filtered_phase[df_filtered_phase["Target Tab"] == selected_block_target]
-    else:
-        df_final_display = df_filtered_phase
-
-    # 3. Summary Intelligence Metrics Card
-    num_selected = len(df_final_display)
-    unique_tabs_count = df_final_display[["Target Phase", "Target Tab"]].drop_duplicates().shape[0] if num_selected > 0 else 0
-    with_demand_count = df_final_display[df_final_display["Demand / Price"] != ""].shape[0]
-    with_contact_count = df_final_display[df_final_display["Contact No"] != ""].shape[0]
-
-    st.markdown(f"""
-        <div class="summary-card">
-            <span class="stat-pill">📊 <b>Selected View:</b> {num_selected} Plots</span>
-            <span class="stat-pill">📁 <b>Target Tabs:</b> {unique_tabs_count} Tabs</span>
-            <span class="stat-pill">💰 <b>Prices Identified:</b> {with_demand_count}</span>
-            <span class="stat-pill">📞 <b>Contacts Identified:</b> {with_contact_count}</span>
-            <span class="stat-pill">🛡️ <b>Total Parsed via Gemini AI:</b> {total_raw_items} Listings</span>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # 4. Table Display / Editable Sheet
-    if edit_popup_mode:
-        st.info("💡 **Edit Mode Active:** Double-click cells to edit or select rows and press **`Delete`** on keyboard. Only rows shown below will sync.")
-        final_df = st.data_editor(
-            df_final_display,
-            use_container_width=True,
-            num_rows="dynamic",
-            height=300,
-            key="popup_active_data_editor"
-        )
-    else:
-        final_df = df_final_display
-        st.dataframe(final_df, use_container_width=True, height=280)
-
-    final_sync_count = len(final_df)
-    
-    # 5. Dynamic ETA Calculator
-    est_seconds = max(3, int(unique_tabs_count * 1.2 + (final_sync_count / 50) * 0.8))
-    e_min = est_seconds // 60
-    e_sec = est_seconds % 60
-    eta_label = f"{e_min}m {e_sec}s" if e_min > 0 else f"{e_sec} seconds"
-
-    st.markdown(f"""
-        <div class="eta-box">
-            🚀 <b>Ready for Sync:</b> {final_sync_count} listings across {unique_tabs_count} tabs | ⏱️ <b>Estimated Sync Time:</b> ~{eta_label}
-        </div>
-    """, unsafe_allow_html=True)
-
-    # 6. Action Buttons: Option A (Zero Record Loss - Save All Entries with Repeats Marked)
-    col_b1, col_b2 = st.columns([1.6, 1])
-    with col_b1:
-        if st.button(f"🚀 Push ({final_sync_count} Plots) to Sheet Tabs", use_container_width=True):
-            if final_sync_count == 0:
-                st.warning("No listings in current selection to sync.")
-            else:
-                now_dt = datetime.now()
-                today_str = now_dt.strftime("%Y-%m-%d")
-                now_str = now_dt.strftime("%Y-%m-%d %H:%M")
-                
-                grouped_data = {}
-                for _, row in final_df.iterrows():
-                    target_phase = str(row.get("Target Phase", "DHA Phase 1")).strip()
-                    target_block = str(row.get("Target Tab", "Block A")).strip()
-                    key = (target_phase, target_block)
-                    if key not in grouped_data:
-                        grouped_data[key] = []
-                    grouped_data[key].append(row)
-                
-                saved_count = 0
-                repeated_tracked = 0
-                
-                workbook_cache = {}
-                total_groups = len(grouped_data)
-                
-                progress_bar = st.progress(0)
-                status_placeholder = st.empty()
-                
-                for idx, ((phase, block), rows_list) in enumerate(grouped_data.items()):
-                    pct = int(((idx + 1) / total_groups) * 100)
-                    status_placeholder.markdown(f"⏳ **Syncing:** `[{phase} ➔ {block}]` — ({idx+1}/{total_groups} tabs) • **{pct}% Complete**")
-                    
-                    if phase not in workbook_cache:
-                        wb = get_phase_workbook(gc_client, phase)
-                        workbook_cache[phase] = wb
-                    
-                    wb = workbook_cache[phase]
-                    ws = get_or_create_clean_tab_exact(wb, block)
-                    
-                    try:
-                        existing_rows = safe_gspread_call(ws.get_all_values)
-                    except Exception:
-                        existing_rows = []
-                    
-                    if len(existing_rows) == 0:
-                        safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
-                    
-                    plot_repeat_map = {}
-                    if len(existing_rows) > 1:
-                        for r in existing_rows[1:]:
-                            r_plot = str(r[4]).strip().lower() if len(r) > 4 else ""
-                            if r_plot:
-                                plot_repeat_map[r_plot] = plot_repeat_map.get(r_plot, 0) + 1
-                    
-                    rows_to_append = []
-                    for row in rows_list:
-                        plot_val = str(row.get("Plot No", "")).strip()
-                        plot_val_clean = plot_val.lower()
-                        
-                        # OPTION A: NEVER SKIP! SAVE EVERY ENTRY AND TRACK FREQUENCY
-                        repeat_count = plot_repeat_map.get(plot_val_clean, 0)
-                        notes_txt = "Direct WhatsApp Ingestion"
-                        if repeat_count > 0:
-                            repeated_tracked += 1
-                            notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
-                        
-                        plot_repeat_map[plot_val_clean] = repeat_count + 1
-                        
-                        row_data = [
-                            str(now_str),
-                            str(row.get("Category", "Selling")),
-                            str(phase),
-                            str(block),
-                            str(plot_val),
-                            str(row.get("Size", "")),
-                            str(row.get("Plot Features", "Standard Layout")),
-                            str(row.get("Demand / Price", "")),
-                            "Dealer",
-                            "",
-                            str(row.get("Contact No", "")),
-                            str(st.session_state['office_name']),
-                            "Available",
-                            str(notes_txt),
-                            f"[AI Ingest] {str(row.get('Source Text', ''))}"
-                        ]
-                        rows_to_append.append(row_data)
-                    
-                    # Safe Chunked Write to protect 429 Quota
-                    CHUNK_SIZE = 50
-                    for i in range(0, len(rows_to_append), CHUNK_SIZE):
-                        chunk_slice = rows_to_append[i:i + CHUNK_SIZE]
-                        safe_gspread_call(ws.append_rows, chunk_slice, value_input_option="USER_ENTERED")
-                        saved_count += len(chunk_slice)
-                        time.sleep(0.4)
-                    
-                    progress_bar.progress((idx + 1) / total_groups)
-                    time.sleep(0.3)
-                
-                status_placeholder.empty()
-                progress_bar.empty()
-                st.success(f"🎉 **Push Complete!** Successfully saved ALL **{saved_count} listings** directly to Google Sheets! (0 Records Lost • Repeats Tracked: **{repeated_tracked}**)")
-                st.info("💡 **Screen remains open:** You can now change Phase/Block above to push other portions, or click 'Back' below.")
-
-    with col_b2:
-        if st.button("⬅️ Back to Main Screen", use_container_width=True):
-            st.session_state["parsed_payloads"] = []
-            st.rerun()
-
 # 8. Login Screen
 if not st.session_state["authenticated"]:
     st.markdown("""
@@ -761,7 +619,7 @@ if not st.session_state["authenticated"]:
             st.session_state["user_email"] = "sso.agent@dha.pk"
             st.rerun()
 
-# 9. Main Dashboard
+# 9. Main Dashboard & Streaming Summary Control Center
 else:
     try:
         gc_client = get_gspread_client()
@@ -773,7 +631,7 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Strict Gemini AI Parser & Multi-Phase Control Center (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">Live Streaming Ingestion & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -879,14 +737,225 @@ else:
     st.markdown("---")
 
     # ==========================================================================
-    # 3. BOTTOM SECTION: AI MULTI-SOURCE INGESTION & HIGH SPEED BATCH ROUTING
+    # 3. LIVE-STREAMING SUMMARY REPORT & INGESTION CONTROL WORKSPACE
+    # ==========================================================================
+    st.subheader("⚡ Live Summary Report & Multi-Phase Ingestion Center")
+
+    total_parsed_now = len(st.session_state["parsed_payloads"])
+
+    # Prepare DataFrame for Live View
+    if total_parsed_now > 0:
+        base_data = []
+        for item in st.session_state["parsed_payloads"]:
+            base_data.append({
+                "Target Phase": str(item.get("Phase", "DHA Phase 1")),
+                "Target Tab": str(item.get("Block", "Block A")),
+                "Plot No": str(item.get("Plot No", "")),
+                "Size": str(item.get("Size", "")),
+                "Demand / Price": str(item.get("Demand / Price", "")),
+                "Contact No": str(item.get("Contact No", "")),
+                "Category": str(item.get("Category", "Selling")),
+                "Plot Features": str(item.get("Plot Features", "Standard Layout")),
+                "Source Text": str(item.get("Raw Listing & Source Material", ""))
+            })
+        df_all_live = pd.DataFrame(base_data)
+    else:
+        df_all_live = pd.DataFrame(columns=[
+            "Target Phase", "Target Tab", "Plot No", "Size", "Demand / Price",
+            "Contact No", "Category", "Plot Features", "Source Text"
+        ])
+
+    # Top Control Bar in Summary Workspace
+    col_sc1, col_sc2, col_sc3, col_sc4 = st.columns([1.2, 1.4, 1.4, 1.2])
+    
+    with col_sc1:
+        edit_summary_mode = st.toggle("✏️ Edit Mode (ON / OFF)", value=False, key="toggle_summary_edit_mode")
+
+    all_dha_phases_summary = ["All Phases (Everything)"] + list(DHA_PHASE_BLOCK_CATALOG.keys())
+    with col_sc2:
+        selected_summary_phase = st.selectbox(
+            "📍 Filter / Target Phase:",
+            options=all_dha_phases_summary,
+            index=0,
+            key="summary_target_phase_select"
+        )
+
+    if selected_summary_phase == "All Phases (Everything)":
+        available_summary_tabs = ["All Block Tabs / CCAs"] + (sorted(list(df_all_live["Target Tab"].unique())) if total_parsed_now > 0 else [])
+        df_filtered_summary_phase = df_all_live
+    else:
+        p_data = DHA_PHASE_BLOCK_CATALOG.get(selected_summary_phase, {})
+        full_catalog_blocks = p_data.get("residential", []) + p_data.get("commercial", [])
+        available_summary_tabs = ["All Block Tabs / CCAs"] + full_catalog_blocks
+        df_filtered_summary_phase = df_all_live[df_all_live["Target Phase"] == selected_summary_phase] if total_parsed_now > 0 else df_all_live
+
+    with col_sc3:
+        selected_summary_block = st.selectbox(
+            "🧱 Filter / Target Block:",
+            options=available_summary_tabs,
+            index=0,
+            key="summary_target_block_select"
+        )
+
+    if selected_summary_block != "All Block Tabs / CCAs" and total_parsed_now > 0:
+        df_final_summary_display = df_filtered_summary_phase[df_filtered_summary_phase["Target Tab"] == selected_summary_block]
+    else:
+        df_final_summary_display = df_filtered_summary_phase
+
+    with col_sc4:
+        st.metric(label="📊 Plots In View", value=f"{len(df_final_summary_display)}", delta=f"{total_parsed_now} Total Loaded")
+
+    # Live Intelligence Metrics Banner
+    num_selected_live = len(df_final_summary_display)
+    unique_tabs_count_live = df_final_summary_display[["Target Phase", "Target Tab"]].drop_duplicates().shape[0] if num_selected_live > 0 else 0
+    with_demand_count_live = df_final_summary_display[df_final_summary_display["Demand / Price"] != ""].shape[0] if num_selected_live > 0 else 0
+    with_contact_count_live = df_final_summary_display[df_final_summary_display["Contact No"] != ""].shape[0] if num_selected_live > 0 else 0
+
+    st.markdown(f"""
+        <div class="summary-card">
+            <span class="stat-pill">📊 <b>Selected View:</b> {num_selected_live} Plots</span>
+            <span class="stat-pill">📁 <b>Target Tabs:</b> {unique_tabs_count_live} Tabs</span>
+            <span class="stat-pill">💰 <b>Prices Identified:</b> {with_demand_count_live}</span>
+            <span class="stat-pill">📞 <b>Contacts Identified:</b> {with_contact_count_live}</span>
+            <span class="stat-pill">⚡ <b>Total Extracted So Far:</b> {total_parsed_now} Listings</span>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Live Table Display / Editor
+    if total_parsed_now > 0:
+        if edit_summary_mode:
+            st.info("💡 **Edit Mode Active:** Modify cells or delete rows. Only rows shown below will push to Google Sheets.")
+            final_summary_df = st.data_editor(
+                df_final_summary_display,
+                use_container_width=True,
+                num_rows="dynamic",
+                height=280,
+                key="summary_active_live_editor"
+            )
+        else:
+            final_summary_df = df_final_summary_display
+            st.dataframe(final_summary_df, use_container_width=True, height=260)
+    else:
+        final_summary_df = df_final_summary_display
+        st.info("ℹ️ Summary is ready. Click **'Start AI Extraction'** below to stream listings live into this table.")
+
+    # Action Row for Pushing Data
+    final_sync_count_live = len(final_summary_df)
+    col_pb1, col_pb2 = st.columns([2, 1])
+    with col_pb1:
+        if st.button(f"🚀 Push ({final_sync_count_live} Filtered Plots) to Sheet Tabs", use_container_width=True, disabled=(final_sync_count_live == 0)):
+            now_dt = datetime.now()
+            today_str = now_dt.strftime("%Y-%m-%d")
+            now_str = now_dt.strftime("%Y-%m-%d %H:%M")
+            
+            grouped_data = {}
+            for _, row in final_summary_df.iterrows():
+                target_phase = str(row.get("Target Phase", "DHA Phase 1")).strip()
+                target_block = str(row.get("Target Tab", "Block A")).strip()
+                key = (target_phase, target_block)
+                if key not in grouped_data:
+                    grouped_data[key] = []
+                grouped_data[key].append(row)
+            
+            saved_count = 0
+            repeated_tracked = 0
+            workbook_cache = {}
+            total_groups = len(grouped_data)
+            
+            progress_bar_sync = st.progress(0)
+            status_placeholder_sync = st.empty()
+            
+            for idx, ((phase, block), rows_list) in enumerate(grouped_data.items()):
+                pct = int(((idx + 1) / total_groups) * 100)
+                status_placeholder_sync.markdown(f"⏳ **Syncing:** `[{phase} ➔ {block}]` — ({idx+1}/{total_groups} tabs) • **{pct}% Complete**")
+                
+                if phase not in workbook_cache:
+                    wb = get_phase_workbook(gc_client, phase)
+                    workbook_cache[phase] = wb
+                
+                wb = workbook_cache[phase]
+                ws = get_or_create_clean_tab_exact(wb, block)
+                
+                try:
+                    existing_rows = safe_gspread_call(ws.get_all_values)
+                except Exception:
+                    existing_rows = []
+                
+                if len(existing_rows) == 0:
+                    safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
+                
+                plot_repeat_map = {}
+                if len(existing_rows) > 1:
+                    for r in existing_rows[1:]:
+                        r_plot = str(r[4]).strip().lower() if len(r) > 4 else ""
+                        if r_plot:
+                            plot_repeat_map[r_plot] = plot_repeat_map.get(r_plot, 0) + 1
+                
+                rows_to_append = []
+                for row in rows_list:
+                    plot_val = str(row.get("Plot No", "")).strip()
+                    plot_val_clean = plot_val.lower()
+                    
+                    repeat_count = plot_repeat_map.get(plot_val_clean, 0)
+                    notes_txt = "Direct WhatsApp Ingestion"
+                    if repeat_count > 0:
+                        repeated_tracked += 1
+                        notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
+                    
+                    plot_repeat_map[plot_val_clean] = repeat_count + 1
+                    
+                    row_data = [
+                        str(now_str),
+                        str(row.get("Category", "Selling")),
+                        str(phase),
+                        str(block),
+                        str(plot_val),
+                        str(row.get("Size", "")),
+                        str(row.get("Plot Features", "Standard Layout")),
+                        str(row.get("Demand / Price", "")),
+                        "Dealer",
+                        "",
+                        str(row.get("Contact No", "")),
+                        str(st.session_state['office_name']),
+                        "Available",
+                        str(notes_txt),
+                        f"[AI Ingest] {str(row.get('Source Text', ''))}"
+                    ]
+                    rows_to_append.append(row_data)
+                
+                CHUNK_SIZE = 50
+                for i in range(0, len(rows_to_append), CHUNK_SIZE):
+                    chunk_slice = rows_to_append[i:i + CHUNK_SIZE]
+                    safe_gspread_call(ws.append_rows, chunk_slice, value_input_option="USER_ENTERED")
+                    saved_count += len(chunk_slice)
+                    time.sleep(0.4)
+                
+                progress_bar_sync.progress((idx + 1) / total_groups)
+                time.sleep(0.3)
+            
+            status_placeholder_sync.empty()
+            progress_bar_sync.empty()
+            st.success(f"🎉 **Push Complete!** Successfully saved ALL **{saved_count} listings** directly to Google Sheets! (0 Records Lost • Repeats Tracked: **{repeated_tracked}**)")
+            st.balloons()
+
+    with col_pb2:
+        if st.button("🗑️ Clear Extracted Summary Data", use_container_width=True):
+            st.session_state["parsed_payloads"] = []
+            st.session_state["extraction_active"] = False
+            st.session_state["extraction_paused"] = False
+            st.rerun()
+
+    st.markdown("---")
+
+    # ==========================================================================
+    # 4. BOTTOM SECTION: AI MULTI-SOURCE INGESTION & PLAY/PAUSE CONTROLLER
     # ==========================================================================
     if gemini_active:
         st.markdown('<div class="ai-badge-active">🟢 Google Gemini AI Extraction Engine: Connected & Active</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="ai-badge-inactive">🟡 Gemini API Key Missing — Operating on Fallback Pattern Parser (Add GEMINI_API_KEY to Secrets for full AI power)</div>', unsafe_allow_html=True)
 
-    st.subheader("🧠 AI Multi-Source Data Ingestion Engine")
+    st.subheader("🧠 Raw Data Input & Extraction Engine")
     
     col_u1, col_u2 = st.columns([1.5, 1.5])
     
@@ -943,21 +1012,81 @@ else:
         default_box_value = st.session_state.get("extracted_file_text", "")
         
         raw_text = st.text_area(
-            "📋 Raw Real Estate Ingestion Box (Strict Line-Preserving Gemini AI Engine):",
+            "📋 Raw Real Estate Ingestion Box (Line-Preserving Gemini Engine):",
             value=default_box_value,
             height=220,
             placeholder="Data loaded from files, Google Drive, camera or copy-paste will appear here for processing..."
         )
 
-    if st.button("🚀 Process, Segregate & Route to Block Tabs", use_container_width=True):
-        final_input_text = raw_text.strip()
-        if final_input_text:
-            with st.spinner("🧠 Strict Gemini AI Engine is reading listings line-by-line and building exact schema..."):
-                payloads = parse_strictly_with_gemini_api(final_input_text, selected_phase)
-                if payloads:
-                    st.session_state["parsed_payloads"] = payloads
-                    show_routing_popup(payloads, DHA_PHASE_SHEET_URLS, gc_client)
+    # Ingestion Control Panel (Play / Pause / Resume / Stop)
+    if not st.session_state["extraction_active"]:
+        if st.button("🚀 Start AI Extraction & Stream Live to Summary", use_container_width=True):
+            final_input_text = raw_text.strip()
+            if final_input_text:
+                all_lines = [l.strip() for l in final_input_text.splitlines() if l.strip()]
+                LINES_PER_CHUNK = 60
+                chunks = ["\n".join(all_lines[i:i+LINES_PER_CHUNK]) for i in range(0, len(all_lines), LINES_PER_CHUNK)]
+                
+                st.session_state["all_chunks"] = chunks
+                st.session_state["current_chunk_idx"] = 0
+                st.session_state["parsed_payloads"] = []
+                st.session_state["extraction_active"] = True
+                st.session_state["extraction_paused"] = False
+                st.session_state["extraction_default_phase"] = selected_phase
+                st.rerun()
+            else:
+                st.warning("Please provide listing text, take a camera photo, or upload a file.")
+
+    # Active Live Streaming Loop
+    if st.session_state["extraction_active"]:
+        chunks = st.session_state["all_chunks"]
+        curr_idx = st.session_state["current_chunk_idx"]
+        total_chunks = len(chunks)
+        
+        st.markdown(f"""
+            <div class="control-panel-box">
+                <div style="font-size: 16px; font-weight: 700; color: #00113A; margin-bottom: 8px;">
+                    ⚡ Live AI Streaming: Processing Chunk {curr_idx + 1} of {total_chunks} • Streamed: {total_parsed_now} Listings into Summary
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        col_p1, col_p2, col_p3 = st.columns([1, 1, 1.2])
+        with col_p1:
+            if not st.session_state["extraction_paused"]:
+                if st.button("⏸️ Pause Extraction", use_container_width=True):
+                    st.session_state["extraction_paused"] = True
+                    st.rerun()
+            else:
+                if st.button("▶️ Resume Extraction", use_container_width=True):
+                    st.session_state["extraction_paused"] = False
+                    st.rerun()
+                    
+        with col_p2:
+            if st.button("⏹️ Stop & Keep Extracted Data", use_container_width=True):
+                st.session_state["extraction_active"] = False
+                st.session_state["extraction_paused"] = False
+                st.rerun()
+
+        with col_p3:
+            if st.button("❌ Cancel / Reset", use_container_width=True):
+                st.session_state["extraction_active"] = False
+                st.session_state["extraction_paused"] = False
+                st.session_state["parsed_payloads"] = []
+                st.rerun()
+
+        # Step next chunk if active and not paused
+        if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
+            with st.spinner(f"🧠 AI Gemini Processing Chunk {curr_idx + 1} of {total_chunks}..."):
+                chunk_to_process = chunks[curr_idx]
+                new_listings = process_single_chunk_via_gemini(chunk_to_process, st.session_state["extraction_default_phase"])
+                st.session_state["parsed_payloads"].extend(new_listings)
+                st.session_state["current_chunk_idx"] += 1
+                
+                if st.session_state["current_chunk_idx"] >= total_chunks:
+                    st.session_state["extraction_active"] = False
+                    st.session_state["extraction_paused"] = False
+                    st.success(f"🎉 100% Complete! Extracted {len(st.session_state['parsed_payloads'])} listings into summary workspace.")
+                    st.rerun()
                 else:
-                    st.warning("No valid property listings could be identified in the text.")
-        else:
-            st.warning("Please provide listing text, take a camera photo, or upload a file.")
+                    st.rerun()
