@@ -20,8 +20,8 @@ if "user_email" not in st.session_state:
     st.session_state["user_email"] = ""
 if "office_name" not in st.session_state:
     st.session_state["office_name"] = "Wali Muhammad Associates"
-if "selected_block_tab" not in st.session_state:
-    st.session_state["selected_block_tab"] = "Block A"
+if "parsed_payloads" not in st.session_state:
+    st.session_state["parsed_payloads"] = []
 
 # ==============================================================================
 # 2. EXACT GOOGLE STITCH ROYAL BLUE CSS INJECTION
@@ -107,6 +107,10 @@ st.markdown("""
     .badge-rental { background-color: #E0F2FE; color: #0284C7; }
     .badge-feature { background-color: #FEF3C7; color: #D97706; }
     .badge-price { background-color: #ECFDF5; color: #059669; font-weight: 800; }
+    .ai-badge {
+        background: #EEF2FF; border: 1px solid #C7D2FE; color: #3730A3;
+        font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-bottom: 8px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -179,7 +183,7 @@ def get_or_create_clean_tab(workbook, tab_title):
     return ws
 
 # ==============================================================================
-# 4. MASTER CLEAN DHA LAHORE PHASE & BLOCK CATALOG
+# 4. MASTER DHA LAHORE PHASE & MAP-MATCHED BLOCK CATALOG
 # ==============================================================================
 DHA_PHASE_BLOCK_CATALOG = {
     "DHA Phase 1": {
@@ -245,74 +249,188 @@ DHA_PHASE_BLOCK_CATALOG = {
 }
 
 # ==============================================================================
-# 5. SMART TEXT PARSER
+# 5. GEMINI-LEVEL MULTI-LISTING NLP EXTRACTION ENGINE
 # ==============================================================================
-def parse_property_crm(text, current_selected_phase, current_selected_block):
-    text_upper = text.upper()
-    category = "Selling"
-    if any(w in text_upper for w in ["REQUIRED", "WANTED", "BUYING", "PURCHASE", "NEED", "DEMANDING"]):
-        category = "Buying"
-    elif any(w in text_upper for w in ["RENT", "TO LET", "TENANT", "LEASE"]):
-        category = "Rental"
+def parse_multi_listing_engine(raw_text, default_phase):
+    text_clean = raw_text.strip()
+    if not text_clean:
+        return []
 
-    phase = current_selected_phase
-    if "PRISM" in text_upper: phase = "DHA Phase 9 Prism"
-    elif "TOWN" in text_upper: phase = "DHA Phase 9 Town"
-    elif "RAHBAR" in text_upper: phase = "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"
-    elif "EME" in text_upper: phase = "DHA Phase 12 (EME Sector)"
-    elif "IVY GREEN" in text_upper: phase = "DHA Phase 8 (Ivy Green / Sector Z)"
-    elif "PARK VIEW" in text_upper: phase = "DHA Phase 8 (Park View)"
-    elif "AIR AVENUE" in text_upper: phase = "DHA Phase 8 (Air Avenue / Sector AA)"
+    # 1. Global Phase Matching
+    detected_phase = default_phase
+    t_upper = text_clean.upper()
+    if "PRISM" in t_upper or "PH.9-PRISM" in t_upper or "9 - PRISM" in t_upper: detected_phase = "DHA Phase 9 Prism"
+    elif "TOWN" in t_upper: detected_phase = "DHA Phase 9 Town"
+    elif "RAHBAR" in t_upper: detected_phase = "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"
+    elif "EME" in t_upper: detected_phase = "DHA Phase 12 (EME Sector)"
+    elif "IVY GREEN" in t_upper: detected_phase = "DHA Phase 8 (Ivy Green / Sector Z)"
+    elif "PARK VIEW" in t_upper: detected_phase = "DHA Phase 8 (Park View)"
+    elif "AIR AVENUE" in t_upper: detected_phase = "DHA Phase 8 (Air Avenue / Sector AA)"
     else:
-        p_match = re.search(r'(?:PHASE|PH|P)[\s:-]*(\d{1,2})', text_upper)
-        if p_match: phase = f"DHA Phase {p_match.group(1)}"
+        p_m = re.search(r'(?:PHASE|PH|P)[\s.:-]*(\d{1,2})', t_upper)
+        if p_m: detected_phase = f"DHA Phase {p_m.group(1)}"
 
-    block = current_selected_block if current_selected_block != "All Blocks" else "Block A"
-    blk_match = re.search(r'(?:BLOCK|BLK|SECTOR|SEC)\s*[:.-]?\s*([A-Z0-9-]{1,5})', text_upper)
-    if blk_match:
-        block = f"Block {blk_match.group(1)}"
-    elif "BROADWAY" in text_upper:
-        block = "Broadway Commercial"
-    elif "CCA 1" in text_upper or "CCA-1" in text_upper:
-        block = "CCA 1 Commercial"
-    elif "CCA 2" in text_upper or "CCA-2" in text_upper:
-        block = "CCA 2 Commercial"
+    # 2. Extract Contacts
+    phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', text_clean)
+    main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else "N/A"
 
-    plot_no = "N/A"
-    plt_match = re.search(r'(?:PLOT|PLT|NO|#)\s*[:.-]?\s*([0-9]{1,4}[A-Za-z/]*)', text_upper)
-    if plt_match:
-        plot_no = f"Plot {plt_match.group(1)}"
+    names = re.findall(r'(?:Atif Bhatti|Adnan Irfan|Ijaz Hussain Sial|[A-Z][a-z]+ [A-Z][a-z]+)', text_clean)
+    main_dealer = names[0] if names else "Direct Associate"
 
-    size = "1 Kanal"
-    s_match = re.search(r'(\d+\.?\d*)\s*(MARLA|KANAL|M|K)', text_upper)
-    if s_match:
-        unit = "Kanal" if s_match.group(2) in ["K", "KANAL"] else "Marla"
-        size = f"{s_match.group(1)} {unit}"
+    # 3. Split by lines
+    lines = [l.strip() for l in text_clean.split('\n') if l.strip()]
+    extracted_items = []
+    current_size_context = "1 Kanal" if "1 KANAL" in t_upper else ("5 Marla" if "5 MARLA" in t_upper else "1 Kanal")
 
-    features = []
-    if "CORNER" in text_upper: features.append("Corner")
-    if "PARK" in text_upper: features.append("Facing Park")
-    if "MAIN" in text_upper or "MB" in text_upper: features.append("Main Boulevard")
-    road_match = re.search(r'(\d{2,3})\s*(FT|FEET|ROAD)', text_upper)
-    if road_match: features.append(f"{road_match.group(0)}")
-    feat_str = ", ".join(features) if features else "Standard Layout"
+    for line in lines:
+        l_up = line.upper()
+        if "1 KANAL" in l_up: current_size_context = "1 Kanal"
+        if "5 MARLA" in l_up or "5.5 MARLA" in l_up: current_size_context = "5 Marla"
+        if "10 MARLA" in l_up: current_size_context = "10 Marla"
+        if "13-MARLA" in l_up: current_size_context = "13 Marla"
 
-    demand = "N/A"
-    pr_match = re.search(r'(\d+\.?\d*)\s*(CRORE|CR|LAC|LACS|LAKH|LAKHS)', text_upper)
-    if pr_match:
-        demand = f"{pr_match.group(1)} {pr_match.group(2)}"
+        pattern = re.search(r'(?:BLOCK\s*([A-Z0-9-]{1,3})|([A-Z])[\s.:-]+(\d+[\+\d]*))\s*(?:–|-|@|PLOT\s*#?|#)?\s*(\d+[\+\d]*)?', l_up)
+        demand_match = re.search(r'(@|\bDEMAND\b:?)\s*(\d+\.?\d*)\s*(LAC|LACS|LAKH|CRORE|CR)?', l_up)
+        
+        if any(w in l_up for w in ["@", "PLOT", "DEMAND", "NDC", "ROAD", "CORNER"]) and (pattern or re.search(r'\b[A-Z]\b[\s.:-]*\d+', l_up)):
+            blk_candidate = "Block A"
+            plt_candidate = "N/A"
+            
+            b_m = re.search(r'(?:BLOCK\s*([A-Z0-9-]{1,3})|\b([A-Z])\b[\s.:-]*(\d+[\+\d]*))', l_up)
+            if b_m:
+                letter = b_m.group(1) if b_m.group(1) else b_m.group(2)
+                blk_candidate = f"Block {letter}"
+                if b_m.group(3):
+                    plt_candidate = f"Plot {b_m.group(3)}"
+            
+            if plt_candidate == "N/A":
+                p_num = re.search(r'(?:PLOT\s*#?|#|L\.|E\.|M\.|N\.|R\.)\s*(\d+[\+\d]*)', l_up)
+                if p_num: plt_candidate = f"Plot {p_num.group(1)}"
 
-    seller_type = "Direct Owner" if any(w in text_upper for w in ["OWNER", "SELF", "DIRECT DEAL"]) else "Dealer"
+            # Size Logic
+            size = current_size_context
+            if "13-MARLA" in l_up or "13 MARLA" in l_up: size = "13 Marla"
+            elif "5.5 MARLA" in l_up or "5 MARLA" in l_up or blk_candidate in ["Block P", "Block Q", "Block R"]: size = "5 Marla"
+            elif blk_candidate in ["Block J", "Block K", "Block L", "Block M", "Block N"]: 
+                size = "10 Marla" if "10 MARLA" in l_up or blk_candidate in ["Block M", "Block N"] else "1 Kanal"
+            elif blk_candidate in ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H"]:
+                size = "1 Kanal"
 
-    phone = "N/A"
-    ph_match = re.search(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', text)
-    if ph_match:
-        phone = re.sub(r'[^0-9+]', '', ph_match.group(0))
+            # Features
+            features = []
+            if "CORNER" in l_up: features.append("Corner")
+            if "PARK" in l_up: features.append("Facing Park")
+            if "POSSESSION" in l_up: features.append("Possession")
+            if "NDC" in l_up: features.append("NDC Ready")
+            rd = re.search(r'(\d{2,3})\s*(FT|FEET|ROAD)', l_up)
+            if rd: features.append(rd.group(0))
+            features_str = ", ".join(features) if features else "Standard Layout"
 
-    return category, phase, block, plot_no, size, feat_str, demand, seller_type, "Direct Associate", phone, "Available", "Fresh listing ingested via system."
+            # Demand
+            price = "N/A"
+            if demand_match:
+                val = demand_match.group(2)
+                unit = demand_match.group(3) if demand_match.group(3) else "Lac"
+                price = f"{val} {unit}".strip()
+            else:
+                p_m2 = re.search(r'(\d+\.?\d*)\s*(LAC|LACS|CRORE|CR)', l_up)
+                if p_m2: price = f"{p_m2.group(1)} {p_m2.group(2)}"
+
+            seller = "Direct Owner" if "DIRECT OWNER" in l_up or "SELF" in l_up else "Dealer"
+
+            line_ph = re.search(r'(?:03\d{2}[- ]?\d{7})', line)
+            item_phone = line_ph.group(0) if line_ph else main_phone
+
+            extracted_items.append({
+                "Category": "Selling",
+                "Phase": detected_phase,
+                "Block": blk_candidate,
+                "Plot No": plt_candidate,
+                "Size": size,
+                "Plot Features": features_str,
+                "Demand / Price": price,
+                "Seller Type": seller,
+                "Seller / Dealer Name": main_dealer,
+                "Contact No": item_phone,
+                "Office / Agency": st.session_state["office_name"],
+                "Deal Status": "Available",
+                "Last Conversation / Notes": "Extracted via Gemini Multi-Parser",
+                "Raw Listing & Source Material": line
+            })
+
+    if not extracted_items:
+        extracted_items.append({
+            "Category": "Selling",
+            "Phase": detected_phase,
+            "Block": "Block A",
+            "Plot No": "Plot 1",
+            "Size": "1 Kanal",
+            "Plot Features": "Standard",
+            "Demand / Price": "N/A",
+            "Seller Type": "Dealer",
+            "Seller / Dealer Name": main_dealer,
+            "Contact No": main_phone,
+            "Office / Agency": st.session_state["office_name"],
+            "Deal Status": "Available",
+            "Last Conversation / Notes": "Direct Ingestion",
+            "Raw Listing & Source Material": text_clean
+        })
+
+    return extracted_items
 
 # ==============================================================================
-# 6. LOGIN SCREEN
+# 6. POPUP DIALOG FOR CONFIRMATION
+# ==============================================================================
+@st.dialog("⚡ Confirm Multi-Listing Cloud Routing & Segregation", width="large")
+def show_routing_popup(payloads, phase_wb_map, gc_client):
+    st.markdown("##### 🔍 Real-Time Extraction Summary:")
+    st.write(f"Gemini Engine has parsed **{len(payloads)} distinct listings** from your raw message:")
+
+    table_data = []
+    for idx, item in enumerate(payloads):
+        table_data.append({
+            "Target Phase": item["Phase"],
+            "Target Tab": item["Block"],
+            "Plot": item["Plot No"],
+            "Size": item["Size"],
+            "Features": item["Plot Features"],
+            "Demand": item["Demand / Price"],
+            "Phone": item["Contact No"]
+        })
+    
+    st.dataframe(pd.DataFrame(table_data), use_container_width=True)
+
+    st.info("💡 **Backend Action:** Each listing will be saved into its respective DHA Phase Google Sheet and Block Tab!")
+
+    col_btn1, col_btn2 = st.columns([1.5, 1])
+    with col_btn1:
+        if st.button("🚀 Confirm & Sync to Google Sheets", use_container_width=True):
+            with st.spinner("Writing to Google Sheets..."):
+                now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                saved_count = 0
+                for item in payloads:
+                    target_phase = item["Phase"]
+                    target_block = item["Block"]
+                    wb = get_phase_workbook(gc_client, target_phase)
+                    ws = get_or_create_clean_tab(wb, target_block)
+                    
+                    row_data = [
+                        now_str, item["Category"], target_phase, target_block,
+                        item["Plot No"], item["Size"], item["Plot Features"],
+                        item["Demand / Price"], item["Seller Type"], item["Seller / Dealer Name"],
+                        item["Contact No"], item["Office / Agency"], item["Deal Status"],
+                        item["Last Conversation / Notes"], f"[Gemini Ingest] {item['Raw Listing & Source Material']}"
+                    ]
+                    ws.append_row(row_data)
+                    saved_count += 1
+                
+                st.success(f"✅ Successfully saved all **{saved_count} listings** into their respective Block tabs!")
+                st.balloons()
+                st.session_state["parsed_payloads"] = []
+                st.rerun()
+
+# ==============================================================================
+# 7. LOGIN SCREEN
 # ==============================================================================
 if not st.session_state["authenticated"]:
     st.markdown("""
@@ -323,7 +441,7 @@ if not st.session_state["authenticated"]:
             </div>
             <div style="color: #757682; font-size: 13px; font-weight: 500;">
                 <span class="material-symbols-outlined" style="vertical-align:middle; font-size:18px; color:#006B5E;">lock</span>
-                Secure CRM Access
+                Secure Access
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -356,7 +474,7 @@ if not st.session_state["authenticated"]:
             st.rerun()
 
 # ==============================================================================
-# 7. MAIN ENGINE DASHBOARD & LIVE BLOCK TAB BUTTONS
+# 8. MAIN DASHBOARD (TOP: LIVE DATA TABLE | BOTTOM: INGESTION BOX)
 # ==============================================================================
 else:
     try:
@@ -369,7 +487,7 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Interactive Block Tab Controller (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">Interactive Block Live Inventory & Ingestion (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -379,7 +497,7 @@ else:
         selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
     with col_phase:
         phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
-        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook)", phase_options, index=0)
+        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook)", phase_options, index=11)
 
     # Load Phase Workbook
     try:
@@ -395,11 +513,10 @@ else:
     all_phase_blocks = res_b + com_b
 
     # ==========================================================================
-    # 2. INTERACTIVE BLOCK SHEET TABS / FEATURE BUTTON BAR
+    # 2. TOP SECTION: INTERACTIVE BLOCK TABS & LIVE INVENTORY TABLE
     # ==========================================================================
     st.markdown(f"##### 🧱 Choose Block Sheet Tab for **[{selected_phase}]**:")
     
-    # Render interactive radio tabs (pills) for immediate table switching
     selected_active_block = st.radio(
         "Direct Block Switcher:",
         options=all_phase_blocks,
@@ -408,59 +525,8 @@ else:
     )
 
     sheet_link = DHA_PHASE_SHEET_URLS.get(selected_phase, "")
-    st.markdown(f"🔗 **Active Google Sheet:** [Open {selected_phase} in Google Sheets ↗]({sheet_link}) | Selected Tab: **`{selected_active_block}`**")
-    st.markdown("---")
+    st.markdown(f"🔗 **Active Google Sheet:** [Open {selected_phase} in Google Sheets ↗]({sheet_link}) | Current Tab: **`{selected_active_block}`**")
 
-    # ==========================================================================
-    # 3. TEXT INGESTION & AUTO SAVE
-    # ==========================================================================
-    st.subheader(f"📥 Ingest Property Text to [{selected_phase} ➔ Tab: {selected_active_block}]")
-    
-    raw_text = st.text_area(
-        "📋 Paste Raw Listing Text",
-        height=100,
-        placeholder=f"Example: {selected_phase} {selected_active_block} Plot 120 1 Kanal Corner Facing Park demand 6.25 crore 03209498044"
-    )
-
-    cat, ph, blk, plt_no, sz, feat, dem, sel_type, sel_name, phn, d_status, l_notes = parse_property_crm(
-        raw_text, selected_phase, selected_active_block
-    )
-
-    final_target_tab = blk if blk in all_phase_blocks else selected_active_block
-
-    if raw_text.strip():
-        st.markdown("##### ⚡ Auto-Extracted Live Preview:")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.info(f"📁 **Tab:** `{final_target_tab}`")
-        c2.info(f"🏷️ **Plot:** `{plt_no}` ({sz})")
-        c3.info(f"💰 **Demand:** `{dem}`")
-        c4.info(f"📞 **Phone:** `{phn}`")
-
-    if st.button(f"💾 Save Listing to Google Sheet Tab: [{final_target_tab}]", use_container_width=True):
-        if raw_text.strip():
-            with st.spinner(f"Writing to tab [{final_target_tab}]..."):
-                try:
-                    target_ws = get_or_create_clean_tab(phase_workbook, final_target_tab)
-                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    
-                    row_payload = [
-                        now_str, cat, ph, final_target_tab, plt_no, sz, feat,
-                        dem, sel_type, sel_name, phn, st.session_state['office_name'],
-                        d_status, l_notes, f"[Direct Input] {raw_text}"
-                    ]
-                    target_ws.append_row(row_payload)
-                    st.success(f"✅ Saved directly in **[{selected_phase}]** under Tab: **[{final_target_tab}]**!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Save Error: {e}")
-        else:
-            st.warning("Please paste listing text first.")
-
-    st.markdown("---")
-
-    # ==========================================================================
-    # 4. LIVE & EDITABLE DATA TABLE (WITH EDIT ON/OFF SWITCH)
-    # ==========================================================================
     st.subheader(f"📊 Live Inventory Table: [{selected_phase} ➔ Tab: `{selected_active_block}`]")
     
     col_t1, col_t2 = st.columns([2, 1])
@@ -478,7 +544,7 @@ else:
             df = pd.DataFrame(records[1:], columns=CRM_SHEET_HEADERS[:len(records[1])])
             
             if edit_mode:
-                st.info("💡 **Edit Mode ON:** You can directly edit any cell below, add rows, or delete rows. Click **'Save Changes'** when done.")
+                st.info("💡 **Edit Mode ON:** Edit any cell below, add rows, or delete rows. Click **'Save Changes'** when done.")
                 edited_df = st.data_editor(
                     df,
                     use_container_width=True,
@@ -490,7 +556,6 @@ else:
                 if st.button("💾 Save Changes to Google Sheet", use_container_width=True):
                     with st.spinner("Updating Google Sheet Tab..."):
                         try:
-                            # Update sheet with modified data
                             updated_values = [CRM_SHEET_HEADERS] + edited_df.fillna("").values.tolist()
                             current_ws.clear()
                             current_ws.update(updated_values)
@@ -499,10 +564,8 @@ else:
                         except Exception as e:
                             st.error(f"Update error: {e}")
             else:
-                # View Mode
                 st.dataframe(df, use_container_width=True, height=280)
                 
-                # Card Summaries
                 for idx, r in df.iterrows():
                     dem_val = r.get('Demand / Price', 'N/A')
                     phn_val = r.get('Contact No', 'N/A')
@@ -523,6 +586,31 @@ else:
                         </div>
                     """, unsafe_allow_html=True)
         else:
-            st.info(f"Tab **[{selected_active_block}]** is active in Google Sheets. Currently 0 entries found. Add a listing above to see it appear live!")
+            st.info(f"Tab **[{selected_active_block}]** is active in Google Sheets. Currently 0 entries found. Add listings in the box below to see them appear here!")
     except Exception as e:
         st.error(f"Error connecting to Tab [{selected_active_block}]: {e}")
+
+    st.markdown("---")
+
+    # ==========================================================================
+    # 3. BOTTOM SECTION: GEMINI MULTI-LISTING INGESTION BOX
+    # ==========================================================================
+    st.markdown("""
+        <div class="ai-badge">🤖 Gemini & Anti-Gravity Smart Ingestion Box</div>
+    """, unsafe_allow_html=True)
+    
+    st.subheader(f"📥 Ingest Any Text, WhatsApp Deals, OCR or Banner Material")
+    
+    raw_text = st.text_area(
+        "📋 Paste Raw Listings Below (Single or Bulk Multi-Plot Messages):",
+        height=140,
+        placeholder="Paste ANY raw text, WhatsApp deals or OCR output here.\nExample:\nDHA Ph.9-Prism\n13-Marla Corner + Possession L.1225@178 NDC Ready 03004361284\nBlock K – Plot #370 Demand: 275 Lac\nE - 520 @ 330 Lac Direct Owner\nM - 836+837 @ 600 Lac Front Back Corner\n(R - 3385 @ 133 Lac) 60ft Road Corner 0321-1108412"
+    )
+
+    if st.button("💾 Save & Route to Respective Block Tabs", use_container_width=True):
+        if raw_text.strip():
+            payloads = parse_multi_listing_engine(raw_text, selected_phase)
+            st.session_state["parsed_payloads"] = payloads
+            show_routing_popup(payloads, DHA_PHASE_SHEET_URLS, gc_client)
+        else:
+            st.warning("Please paste listing material first.")
