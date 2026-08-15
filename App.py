@@ -5,6 +5,7 @@ import json
 import io
 import os
 import time
+import math
 import urllib.request
 import pandas as pd
 from datetime import datetime
@@ -83,6 +84,7 @@ st.markdown("""
     .badge-feature { background-color: #EEF2FF; color: #4338CA; font-weight: 600; }
     .ai-badge-active { background: #DCFCE7; border: 1px solid #86EFAC; color: #15803D; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
+    .eta-box { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 12px 16px; margin: 10px 0; color: #166534; font-size: 13.5px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -267,14 +269,25 @@ def get_gspread_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
     return gspread.service_account_from_dict(creds_dict)
 
+def safe_gspread_call(func, *args, **kwargs):
+    retries = 6
+    delay = 1.5
+    for attempt in range(retries):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            if attempt == retries - 1:
+                raise e
+            time.sleep(delay)
+            delay *= 1.8
+
 def get_phase_workbook(gc, phase_name):
     target_url = DHA_PHASE_SHEET_URLS.get(phase_name)
     try:
-        return gc.open_by_url(target_url)
+        return safe_gspread_call(gc.open_by_url, target_url)
     except Exception:
-        return gc.open_by_url(DHA_PHASE_SHEET_URLS["DHA Phase 1"])
+        return safe_gspread_call(gc.open_by_url, DHA_PHASE_SHEET_URLS["DHA Phase 1"])
 
-# Cached Worksheet Fetcher (Single Call)
 def get_cached_tab(workbook, tab_title, ws_dict):
     clean_title = tab_title.strip()
     clean_key = clean_title.lower()
@@ -283,12 +296,11 @@ def get_cached_tab(workbook, tab_title, ws_dict):
         return ws_dict[clean_key]
     
     try:
-        ws = workbook.add_worksheet(title=clean_title, rows=500, cols=16)
-        ws.append_row(CRM_SHEET_HEADERS)
+        ws = safe_gspread_call(workbook.add_worksheet, title=clean_title, rows=500, cols=16)
+        safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
         ws_dict[clean_key] = ws
         return ws
     except Exception:
-        # Fallback to first tab
         return workbook.sheet1
 
 def clean_whatsapp_chat_text(raw_bytes):
@@ -542,14 +554,37 @@ def parse_fallback_heuristic(text_clean, default_phase):
             })
     return extracted
 
-# 7. Robust Cached-Batch Popup (Zero Metadata Rate-Limit)
+# 7. Safe Chunking Popup with ETA & Quota Protection
 @st.dialog("⚡ Confirm Universal Multimodal Routing", width="large")
 def show_routing_popup(payloads, phase_wb_map, gc_client):
-    st.markdown("##### 🤖 Extraction Summary & Clean Reconciliation:")
-    st.write(f"Analyzed **{len(payloads)} distinct listings**:")
+    total_items = len(payloads)
+    
+    # 1. Calculate Estimated Sync Time
+    # Group estimation
+    grouped_preview = {}
+    for item in payloads:
+        k = (item.get("Phase", "DHA Phase 1"), item.get("Block", "Block A"))
+        grouped_preview[k] = grouped_preview.get(k, 0) + 1
+    
+    num_unique_tabs = len(grouped_preview)
+    # Estimate: ~1.2s per unique block tab (metadata + safe append delay)
+    estimated_seconds = max(5, int(num_unique_tabs * 1.3 + (total_items / 100) * 1.5))
+    est_min = estimated_seconds // 60
+    est_sec = estimated_seconds % 60
+    eta_str = f"{est_min}m {est_sec}s" if est_min > 0 else f"{est_sec} seconds"
+
+    st.markdown("##### 🤖 Extraction Summary & Quota-Safe Batch Engine:")
+    st.write(f"Analyzed **{total_items} distinct listings** across **{num_unique_tabs} block tabs**.")
+    
+    st.markdown(f"""
+        <div class="eta-box">
+            ⏱️ <b>Estimated Sync Time:</b> ~{eta_str}<br>
+            🛡️ <b>Safe Quota Chunking Active:</b> Data is dispatched in micro-batches with automatic rate-limit throttling to prevent Google Quota (429) errors.
+        </div>
+    """, unsafe_allow_html=True)
 
     table_data = []
-    for idx, item in enumerate(payloads):
+    for idx, item in enumerate(payloads[:100]):  # Fast preview of first 100
         table_data.append({
             "Target Phase": item.get("Phase", ""),
             "Target Tab": item.get("Block", ""),
@@ -561,117 +596,126 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
         })
     
     st.dataframe(pd.DataFrame(table_data), use_container_width=True)
-    st.info("💡 **Cached Batch Sync:** Single-call metadata caching enabled. Zero API limits, instant segregation.")
+    if total_items > 100:
+        st.caption(f"Showing first 100 listings of total {total_items} parsed items.")
 
     col_btn1, col_btn2 = st.columns([1.5, 1])
     with col_btn1:
-        if st.button("🚀 Confirm & Sync to Google Sheets", use_container_width=True):
-            with st.spinner("Batch writing to Google Sheets..."):
-                now_dt = datetime.now()
-                today_str = now_dt.strftime("%Y-%m-%d")
-                now_str = now_dt.strftime("%Y-%m-%d %H:%M")
+        if st.button("🚀 Start Safe Chunked Sync to Google Sheets", use_container_width=True):
+            now_dt = datetime.now()
+            today_str = now_dt.strftime("%Y-%m-%d")
+            now_str = now_dt.strftime("%Y-%m-%d %H:%M")
+            
+            # Step 1: In-memory grouping
+            grouped_data = {}
+            for item in payloads:
+                target_phase = item.get("Phase", "DHA Phase 1")
+                target_block = item.get("Block", "Block A")
+                key = (target_phase, target_block)
+                if key not in grouped_data:
+                    grouped_data[key] = []
+                grouped_data[key].append(item)
+            
+            saved_count = 0
+            skipped_today = 0
+            repeated_tracked = 0
+            
+            workbook_cache = {}
+            worksheets_map_cache = {}
+            total_groups = len(grouped_data)
+            
+            progress_bar = st.progress(0)
+            status_placeholder = st.empty()
+            
+            for idx, ((phase, block), items) in enumerate(grouped_data.items()):
+                pct = int(((idx + 1) / total_groups) * 100)
+                status_placeholder.markdown(f"⏳ **Syncing:** `[{phase} ➔ {block}]` — ({idx+1}/{total_groups} tabs) • **{pct}% Complete**")
                 
-                grouped_data = {}
-                for item in payloads:
-                    target_phase = item.get("Phase", "DHA Phase 1")
-                    target_block = item.get("Block", "Block A")
-                    key = (target_phase, target_block)
-                    if key not in grouped_data:
-                        grouped_data[key] = []
-                    grouped_data[key].append(item)
+                # Fetch workbook with retry
+                if phase not in workbook_cache:
+                    wb = get_phase_workbook(gc_client, phase)
+                    workbook_cache[phase] = wb
+                    ws_list = safe_gspread_call(wb.worksheets)
+                    worksheets_map_cache[phase] = {w.title.strip().lower(): w for w in ws_list}
                 
-                saved_count = 0
-                skipped_today = 0
-                repeated_tracked = 0
+                wb = workbook_cache[phase]
+                ws_dict = worksheets_map_cache[phase]
+                ws = get_cached_tab(wb, block, ws_dict)
                 
-                workbook_cache = {}
-                worksheets_map_cache = {}
+                try:
+                    existing_rows = safe_gspread_call(ws.get_all_values)
+                except Exception:
+                    existing_rows = []
                 
-                for (phase, block), items in grouped_data.items():
-                    # 1. Fetch workbook once
-                    if phase not in workbook_cache:
-                        time.sleep(0.3)
-                        wb = get_phase_workbook(gc_client, phase)
-                        workbook_cache[phase] = wb
-                        # Cache all existing worksheets in one API call
-                        ws_list = wb.worksheets()
-                        worksheets_map_cache[phase] = {w.title.strip().lower(): w for w in ws_list}
-                    
-                    wb = workbook_cache[phase]
-                    ws_dict = worksheets_map_cache[phase]
-                    ws = get_cached_tab(wb, block, ws_dict)
-                    
-                    try:
-                        existing_rows = ws.get_all_values()
-                    except Exception:
-                        time.sleep(0.8)
-                        try:
-                            existing_rows = ws.get_all_values()
-                        except Exception:
-                            existing_rows = []
-                    
-                    # Ensure headers if empty sheet
-                    if len(existing_rows) == 0:
-                        ws.append_row(CRM_SHEET_HEADERS)
-                    
-                    existing_plots_today = set()
-                    plot_repeat_map = {}
-                    
-                    if len(existing_rows) > 1:
-                        for r in existing_rows[1:]:
-                            r_date = r[0] if len(r) > 0 else ""
-                            r_plot = str(r[4]).strip().lower() if len(r) > 4 else ""
-                            if r_plot:
-                                plot_repeat_map[r_plot] = plot_repeat_map.get(r_plot, 0) + 1
-                                if today_str in r_date:
-                                    existing_plots_today.add(r_plot)
-                    
-                    rows_to_append = []
-                    for itm in items:
-                        plot_val = str(itm.get("Plot No", "")).strip()
-                        plot_val_clean = plot_val.lower()
-                        
-                        if plot_val_clean and plot_val_clean in existing_plots_today:
-                            skipped_today += 1
-                            continue
-                        
-                        repeat_count = plot_repeat_map.get(plot_val_clean, 0)
-                        notes_txt = itm.get("Last Conversation / Notes", "Direct WhatsApp Ingestion")
-                        if repeat_count > 0:
-                            repeated_tracked += 1
-                            notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
-                        
-                        row_data = [
-                            now_str,
-                            itm.get("Category", "Selling"),
-                            phase,
-                            block,
-                            plot_val,
-                            itm.get("Size", ""),
-                            itm.get("Plot Features", ""),
-                            itm.get("Demand / Price", ""),
-                            itm.get("Seller Type", "Dealer"),
-                            itm.get("Seller / Dealer Name", ""),
-                            itm.get("Contact No", ""),
-                            itm.get("Office / Agency", st.session_state['office_name']),
-                            itm.get("Deal Status", "Available"),
-                            notes_txt,
-                            f"[AI Ingest] {itm.get('Raw Listing & Source Material', '')}"
-                        ]
-                        rows_to_append.append(row_data)
-                        if plot_val_clean:
-                            existing_plots_today.add(plot_val_clean)
-                    
-                    if rows_to_append:
-                        time.sleep(0.3)
-                        ws.append_rows(rows_to_append)
-                        saved_count += len(rows_to_append)
+                if len(existing_rows) == 0:
+                    safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
                 
-                st.success(f"✅ Successfully synced **{saved_count} listings** across all tabs! (Duplicates skipped: **{skipped_today}**, Repeats tracked: **{repeated_tracked}**)")
-                st.balloons()
-                st.session_state["parsed_payloads"] = []
-                st.session_state["extracted_file_text"] = ""
-                st.rerun()
+                existing_plots_today = set()
+                plot_repeat_map = {}
+                
+                if len(existing_rows) > 1:
+                    for r in existing_rows[1:]:
+                        r_date = r[0] if len(r) > 0 else ""
+                        r_plot = str(r[4]).strip().lower() if len(r) > 4 else ""
+                        if r_plot:
+                            plot_repeat_map[r_plot] = plot_repeat_map.get(r_plot, 0) + 1
+                            if today_str in r_date:
+                                existing_plots_today.add(r_plot)
+                
+                rows_to_append = []
+                for itm in items:
+                    plot_val = str(itm.get("Plot No", "")).strip()
+                    plot_val_clean = plot_val.lower()
+                    
+                    if plot_val_clean and plot_val_clean in existing_plots_today:
+                        skipped_today += 1
+                        continue
+                    
+                    repeat_count = plot_repeat_map.get(plot_val_clean, 0)
+                    notes_txt = itm.get("Last Conversation / Notes", "Direct WhatsApp Ingestion")
+                    if repeat_count > 0:
+                        repeated_tracked += 1
+                        notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
+                    
+                    row_data = [
+                        str(now_str),
+                        str(itm.get("Category", "Selling")),
+                        str(phase),
+                        str(block),
+                        str(plot_val),
+                        str(itm.get("Size", "")),
+                        str(itm.get("Plot Features", "")),
+                        str(itm.get("Demand / Price", "")),
+                        str(itm.get("Seller Type", "Dealer")),
+                        str(itm.get("Seller / Dealer Name", "")),
+                        str(itm.get("Contact No", "")),
+                        str(itm.get("Office / Agency", st.session_state['office_name'])),
+                        str(itm.get("Deal Status", "Available")),
+                        str(notes_txt),
+                        f"[AI Ingest] {str(itm.get('Raw Listing & Source Material', ''))}"
+                    ]
+                    rows_to_append.append(row_data)
+                    if plot_val_clean:
+                        existing_plots_today.add(plot_val_clean)
+                
+                # Chunked write per tab (Max 50 rows per chunk to strictly protect 429 quota)
+                CHUNK_SIZE = 50
+                for i in range(0, len(rows_to_append), CHUNK_SIZE):
+                    chunk_slice = rows_to_append[i:i + CHUNK_SIZE]
+                    safe_gspread_call(ws.append_rows, chunk_slice, value_input_option="USER_ENTERED")
+                    saved_count += len(chunk_slice)
+                    time.sleep(0.5)  # Safe quota relief delay
+                
+                progress_bar.progress((idx + 1) / total_groups)
+                time.sleep(0.4)
+            
+            status_placeholder.empty()
+            progress_bar.empty()
+            st.success(f"🎉 **Chunked Sync Complete!** Successfully saved **{saved_count} listings** across all tabs! (Skipped duplicates today: **{skipped_today}**, Repeats marked: **{repeated_tracked}**)")
+            st.balloons()
+            st.session_state["parsed_payloads"] = []
+            st.session_state["extracted_file_text"] = ""
+            st.rerun()
 
 # 8. Login Screen
 if not st.session_state["authenticated"]:
@@ -727,7 +771,7 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Strict Schema & Clean Reconciliation (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">Enterprise Fault-Tolerant Engine (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -771,11 +815,10 @@ else:
             st.rerun()
 
     try:
-        # Load active tab with in-memory check
-        all_ws = phase_workbook.worksheets()
+        all_ws = safe_gspread_call(phase_workbook.worksheets)
         ws_lookup = {w.title.strip().lower(): w for w in all_ws}
         current_ws = get_cached_tab(phase_workbook, selected_active_block, ws_lookup)
-        records = current_ws.get_all_values()
+        records = safe_gspread_call(current_ws.get_all_values)
         
         if len(records) > 1:
             df = pd.DataFrame(records[1:], columns=CRM_SHEET_HEADERS[:len(records[1])])
@@ -794,8 +837,8 @@ else:
                     with st.spinner("Updating Google Sheet Tab..."):
                         try:
                             updated_values = [CRM_SHEET_HEADERS] + edited_df.fillna("").values.tolist()
-                            current_ws.clear()
-                            current_ws.update(updated_values)
+                            safe_gspread_call(current_ws.clear)
+                            safe_gspread_call(current_ws.update, updated_values)
                             st.success(f"✅ Google Sheet Tab **[{selected_active_block}]** successfully updated!")
                             st.rerun()
                         except Exception as e:
@@ -900,7 +943,7 @@ else:
         default_box_value = st.session_state.get("extracted_file_text", "")
         
         raw_text = st.text_area(
-            "📋 Raw Real Estate Ingestion Box (Text-First Precision & Reconciliation):",
+            "📋 Raw Real Estate Ingestion Box (Enterprise Fault-Tolerant Engine):",
             value=default_box_value,
             height=220,
             placeholder="Data loaded from files, Google Drive, camera or copy-paste will appear here for processing..."
@@ -909,7 +952,7 @@ else:
     if st.button("🚀 Process, Segregate & Route to Block Tabs", use_container_width=True):
         final_input_text = raw_text.strip()
         if final_input_text:
-            with st.spinner("🧠 AI Engine is extracting listings with text-first accuracy and resolving sheets routing..."):
+            with st.spinner("🧠 AI Engine is extracting listings and preparing zero-rate-limit batch sync..."):
                 payloads = parse_with_strict_gemini_schema(final_input_text, selected_phase)
                 if payloads:
                     st.session_state["parsed_payloads"] = payloads
