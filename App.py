@@ -1,9 +1,11 @@
 import streamlit as st
 import gspread
 import re
+import json
 import urllib.parse
 import pandas as pd
 from datetime import datetime
+import google.generativeai as genai
 
 # 1. Page Configuration
 st.set_page_config(
@@ -22,6 +24,10 @@ if "office_name" not in st.session_state:
     st.session_state["office_name"] = "Wali Muhammad Associates"
 if "parsed_payloads" not in st.session_state:
     st.session_state["parsed_payloads"] = []
+
+# Setup Official Google Gemini AI Engine
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 # ==============================================================================
 # 2. EXACT GOOGLE STITCH ROYAL BLUE CSS INJECTION
@@ -249,142 +255,118 @@ DHA_PHASE_BLOCK_CATALOG = {
 }
 
 # ==============================================================================
-# 5. GEMINI-LEVEL MULTI-LISTING NLP EXTRACTION ENGINE
+# 5. GOOGLE GEMINI NATIVE MULTI-LISTING AI PARSER
 # ==============================================================================
-def parse_multi_listing_engine(raw_text, default_phase):
+def parse_with_google_gemini(raw_text, default_phase):
     text_clean = raw_text.strip()
     if not text_clean:
         return []
 
-    # 1. Global Phase Matching
-    detected_phase = default_phase
-    t_upper = text_clean.upper()
-    if "PRISM" in t_upper or "PH.9-PRISM" in t_upper or "9 - PRISM" in t_upper: detected_phase = "DHA Phase 9 Prism"
-    elif "TOWN" in t_upper: detected_phase = "DHA Phase 9 Town"
-    elif "RAHBAR" in t_upper: detected_phase = "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"
-    elif "EME" in t_upper: detected_phase = "DHA Phase 12 (EME Sector)"
-    elif "IVY GREEN" in t_upper: detected_phase = "DHA Phase 8 (Ivy Green / Sector Z)"
-    elif "PARK VIEW" in t_upper: detected_phase = "DHA Phase 8 (Park View)"
-    elif "AIR AVENUE" in t_upper: detected_phase = "DHA Phase 8 (Air Avenue / Sector AA)"
-    else:
-        p_m = re.search(r'(?:PHASE|PH|P)[\s.:-]*(\d{1,2})', t_upper)
-        if p_m: detected_phase = f"DHA Phase {p_m.group(1)}"
+    # Check if Gemini API key exists
+    if "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
+        try:
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            
+            prompt = f"""
+            You are an expert DHA Lahore Real Estate CRM parser.
+            Parse the following raw real estate text into a clean JSON list of individual property listings.
+            
+            Context Rules:
+            1. Normalize Phase to official names like: "DHA Phase 1", "DHA Phase 2", "DHA Phase 3", "DHA Phase 4", "DHA Phase 5", "DHA Phase 6", "DHA Phase 7", "DHA Phase 8 (Proper)", "DHA Phase 8 (Ivy Green / Sector Z)", "DHA Phase 8 (Park View)", "DHA Phase 8 (Air Avenue / Sector AA)", "DHA Phase 9 Prism", "DHA Phase 9 Town", "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)", "DHA Phase 12 (EME Sector)".
+            2. If Phase is missing for a line, inherit from previous lines context or default to: "{default_phase}".
+            3. Normalize Block to format: "Block A", "Block B", "Block C", "Broadway Commercial", "CCA 1 Commercial", etc.
+            4. Detect Size (e.g. 5 Marla, 10 Marla, 1 Kanal, 2 Kanal, 13 Marla, 4 Marla).
+            5. Extract Plot No, Features (Corner, Facing Park, Pair, Direct Owner, etc), Demand / Price with unit (e.g. 600 Lac, 5.50 Crore), Contact Phone No, Dealer/Agency Name.
+            6. Category must be one of: "Selling", "Buying", "Rental".
+            
+            Input Raw Text:
+            \"\"\"{text_clean}\"\"\"
 
-    # 2. Extract Contacts
+            Return ONLY valid JSON array with objects with keys:
+            [
+              {{
+                "Category": "Selling",
+                "Phase": "DHA Phase 6",
+                "Block": "Block C",
+                "Plot No": "Plot 845",
+                "Size": "1 Kanal",
+                "Plot Features": "Standard Layout",
+                "Demand / Price": "600 Lac",
+                "Seller Type": "Dealer",
+                "Seller / Dealer Name": "Hunjra Real Estate",
+                "Contact No": "03009550559",
+                "Office / Agency": "Hunjra Real Estate",
+                "Deal Status": "Available",
+                "Last Conversation / Notes": "Parsed via Google Gemini AI",
+                "Raw Listing & Source Material": "C-845@600.lac"
+              }}
+            ]
+            """
+            
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    response_mime_type="application/json",
+                    temperature=0.1
+                )
+            )
+            
+            parsed_data = json.loads(response.text)
+            if isinstance(parsed_data, list) and len(parsed_data) > 0:
+                return parsed_data
+        except Exception as e:
+            st.warning(f"Gemini API returned an error, falling back to heuristic engine: {e}")
+
+    # Fallback heuristic parser
+    return parse_fallback_heuristic(text_clean, default_phase)
+
+def parse_fallback_heuristic(text_clean, default_phase):
+    lines = [l.strip() for l in text_clean.split('\n') if l.strip()]
     phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', text_clean)
     main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else "N/A"
-
-    names = re.findall(r'(?:Atif Bhatti|Adnan Irfan|Ijaz Hussain Sial|[A-Z][a-z]+ [A-Z][a-z]+)', text_clean)
-    main_dealer = names[0] if names else "Direct Associate"
-
-    # 3. Split by lines
-    lines = [l.strip() for l in text_clean.split('\n') if l.strip()]
-    extracted_items = []
-    current_size_context = "1 Kanal" if "1 KANAL" in t_upper else ("5 Marla" if "5 MARLA" in t_upper else "1 Kanal")
-
+    
+    current_phase = default_phase
+    current_size = "1 Kanal"
+    extracted = []
+    
     for line in lines:
         l_up = line.upper()
-        if "1 KANAL" in l_up: current_size_context = "1 Kanal"
-        if "5 MARLA" in l_up or "5.5 MARLA" in l_up: current_size_context = "5 Marla"
-        if "10 MARLA" in l_up: current_size_context = "10 Marla"
-        if "13-MARLA" in l_up: current_size_context = "13 Marla"
-
-        pattern = re.search(r'(?:BLOCK\s*([A-Z0-9-]{1,3})|([A-Z])[\s.:-]+(\d+[\+\d]*))\s*(?:–|-|@|PLOT\s*#?|#)?\s*(\d+[\+\d]*)?', l_up)
-        demand_match = re.search(r'(@|\bDEMAND\b:?)\s*(\d+\.?\d*)\s*(LAC|LACS|LAKH|CRORE|CR)?', l_up)
+        if "PHASE 6" in l_up: current_phase = "DHA Phase 6"; continue
+        elif "PHASE 7" in l_up: current_phase = "DHA Phase 7"; continue
+        elif "PHASE 9 PRISM" in l_up or "9-PRISM" in l_up: current_phase = "DHA Phase 9 Prism"; continue
+        elif "10 MARLA" in l_up: current_size = "10 Marla"; continue
+        elif "5 MARLA" in l_up: current_size = "5 Marla"; continue
         
-        if any(w in l_up for w in ["@", "PLOT", "DEMAND", "NDC", "ROAD", "CORNER"]) and (pattern or re.search(r'\b[A-Z]\b[\s.:-]*\d+', l_up)):
-            blk_candidate = "Block A"
-            plt_candidate = "N/A"
-            
-            b_m = re.search(r'(?:BLOCK\s*([A-Z0-9-]{1,3})|\b([A-Z])\b[\s.:-]*(\d+[\+\d]*))', l_up)
-            if b_m:
-                letter = b_m.group(1) if b_m.group(1) else b_m.group(2)
-                blk_candidate = f"Block {letter}"
-                if b_m.group(3):
-                    plt_candidate = f"Plot {b_m.group(3)}"
-            
-            if plt_candidate == "N/A":
-                p_num = re.search(r'(?:PLOT\s*#?|#|L\.|E\.|M\.|N\.|R\.)\s*(\d+[\+\d]*)', l_up)
-                if p_num: plt_candidate = f"Plot {p_num.group(1)}"
-
-            # Size Logic
-            size = current_size_context
-            if "13-MARLA" in l_up or "13 MARLA" in l_up: size = "13 Marla"
-            elif "5.5 MARLA" in l_up or "5 MARLA" in l_up or blk_candidate in ["Block P", "Block Q", "Block R"]: size = "5 Marla"
-            elif blk_candidate in ["Block J", "Block K", "Block L", "Block M", "Block N"]: 
-                size = "10 Marla" if "10 MARLA" in l_up or blk_candidate in ["Block M", "Block N"] else "1 Kanal"
-            elif blk_candidate in ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H"]:
-                size = "1 Kanal"
-
-            # Features
-            features = []
-            if "CORNER" in l_up: features.append("Corner")
-            if "PARK" in l_up: features.append("Facing Park")
-            if "POSSESSION" in l_up: features.append("Possession")
-            if "NDC" in l_up: features.append("NDC Ready")
-            rd = re.search(r'(\d{2,3})\s*(FT|FEET|ROAD)', l_up)
-            if rd: features.append(rd.group(0))
-            features_str = ", ".join(features) if features else "Standard Layout"
-
-            # Demand
-            price = "N/A"
-            if demand_match:
-                val = demand_match.group(2)
-                unit = demand_match.group(3) if demand_match.group(3) else "Lac"
-                price = f"{val} {unit}".strip()
-            else:
-                p_m2 = re.search(r'(\d+\.?\d*)\s*(LAC|LACS|CRORE|CR)', l_up)
-                if p_m2: price = f"{p_m2.group(1)} {p_m2.group(2)}"
-
-            seller = "Direct Owner" if "DIRECT OWNER" in l_up or "SELF" in l_up else "Dealer"
-
-            line_ph = re.search(r'(?:03\d{2}[- ]?\d{7})', line)
-            item_phone = line_ph.group(0) if line_ph else main_phone
-
-            extracted_items.append({
+        m = re.search(r'([A-Z0-9-]{1,3})\s*[-.:/]\s*([0-9]{1,5}(?:[\+/][0-9A-Za-z]+)?)\s*(?:@|\bDEMAND\b:?)?\s*(\d+\.?\d*)\s*(?:[.]?(LAC|LACS|CRORE|CR))?', l_up)
+        if m:
+            blk = f"Block {m.group(1).upper()}"
+            plt = f"Plot {m.group(2)}"
+            prc = f"{m.group(3)} {m.group(4) if m.group(4) else 'Lac'}".strip() if m.group(3) else "N/A"
+            extracted.append({
                 "Category": "Selling",
-                "Phase": detected_phase,
-                "Block": blk_candidate,
-                "Plot No": plt_candidate,
-                "Size": size,
-                "Plot Features": features_str,
-                "Demand / Price": price,
-                "Seller Type": seller,
-                "Seller / Dealer Name": main_dealer,
-                "Contact No": item_phone,
+                "Phase": current_phase,
+                "Block": blk,
+                "Plot No": plt,
+                "Size": current_size,
+                "Plot Features": "Standard Layout",
+                "Demand / Price": prc,
+                "Seller Type": "Dealer",
+                "Seller / Dealer Name": "Direct Associate",
+                "Contact No": main_phone,
                 "Office / Agency": st.session_state["office_name"],
                 "Deal Status": "Available",
-                "Last Conversation / Notes": "Extracted via Gemini Multi-Parser",
+                "Last Conversation / Notes": "Fallback Ingestion",
                 "Raw Listing & Source Material": line
             })
-
-    if not extracted_items:
-        extracted_items.append({
-            "Category": "Selling",
-            "Phase": detected_phase,
-            "Block": "Block A",
-            "Plot No": "Plot 1",
-            "Size": "1 Kanal",
-            "Plot Features": "Standard",
-            "Demand / Price": "N/A",
-            "Seller Type": "Dealer",
-            "Seller / Dealer Name": main_dealer,
-            "Contact No": main_phone,
-            "Office / Agency": st.session_state["office_name"],
-            "Deal Status": "Available",
-            "Last Conversation / Notes": "Direct Ingestion",
-            "Raw Listing & Source Material": text_clean
-        })
-
-    return extracted_items
+    return extracted
 
 # ==============================================================================
 # 6. POPUP DIALOG FOR CONFIRMATION
 # ==============================================================================
-@st.dialog("⚡ Confirm Multi-Listing Cloud Routing & Segregation", width="large")
+@st.dialog("⚡ Confirm Google AI Multi-Listing Cloud Routing", width="large")
 def show_routing_popup(payloads, phase_wb_map, gc_client):
-    st.markdown("##### 🔍 Real-Time Extraction Summary:")
-    st.write(f"Gemini Engine has parsed **{len(payloads)} distinct listings** from your raw message:")
+    st.markdown("##### 🤖 Google Gemini AI Extraction Summary:")
+    st.write(f"Google AI Model has parsed **{len(payloads)} distinct listings** from your raw message:")
 
     table_data = []
     for idx, item in enumerate(payloads):
@@ -393,14 +375,15 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
             "Target Tab": item["Block"],
             "Plot": item["Plot No"],
             "Size": item["Size"],
-            "Features": item["Plot Features"],
+            "Features": item.get("Plot Features", "Standard"),
             "Demand": item["Demand / Price"],
-            "Phone": item["Contact No"]
+            "Phone": item.get("Contact No", "N/A"),
+            "Agency": item.get("Office / Agency", "N/A")
         })
     
     st.dataframe(pd.DataFrame(table_data), use_container_width=True)
 
-    st.info("💡 **Backend Action:** Each listing will be saved into its respective DHA Phase Google Sheet and Block Tab!")
+    st.info("💡 **Backend Google Action:** Each listing will be automatically saved into its respective DHA Phase Google Sheet and Block Tab!")
 
     col_btn1, col_btn2 = st.columns([1.5, 1])
     with col_btn1:
@@ -415,11 +398,11 @@ def show_routing_popup(payloads, phase_wb_map, gc_client):
                     ws = get_or_create_clean_tab(wb, target_block)
                     
                     row_data = [
-                        now_str, item["Category"], target_phase, target_block,
-                        item["Plot No"], item["Size"], item["Plot Features"],
-                        item["Demand / Price"], item["Seller Type"], item["Seller / Dealer Name"],
-                        item["Contact No"], item["Office / Agency"], item["Deal Status"],
-                        item["Last Conversation / Notes"], f"[Gemini Ingest] {item['Raw Listing & Source Material']}"
+                        now_str, item.get("Category", "Selling"), target_phase, target_block,
+                        item.get("Plot No", "N/A"), item.get("Size", "1 Kanal"), item.get("Plot Features", "Standard Layout"),
+                        item.get("Demand / Price", "N/A"), item.get("Seller Type", "Dealer"), item.get("Seller / Dealer Name", "Direct Party"),
+                        item.get("Contact No", "N/A"), item.get("Office / Agency", st.session_state['office_name']), item.get("Deal Status", "Available"),
+                        item.get("Last Conversation / Notes", "Extracted via Google Gemini"), f"[Google Gemini AI] {item.get('Raw Listing & Source Material', '')}"
                     ]
                     ws.append_row(row_data)
                     saved_count += 1
@@ -487,7 +470,7 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Interactive Block Live Inventory & Ingestion (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">Google Gemini 2.5 Flash Native Parser Engine (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -497,7 +480,7 @@ else:
         selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
     with col_phase:
         phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
-        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook)", phase_options, index=11)
+        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook View)", phase_options, index=6)
 
     # Load Phase Workbook
     try:
@@ -593,24 +576,28 @@ else:
     st.markdown("---")
 
     # ==========================================================================
-    # 3. BOTTOM SECTION: GEMINI MULTI-LISTING INGESTION BOX
+    # 3. BOTTOM SECTION: OFFICIAL GOOGLE GEMINI MULTI-LISTING INGESTION BOX
     # ==========================================================================
     st.markdown("""
-        <div class="ai-badge">🤖 Gemini & Anti-Gravity Smart Ingestion Box</div>
+        <div class="ai-badge">🤖 Powered by Google Gemini 2.5 Flash Native AI Parser</div>
     """, unsafe_allow_html=True)
     
-    st.subheader(f"📥 Ingest Any Text, WhatsApp Deals, OCR or Banner Material")
+    st.subheader(f"📥 Ingest Any Text, Multi-Phase WhatsApp Deals, OCR or Banner Material")
     
     raw_text = st.text_area(
-        "📋 Paste Raw Listings Below (Single or Bulk Multi-Plot Messages):",
-        height=140,
-        placeholder="Paste ANY raw text, WhatsApp deals or OCR output here.\nExample:\nDHA Ph.9-Prism\n13-Marla Corner + Possession L.1225@178 NDC Ready 03004361284\nBlock K – Plot #370 Demand: 275 Lac\nE - 520 @ 330 Lac Direct Owner\nM - 836+837 @ 600 Lac Front Back Corner\n(R - 3385 @ 133 Lac) 60ft Road Corner 0321-1108412"
+        "📋 Paste Raw Listings Below (Directly Interpreted by Google Gemini AI Model):",
+        height=150,
+        placeholder="Paste ANY messy raw text here...\nExample:\nPhase 6\nC-845@600.lac\nM-399+400@1550.lac\n\nPhase 7\nS-443@550.lac\nQ-12@465.lac\n\n10 Marla\nY-3534/2@195.lac\n\n*Hunjra Real Estate*\n03009550559"
     )
 
-    if st.button("💾 Save & Route to Respective Block Tabs", use_container_width=True):
+    if st.button("💾 Save & Route via Google Gemini AI", use_container_width=True):
         if raw_text.strip():
-            payloads = parse_multi_listing_engine(raw_text, selected_phase)
-            st.session_state["parsed_payloads"] = payloads
-            show_routing_popup(payloads, DHA_PHASE_SHEET_URLS, gc_client)
+            with st.spinner("🧠 Google Gemini AI is reading and extracting all properties..."):
+                payloads = parse_with_google_gemini(raw_text, selected_phase)
+                if payloads:
+                    st.session_state["parsed_payloads"] = payloads
+                    show_routing_popup(payloads, DHA_PHASE_SHEET_URLS, gc_client)
+                else:
+                    st.warning("Could not detect any valid plot listings in the text. Please check the format.")
         else:
             st.warning("Please paste listing material first.")
