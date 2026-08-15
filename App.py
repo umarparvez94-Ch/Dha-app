@@ -20,8 +20,8 @@ if "user_email" not in st.session_state:
     st.session_state["user_email"] = ""
 if "office_name" not in st.session_state:
     st.session_state["office_name"] = "Wali Muhammad Associates"
-if "auto_mode" not in st.session_state:
-    st.session_state["auto_mode"] = True
+if "selected_block_tab" not in st.session_state:
+    st.session_state["selected_block_tab"] = "Block A"
 
 # ==============================================================================
 # 2. EXACT GOOGLE STITCH ROYAL BLUE CSS INJECTION
@@ -36,7 +36,7 @@ st.markdown("""
     #MainMenu, header, footer { visibility: hidden !important; height: 0 !important; }
     .stAppDeployButton { display: none !important; }
     .block-container {
-        padding-top: 1.5rem !important;
+        padding-top: 1.2rem !important;
         padding-bottom: 2rem !important;
         max-width: 100% !important;
     }
@@ -53,7 +53,7 @@ st.markdown("""
         align-items: center;
         justify-content: space-between;
         border-radius: 12px;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
         box-shadow: 0px 2px 6px rgba(0, 17, 58, 0.02);
     }
     .stitch-logo-text {
@@ -65,6 +65,20 @@ st.markdown("""
         align-items: center;
         gap: 8px;
     }
+    .header-banner {
+        background: linear-gradient(135deg, #00113A 0%, #102A6B 100%);
+        padding: 20px 24px;
+        border-radius: 14px;
+        color: white;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 20px -5px rgba(0, 17, 58, 0.2);
+    }
+    .header-title { font-family: 'Manrope', sans-serif; font-size: 24px; font-weight: 800; margin: 0; color: #FFFFFF; }
+    .header-subtitle { color: #B3C5FF; font-size: 13px; margin-top: 4px; }
+    .office-badge {
+        background-color: #006B5E; color: #9FF2E1; padding: 5px 12px;
+        border-radius: 16px; font-size: 12px; font-weight: 600; float: right;
+    }
     .stitch-login-box {
         background: #FFFFFF;
         border: 1px solid rgba(197, 198, 210, 0.6);
@@ -75,118 +89,24 @@ st.markdown("""
         text-align: center;
     }
     .stitch-avatar {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background-color: #D6E2FF;
-        border: 1px solid #B3C5FF;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        color: #00113A;
-        margin-bottom: 12px;
-    }
-    .stitch-title {
-        font-family: 'Manrope', sans-serif;
-        font-weight: 800;
-        font-size: 28px;
-        color: #00113A;
-        letter-spacing: -0.02em;
-        margin-bottom: 2px;
-    }
-    .stitch-subtitle {
-        font-size: 15px;
-        color: #444650;
-        margin-bottom: 20px;
-    }
-    div[data-baseweb="input"] {
-        border-radius: 8px !important;
-        background-color: #F4F3F9 !important;
-        border: 1px solid #C5C6D2 !important;
-    }
-    div[data-baseweb="input"]:focus-within {
-        border-color: #00113A !important;
-        background-color: #FFFFFF !important;
-    }
-    .stButton>button {
-        background-color: #00113A !important;
-        color: #FFFFFF !important;
-        font-family: 'JetBrains Mono', monospace !important;
-        font-size: 13px !important;
-        font-weight: 600 !important;
-        letter-spacing: 0.06em !important;
-        text-transform: uppercase !important;
-        border-radius: 8px !important;
-        border: none !important;
-        height: 2.8rem !important;
-        width: 100% !important;
-        transition: all 0.2s ease !important;
-    }
-    .stButton>button:hover {
-        background-color: #2A4386 !important;
-        box-shadow: 0 4px 12px rgba(0, 17, 58, 0.2) !important;
-    }
-    .header-banner {
-        background: linear-gradient(135deg, #00113A 0%, #102A6B 100%);
-        padding: 22px 28px;
-        border-radius: 16px;
-        color: white;
-        margin-bottom: 24px;
-        box-shadow: 0 10px 25px -5px rgba(0, 17, 58, 0.2);
-    }
-    .header-title { font-family: 'Manrope', sans-serif; font-size: 26px; font-weight: 800; margin: 0; color: #FFFFFF; }
-    .header-subtitle { color: #B3C5FF; font-size: 13px; margin-top: 4px; }
-    .office-badge {
-        background-color: #006B5E; color: #9FF2E1; padding: 6px 14px;
-        border-radius: 20px; font-size: 13px; font-weight: 600; float: right;
+        width: 60px; height: 60px; border-radius: 50%;
+        background-color: #D6E2FF; border: 1px solid #B3C5FF;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: #00113A; margin-bottom: 12px;
     }
     .property-card {
-        background: white;
-        border: 1px solid #E2E8F0;
-        border-radius: 12px;
-        padding: 18px 22px;
-        margin-bottom: 14px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+        background: white; border: 1px solid #E2E8F0; border-radius: 10px;
+        padding: 14px 18px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);
     }
     .badge {
-        display: inline-block; padding: 4px 10px; border-radius: 6px;
-        font-size: 12px; font-weight: 700; margin-right: 6px;
+        display: inline-block; padding: 3px 8px; border-radius: 5px;
+        font-size: 11.5px; font-weight: 700; margin-right: 5px;
     }
     .badge-selling { background-color: #FEE2E2; color: #DC2626; }
     .badge-buying { background-color: #DCFCE7; color: #16A34A; }
     .badge-rental { background-color: #E0F2FE; color: #0284C7; }
     .badge-feature { background-color: #FEF3C7; color: #D97706; }
-    .badge-type { background-color: #EDE9FE; color: #6D28D9; }
     .badge-price { background-color: #ECFDF5; color: #059669; font-weight: 800; }
-    .badge-status { background-color: #F1F5F9; color: #334155; border: 1px solid #CBD5E1; }
-    .badge-source { background-color: #E0F2FE; color: #0369A1; font-weight: 600; }
-
-    .wa-btn {
-        display: inline-block; background-color: #25D366; color: white !important;
-        padding: 10px 16px; border-radius: 8px; font-weight: 700; text-decoration: none;
-        font-size: 13px; text-align: center; width: 100%; box-sizing: border-box;
-        margin-bottom: 6px;
-    }
-    .wa-btn:hover { background-color: #1EBE5D; text-decoration: none; }
-
-    .popup-box {
-        background-color: #F8FAFC;
-        border: 1px solid #CBD5E1;
-        border-radius: 10px;
-        padding: 16px;
-        margin-top: 10px;
-        font-family: 'Inter', sans-serif;
-    }
-    .stitch-footer {
-        margin-top: 36px;
-        padding-top: 16px;
-        border-top: 1px solid #C5C6D2;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        color: #757682;
-        font-size: 13px;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -250,7 +170,6 @@ def get_or_create_clean_tab(workbook, tab_title):
         ws.append_row(CRM_SHEET_HEADERS)
         return ws
     
-    # Ensure header row exists
     try:
         first_row = ws.row_values(1)
         if not first_row or len(first_row) < 3 or first_row[0] != CRM_SHEET_HEADERS[0]:
@@ -330,7 +249,6 @@ DHA_PHASE_BLOCK_CATALOG = {
 # ==============================================================================
 def parse_property_crm(text, current_selected_phase, current_selected_block):
     text_upper = text.upper()
-    
     category = "Selling"
     if any(w in text_upper for w in ["REQUIRED", "WANTED", "BUYING", "PURCHASE", "NEED", "DEMANDING"]):
         category = "Buying"
@@ -349,7 +267,6 @@ def parse_property_crm(text, current_selected_phase, current_selected_block):
         p_match = re.search(r'(?:PHASE|PH|P)[\s:-]*(\d{1,2})', text_upper)
         if p_match: phase = f"DHA Phase {p_match.group(1)}"
 
-    # Block Detection
     block = current_selected_block if current_selected_block != "All Blocks" else "Block A"
     blk_match = re.search(r'(?:BLOCK|BLK|SECTOR|SEC)\s*[:.-]?\s*([A-Z0-9-]{1,5})', text_upper)
     if blk_match:
@@ -360,26 +277,18 @@ def parse_property_crm(text, current_selected_phase, current_selected_block):
         block = "CCA 1 Commercial"
     elif "CCA 2" in text_upper or "CCA-2" in text_upper:
         block = "CCA 2 Commercial"
-    elif "ZONE 1" in text_upper:
-        block = "Zone 1 Commercial"
 
-    # Plot No
     plot_no = "N/A"
     plt_match = re.search(r'(?:PLOT|PLT|NO|#)\s*[:.-]?\s*([0-9]{1,4}[A-Za-z/]*)', text_upper)
     if plt_match:
         plot_no = f"Plot {plt_match.group(1)}"
-    else:
-        num_after_blk = re.search(r'(?:BLOCK|BLK)\s*[A-Z0-9-]+\s*[,:-]?\s*([0-9]{1,4})\b', text_upper)
-        if num_after_blk: plot_no = f"Plot {num_after_blk.group(1)}"
 
-    # Size
     size = "1 Kanal"
     s_match = re.search(r'(\d+\.?\d*)\s*(MARLA|KANAL|M|K)', text_upper)
     if s_match:
         unit = "Kanal" if s_match.group(2) in ["K", "KANAL"] else "Marla"
         size = f"{s_match.group(1)} {unit}"
 
-    # Features
     features = []
     if "CORNER" in text_upper: features.append("Corner")
     if "PARK" in text_upper: features.append("Facing Park")
@@ -388,7 +297,6 @@ def parse_property_crm(text, current_selected_phase, current_selected_block):
     if road_match: features.append(f"{road_match.group(0)}")
     feat_str = ", ".join(features) if features else "Standard Layout"
 
-    # Demand
     demand = "N/A"
     pr_match = re.search(r'(\d+\.?\d*)\s*(CRORE|CR|LAC|LACS|LAKH|LAKHS)', text_upper)
     if pr_match:
@@ -415,7 +323,7 @@ if not st.session_state["authenticated"]:
             </div>
             <div style="color: #757682; font-size: 13px; font-weight: 500;">
                 <span class="material-symbols-outlined" style="vertical-align:middle; font-size:18px; color:#006B5E;">lock</span>
-                Secure Access
+                Secure CRM Access
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -448,7 +356,7 @@ if not st.session_state["authenticated"]:
             st.rerun()
 
 # ==============================================================================
-# 7. MAIN ENGINE DASHBOARD
+# 7. MAIN ENGINE DASHBOARD & LIVE BLOCK TAB BUTTONS
 # ==============================================================================
 else:
     try:
@@ -461,57 +369,64 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Direct Block-Tab Live Connector (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">Interactive Block Tab Controller (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
 
-    # 1. Select Phase & Open Exact Sheet
-    col_city, col_phase, col_block = st.columns([1.2, 2.2, 2.2])
+    # 1. Global Selectors
+    col_city, col_phase = st.columns([1.2, 2.5])
     with col_city:
         selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
     with col_phase:
         phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
-        selected_phase = st.selectbox("📍 DHA Phase (Target Workbook)", phase_options, index=0)
+        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook)", phase_options, index=0)
 
     # Load Phase Workbook
     try:
         phase_workbook = get_phase_workbook(gc_client, selected_phase)
     except Exception as e:
-        st.error(f"Could not open spreadsheet for {selected_phase}. Please ensure sheet is shared with `dha-bot@dha-property-sync.iam.gserviceaccount.com` as Editor.")
+        st.error(f"Could not open spreadsheet for {selected_phase}. Please share sheet with `dha-bot@dha-property-sync.iam.gserviceaccount.com` as Editor.")
         st.stop()
 
-    # 2. Clean Blocks List for Selected Phase
+    # Blocks List
     p_info = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
     res_b = p_info.get("residential", [])
     com_b = p_info.get("commercial", [])
     all_phase_blocks = res_b + com_b
 
-    with col_block:
-        selected_block = st.selectbox(f"🧱 Block / Sheet Tab ({selected_phase})", all_phase_blocks, index=0)
+    # ==========================================================================
+    # 2. INTERACTIVE BLOCK SHEET TABS / FEATURE BUTTON BAR
+    # ==========================================================================
+    st.markdown(f"##### 🧱 Choose Block Sheet Tab for **[{selected_phase}]**:")
+    
+    # Render interactive radio tabs (pills) for immediate table switching
+    selected_active_block = st.radio(
+        "Direct Block Switcher:",
+        options=all_phase_blocks,
+        horizontal=True,
+        key="block_feature_tab_bar"
+    )
 
-    # Link to open Google Sheet directly in new tab
     sheet_link = DHA_PHASE_SHEET_URLS.get(selected_phase, "")
-    st.markdown(f"🔗 **Direct Sheet Link:** [Open {selected_phase} Google Sheet in New Tab ↗]({sheet_link})")
-
+    st.markdown(f"🔗 **Active Google Sheet:** [Open {selected_phase} in Google Sheets ↗]({sheet_link}) | Selected Tab: **`{selected_active_block}`**")
     st.markdown("---")
 
     # ==========================================================================
-    # 8. INGESTION & REAL-TIME SAVE TO THIS BLOCK TAB
+    # 3. TEXT INGESTION & AUTO SAVE
     # ==========================================================================
-    st.subheader(f"📥 Add Property to [{selected_phase}] ➔ Tab: `[{selected_block}]`")
+    st.subheader(f"📥 Ingest Property Text to [{selected_phase} ➔ Tab: {selected_active_block}]")
     
     raw_text = st.text_area(
         "📋 Paste Raw Listing Text",
-        height=110,
-        placeholder=f"Example: {selected_phase} {selected_block} Plot 120 1 Kanal Corner Facing Park 100 ft road for sale demand 6.25 crore direct dealer Muhammad Aslam 03209498044"
+        height=100,
+        placeholder=f"Example: {selected_phase} {selected_active_block} Plot 120 1 Kanal Corner Facing Park demand 6.25 crore 03209498044"
     )
 
     cat, ph, blk, plt_no, sz, feat, dem, sel_type, sel_name, phn, d_status, l_notes = parse_property_crm(
-        raw_text, selected_phase, selected_block
+        raw_text, selected_phase, selected_active_block
     )
 
-    # Target Tab (Use extracted block if present, otherwise selected dropdown block)
-    final_target_tab = blk if blk in all_phase_blocks else selected_block
+    final_target_tab = blk if blk in all_phase_blocks else selected_active_block
 
     if raw_text.strip():
         st.markdown("##### ⚡ Auto-Extracted Live Preview:")
@@ -521,9 +436,9 @@ else:
         c3.info(f"💰 **Demand:** `{dem}`")
         c4.info(f"📞 **Phone:** `{phn}`")
 
-    if st.button(f"💾 Save Listing to Google Sheet [{selected_phase} ➔ Tab: {final_target_tab}]", use_container_width=True):
+    if st.button(f"💾 Save Listing to Google Sheet Tab: [{final_target_tab}]", use_container_width=True):
         if raw_text.strip():
-            with st.spinner(f"Connecting to tab [{final_target_tab}] in Google Sheet..."):
+            with st.spinner(f"Writing to tab [{final_target_tab}]..."):
                 try:
                     target_ws = get_or_create_clean_tab(phase_workbook, final_target_tab)
                     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -534,8 +449,7 @@ else:
                         d_status, l_notes, f"[Direct Input] {raw_text}"
                     ]
                     target_ws.append_row(row_payload)
-                    st.success(f"✅ Listing saved successfully in **[{selected_phase}]** under Tab: **[{final_target_tab}]**!")
-                    st.balloons()
+                    st.success(f"✅ Saved directly in **[{selected_phase}]** under Tab: **[{final_target_tab}]**!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Save Error: {e}")
@@ -545,39 +459,70 @@ else:
     st.markdown("---")
 
     # ==========================================================================
-    # 9. LIVE INVENTORY TABLE FOR SELECTED BLOCK TAB
+    # 4. LIVE & EDITABLE DATA TABLE (WITH EDIT ON/OFF SWITCH)
     # ==========================================================================
-    st.subheader(f"📊 Live Inventory in [{selected_phase}] ➔ Tab: `[{selected_block}]`")
+    st.subheader(f"📊 Live Inventory Table: [{selected_phase} ➔ Tab: `{selected_active_block}`]")
     
+    col_t1, col_t2 = st.columns([2, 1])
+    with col_t1:
+        edit_mode = st.toggle("✏️ Enable Live Edit Mode (Edit Data on Screen)", value=False)
+    with col_t2:
+        if st.button("🔄 Refresh Table from Google Sheet"):
+            st.rerun()
+
     try:
-        current_ws = get_or_create_clean_tab(phase_workbook, selected_block)
+        current_ws = get_or_create_clean_tab(phase_workbook, selected_active_block)
         records = current_ws.get_all_values()
         
         if len(records) > 1:
             df = pd.DataFrame(records[1:], columns=CRM_SHEET_HEADERS[:len(records[1])])
-            st.dataframe(df, use_container_width=True, height=280)
             
-            # Cards view
-            for idx, r in df.iterrows():
-                dem_val = r.get('Demand / Price', 'N/A')
-                phn_val = r.get('Contact No', 'N/A')
-                plt_val = r.get('Plot No', 'N/A')
-                sz_val = r.get('Size', 'N/A')
-                feat_val = r.get('Plot Features', 'Standard')
-                cat_val = r.get('Category', 'Selling')
-                raw_val = r.get('Raw Listing & Source Material', '')
+            if edit_mode:
+                st.info("💡 **Edit Mode ON:** You can directly edit any cell below, add rows, or delete rows. Click **'Save Changes'** when done.")
+                edited_df = st.data_editor(
+                    df,
+                    use_container_width=True,
+                    num_rows="dynamic",
+                    height=320,
+                    key=f"editor_{selected_phase}_{selected_active_block}"
+                )
+                
+                if st.button("💾 Save Changes to Google Sheet", use_container_width=True):
+                    with st.spinner("Updating Google Sheet Tab..."):
+                        try:
+                            # Update sheet with modified data
+                            updated_values = [CRM_SHEET_HEADERS] + edited_df.fillna("").values.tolist()
+                            current_ws.clear()
+                            current_ws.update(updated_values)
+                            st.success(f"✅ Google Sheet Tab **[{selected_active_block}]** successfully updated!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Update error: {e}")
+            else:
+                # View Mode
+                st.dataframe(df, use_container_width=True, height=280)
+                
+                # Card Summaries
+                for idx, r in df.iterrows():
+                    dem_val = r.get('Demand / Price', 'N/A')
+                    phn_val = r.get('Contact No', 'N/A')
+                    plt_val = r.get('Plot No', 'N/A')
+                    sz_val = r.get('Size', 'N/A')
+                    feat_val = r.get('Plot Features', 'Standard')
+                    cat_val = r.get('Category', 'Selling')
+                    raw_val = r.get('Raw Listing & Source Material', '')
 
-                st.markdown(f"""
-                    <div class="property-card">
-                        <span class="badge badge-selling">{cat_val}</span>
-                        <span class="badge badge-price">💰 {dem_val}</span>
-                        <span class="badge badge-feature">⭐ {feat_val}</span>
-                        <b>{selected_phase} {selected_block} — {plt_val} ({sz_val})</b>
-                        <div style="margin-top: 6px; font-size: 13px; color: #475569;">📞 Contact: <b>{phn_val}</b> | Added: {r.get('Date / Timestamp', '')}</div>
-                        <div style="margin-top: 4px; font-size: 12px; color: #64748B; background: #F8FAFC; padding: 6px; border-radius: 6px;">📝 {raw_val}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                    st.markdown(f"""
+                        <div class="property-card">
+                            <span class="badge badge-selling">{cat_val}</span>
+                            <span class="badge badge-price">💰 {dem_val}</span>
+                            <span class="badge badge-feature">⭐ {feat_val}</span>
+                            <b>{selected_phase} {selected_active_block} — {plt_val} ({sz_val})</b>
+                            <div style="margin-top: 5px; font-size: 13px; color: #475569;">📞 Contact: <b>{phn_val}</b> | Added: {r.get('Date / Timestamp', '')}</div>
+                            <div style="margin-top: 4px; font-size: 12px; color: #64748B; background: #F8FAFC; padding: 5px 8px; border-radius: 6px;">📝 {raw_val}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
         else:
-            st.info(f"Tab **[{selected_block}]** is connected and active in Google Sheet. No entries yet. Save a listing above to see it appear here!")
+            st.info(f"Tab **[{selected_active_block}]** is active in Google Sheets. Currently 0 entries found. Add a listing above to see it appear live!")
     except Exception as e:
-        st.error(f"Error loading live data from Sheet Tab [{selected_block}]: {e}")
+        st.error(f"Error connecting to Tab [{selected_active_block}]: {e}")
