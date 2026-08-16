@@ -267,14 +267,19 @@ def get_gspread_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
     raw_pk = str(creds_dict.get("private_key", ""))
     
-    # Strip existing markers and unwanted characters to get clean Base64
+    # Strip existing markers, escaped slashes, and spaces to isolate pure Base64
     raw_pk = raw_pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
     raw_pk = raw_pk.replace("\\n", "").replace("\n", "").replace(" ", "").replace("\r", "")
     
-    # Keep only base64 characters
-    b64_clean = re.sub(r'[^A-Za-z0-9+/=]', '', raw_pk)
+    # Filter valid Base64 characters only
+    b64_clean = re.sub(r'[^A-Za-z0-9+/]', '', raw_pk)
     
-    # Re-wrap into standard 64-char lines
+    # Auto-balance padding if any characters were shifted
+    missing_padding = len(b64_clean) % 4
+    if missing_padding:
+        b64_clean += '=' * (4 - missing_padding)
+        
+    # Format cleanly into 64-character chunks
     chunked = [b64_clean[i:i+64] for i in range(0, len(b64_clean), 64)]
     creds_dict["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(chunked) + "\n-----END PRIVATE KEY-----\n"
     
