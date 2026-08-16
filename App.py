@@ -235,7 +235,6 @@ def clean_plot_number(plot_val):
     if not plot_val:
         return ""
     p_str = str(plot_val).strip()
-    # Remove any prefix like 'Plot ' to parse digits safely
     p_clean = re.sub(r'(?i)^plot\s*', '', p_str).strip()
     digits_only = re.sub(r'[^0-9A-Za-z-]', '', p_clean)
     if digits_only:
@@ -430,7 +429,7 @@ def segment_into_discrete_whatsapp_messages(raw_text):
     return discrete_messages
 
 # ==============================================================================
-# STRICT 12-COLUMN CRM SCHEMA AI EXTRACTION ENGINE WITH CONTEXT-SWITCHING
+# SMART MESSAGE-FLOW & INDIVIDUAL DEALER EXTRACTION ENGINE
 # ==============================================================================
 def process_message_batch_via_gemini(message_objects, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
@@ -438,38 +437,36 @@ def process_message_batch_via_gemini(message_objects, default_phase):
     
     formatted_input_lines = []
     for idx, msg in enumerate(message_objects):
-        sender_txt = f" | Sender: {msg['sender_name']}" if msg['sender_name'] else ""
-        contact_txt = f" | Phone: {msg['contact_no']}" if msg['contact_no'] else ""
-        formatted_input_lines.append(f"--- WHATSAPP MESSAGE #{idx+1}{sender_txt}{contact_txt} ---\n{msg['full_message']}")
+        formatted_input_lines.append(f"--- LISTING BUNDLE #{idx+1} (Start: Bismillah/Phase, End: Mobile/Office) ---\n{msg['full_message']}")
 
     batch_payload_text = "\n\n".join(formatted_input_lines)
 
-    prompt = f"""You are the Elite Real Estate Intelligence & Ingestion Agent for Wali Muhammad Associates (DHA Lahore).
-Parse each discrete WhatsApp message directly into the EXACT 12-column canonical Google Sheets CRM schema.
+    prompt = f"""You are an Expert Real Estate Ingestion & Message-Flow Engine for Wali Muhammad Associates (DHA Lahore).
+Analyze each WhatsApp listing bundle. Each bundle represents a single dealer's broadcast message (typically starting with Bismillah/Phase/Greetings and ending with a mobile number or office name).
 
-=== MASTER RULES & CONTEXT SWITCHING ===
-1. MULTI-PHASE MESSAGES: If a single message contains multiple phases (e.g., '(9 Prism)' then '(9 town)') or switches phase/block mid-text, treat EACH distinct phase/block section as a SEPARATE listing object in the JSON array. Never merge them.
-2. BLOCK-PLOT SEPARATION & SHORTHAND: 
-   - Formats like 'C-654', 'A-61', 'E-654' mean Block C/A/E and Plot 654/61/654 respectively.
-   - Shorthand '6-k-220@200' -> Phase: 'DHA Phase 6', Block: 'Block K', Plot No: 'Plot 220', Demand: '200 Lac'.
-3. PRICE BINDING: Demand/Price (e.g. 'Demand -260', 'Demand -122') binds specifically to the plot immediately preceding it in that section.
-4. CATALOG GUARDRAILS: Match blocks strictly against: {catalog_json_str}. Discard fake blocks like 'HASE' or 'PH'. Fallback Phase: '{default_phase}'.
-5. EXACT 12-COLUMN MAPPING:
+TASK: Extract every single plot/listing inside each bundle as a SEPARATE row in a JSON array.
+
+SMART PARSING RULES:
+1. INDIVIDUAL PLOT ROWS: If a single dealer message contains 10 plots, output 10 separate JSON objects. Never merge them.
+2. DYNAMIC PHASE & BLOCK DETECTION: Each plot may belong to a different Phase or Block mentioned in that specific message (e.g., '9 Prism' then '9 Town'). Detect the correct Phase and Block per plot. Discard fake blocks like 'HASE' or 'PH'. Official catalog: {catalog_json_str}. If no phase is mentioned, use '{default_phase}'.
+3. BLOCK-PLOT SEPARATION: Formats like 'C-654', 'A-61' mean Block C/A and Plot 654/61. Shorthand like '6-k-220@200' means Phase 6, Block K, Plot 220, Price 200 Lac.
+4. ENTITY BINDING: Every plot extracted from the bundle must inherit the exact Dealer Name, Mobile/Contact No, and Office/Agency Name found at the bottom or header of that same bundle.
+5. EXACT 12-COLUMN SCHEMA MAPPING:
    - "Date / Timestamp": '{now_str}'
    - "Phase": Official DHA Phase
    - "Block": Official Block Tab
    - "Plot No": Complete Plot Number digits only (e.g. 'Plot 61')
-   - "Size": Explicit or Auto-resolved via Cutting Map
+   - "Size": Explicit or auto-resolved
    - "Plot Features": 'Corner / Facing Park', 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Standard Layout', etc.
    - "Demand / Price": Standardized Price (e.g. '260 Lac')
-   - "Seller / Dealer Name": Extracted from message header/body
+   - "Seller / Dealer Name": Extracted dealer name
    - "Contact No": Valid Mobile Number
-   - "Office / Agency": Wali Muhammad Associates or Sender Agency
+   - "Office / Agency": Extracted agency name
    - "Deal Status": 'Available'
    - "Last Conversation / Notes": 'Direct Ingestion'
-   - "Source": Exact raw snippet or context of that specific listing
+   - "Source": Exact text snippet for this specific listing
 
-Input WhatsApp Messages:
+Input Listing Bundles:
 {batch_payload_text}
 
 Return ONLY a valid JSON Array with exact keys:
@@ -570,7 +567,7 @@ def show_backend_connection_dialog(selected_phase, selected_block, target_url):
             <b>🌐 Active Spreadsheet Target:</b> <a href="{target_url}" target="_blank">{selected_phase} Database</a><br>
             <b>🧱 Target Tab Attached:</b> <code>{selected_block}</code><br>
             <b>⚡ Sync Protocols:</b> Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
-            <b>🛡️ Schema Compliance:</b> Multi-Phase Context Switching & 12-Col CRM Active.
+            <b>🛡️ Schema Compliance:</b> Smart Message-Flow & 12-Col CRM Active.
         </div>
     """, unsafe_allow_html=True)
 
@@ -664,7 +661,7 @@ else:
             <div class="header-banner">
                 <span class="office-badge">📍 {st.session_state['office_name']}</span>
                 <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-                <div class="header-subtitle">Multi-Phase Context & 12-Column Pipeline Active (Active: {st.session_state['user_email']})</div>
+                <div class="header-subtitle">Smart Message-Flow Engine & 12-Col Pipeline Active (Active: {st.session_state['user_email']})</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -914,7 +911,7 @@ else:
     # 4. UNIFIED ALL-IN-ONE INGESTION PROMPT ENCLOSURE
     # ==========================================================================
     if gemini_active:
-        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Multi-Phase Context Switching Active)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Smart Message-Flow Engine Active)</div>', unsafe_allow_html=True)
     else:
         err_msg = st.session_state.get("gemini_last_error", "API Key Missing or Misconfigured")
         st.markdown(f'<div class="ai-badge-inactive">🟡 Gemini Brain Inactive ({err_msg}) — Please check GEMINI_API_KEY in Streamlit Secrets</div>', unsafe_allow_html=True)
@@ -929,7 +926,7 @@ else:
         "📋 Live Real Estate Ingestion Stream:",
         value=default_box_value,
         height=260,
-        placeholder="Paste thousands of exported WhatsApp chat messages, shorthand entries, or use [+] Attach Sources...",
+        placeholder="Paste WhatsApp broadcast messages (starting with Bismillah/Phase and ending with mobile/office), or use [+] Attach Sources...",
         label_visibility="collapsed"
     )
 
@@ -1064,7 +1061,7 @@ else:
                 st.rerun()
 
         if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
-            with st.spinner(f"🧠 Gemini 2.5 Multi-Phase Scanning ({curr_idx + 1} of {total_chunks})..."):
+            with st.spinner(f"🧠 Gemini 2.5 Message-Flow Processing ({curr_idx + 1} of {total_chunks})..."):
                 chunk_messages = chunks[curr_idx]
                 new_listings = process_message_batch_via_gemini(chunk_messages, st.session_state["extraction_default_phase"])
                 st.session_state["parsed_payloads"].extend(new_listings)
