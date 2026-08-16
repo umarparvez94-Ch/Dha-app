@@ -92,28 +92,16 @@ st.markdown("""
     .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     .summary-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
     .stat-pill { background: #F1F5F9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #334155; display: inline-block; margin-right: 8px; margin-bottom: 6px; }
-    .eta-box { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 10px 14px; margin: 10px 0; color: #166534; font-size: 13px; }
     .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 16px 20px; margin: 15px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.08); }
     .backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }
     </style>
 """, unsafe_allow_html=True)
 
 CRM_SHEET_HEADERS = [
-    "Date / Timestamp",
-    "Category",
-    "Phase",
-    "Block",
-    "Plot No",
-    "Size",
-    "Plot Features",
-    "Demand / Price",
-    "Seller Type",
-    "Seller / Dealer Name",
-    "Contact No",
-    "Office / Agency",
-    "Deal Status",
-    "Last Conversation / Notes",
-    "Raw Listing & Source Material"
+    "Date / Timestamp", "Category", "Phase", "Block", "Plot No",
+    "Size", "Plot Features", "Demand / Price", "Seller Type",
+    "Seller / Dealer Name", "Contact No", "Office / Agency",
+    "Deal Status", "Last Conversation / Notes", "Raw Listing & Source Material"
 ]
 
 DHA_PHASE_SHEET_URLS = {
@@ -260,30 +248,36 @@ def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
     cleaned_size = str(extracted_size).strip() if extracted_size else ""
     if cleaned_size and cleaned_size.lower() not in ["n/a", "unknown", "none", ""]:
         return cleaned_size
-    
     try:
         p_num = int(re.sub(r'[^0-9]', '', str(plot_no)))
     except Exception:
         return ""
-    
     phase_rules = DHA_CUTTING_MAP_RULES.get(phase, {})
     block_ranges = phase_rules.get(block, [])
     for start_n, end_n, official_sz in block_ranges:
         if start_n <= p_num <= end_n:
             return official_sz
-            
     return ""
 
 # ==============================================================================
-# SECURE SERVICE ACCOUNT AUTHENTICATION HANDLER (UPDATED)
+# SECURE AUTO-FORMATTED SERVICE ACCOUNT AUTHENTICATION
 # ==============================================================================
 @st.cache_resource
 def get_gspread_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
-    pk = str(creds_dict.get("private_key", ""))
-    if "\\n" in pk:
-        pk = pk.replace("\\n", "\n")
-    creds_dict["private_key"] = pk.strip()
+    raw_pk = str(creds_dict.get("private_key", ""))
+    
+    # Strip existing markers and unwanted characters to get clean Base64
+    raw_pk = raw_pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
+    raw_pk = raw_pk.replace("\\n", "").replace("\n", "").replace(" ", "").replace("\r", "")
+    
+    # Keep only base64 characters
+    b64_clean = re.sub(r'[^A-Za-z0-9+/=]', '', raw_pk)
+    
+    # Re-wrap into standard 64-char lines
+    chunked = [b64_clean[i:i+64] for i in range(0, len(b64_clean), 64)]
+    creds_dict["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(chunked) + "\n-----END PRIVATE KEY-----\n"
+    
     return gspread.service_account_from_dict(creds_dict)
 
 def safe_gspread_call(func, *args, **kwargs):
