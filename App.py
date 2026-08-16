@@ -48,7 +48,7 @@ if "extracted_file_text" not in st.session_state:
 if "uploaded_temp_text" not in st.session_state:
     st.session_state["uploaded_temp_text"] = ""
 
-# Batch Processing State Machine (100 msgs/batch)
+# Batch Processing State Machine
 if "extraction_active" not in st.session_state:
     st.session_state["extraction_active"] = False
 if "extraction_paused" not in st.session_state:
@@ -272,6 +272,12 @@ DHA_PHASE_BLOCK_CATALOG = {
     }
 }
 
+VALID_DHA_BLOCK_NAMES = set()
+for p, d in DHA_PHASE_BLOCK_CATALOG.items():
+    for b in d["residential"] + d["commercial"]:
+        VALID_DHA_BLOCK_NAMES.add(b.upper())
+        VALID_DHA_BLOCK_NAMES.add(b.replace("Block ", "").upper())
+
 def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
     cleaned_size = str(extracted_size).strip() if extracted_size else ""
     if cleaned_size and cleaned_size.lower() not in ["n/a", "unknown", "none", ""]:
@@ -398,7 +404,6 @@ def show_dealer_ledger_dialog(payloads):
 # SOURCE FETCHERS, 100-MESSAGE CHUNKER & OCR PROCESSORS
 # ==============================================================================
 def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
-    """Splits WhatsApp chat into ~100 complete message blocks preserving full context."""
     msg_split_pattern = r'(?=\n?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2})'
     raw_messages = re.split(msg_split_pattern, raw_text)
     
@@ -503,84 +508,165 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
     return file_bytes.decode('utf-8', errors='ignore')
 
 # ==============================================================================
-# SMART REFINED MULTI-ENGINE PARSER (PURE AI + ACCURATE SMART FALLBACK)
+# ROBUST MULTI-SECTION PARSER (ELIMINATES 'BLOCK SE' & HEADER HALLUCINATIONS)
 # ==============================================================================
+def clean_line_from_artifacts(l):
+    return re.sub(r'[*_~`]', ' ', l).strip()
+
+def detect_phase_from_header(line_up):
+    if "PHASE 12" in line_up or "EME" in line_up:
+        return "DHA Phase 12 (EME Sector)"
+    elif "PHASE 11" in line_up or "RAHBAR" in line_up:
+        return "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"
+    elif "IVY GREEN" in line_up or "SECTOR Z" in line_up:
+        return "DHA Phase 8 (Ivy Green / Sector Z)"
+    elif "9PRISM" in line_up or "9 PRISM" in line_up or "PRISM" in line_up:
+        return "DHA Phase 9 Prism"
+    elif "9TOWN" in line_up or "9 TOWN" in line_up:
+        return "DHA Phase 9 Town"
+    elif "PHASE 8" in line_up or "PH 8" in line_up:
+        return "DHA Phase 8 (Proper)"
+    elif "PHASE 7" in line_up or "PH 7" in line_up:
+        return "DHA Phase 7"
+    elif "PHASE 6" in line_up or "PH 6" in line_up:
+        return "DHA Phase 6"
+    elif "PHASE 5" in line_up or "PH 5" in line_up:
+        return "DHA Phase 5"
+    elif "PHASE 4" in line_up or "PH 4" in line_up:
+        return "DHA Phase 4"
+    elif "PHASE 3" in line_up or "PH 3" in line_up:
+        return "DHA Phase 3"
+    elif "PHASE 2" in line_up or "PH 2" in line_up:
+        return "DHA Phase 2"
+    elif "PHASE 1" in line_up or "PH 1" in line_up:
+        return "DHA Phase 1"
+    return None
+
 def smart_accurate_rule_parser(chunk_text, default_phase):
     messages = chunk_text.split("===MESSAGE_START===")
     results = []
+
+    # Words that must NEVER be treated as Block letters
+    FORBIDDEN_BLOCK_WORDS = {
+        "PHASE", "PH", "SECTOR", "DHA", "CCA", "COMMERCIAL", "PAIR", "DEMAND", "ASKING",
+        "OFFER", "FINAL", "DIRECT", "MEETING", "COMPLETE", "FILE", "PAPER", "CORNER", "PARK",
+        "ROAD", "FACING", "POSSESSION", "RS", "LAC", "LACS", "CRORE", "CR", "KANAL", "MARLA",
+        "MAIN", "NEAR", "BOULEVARD", "ZONE", "SE", "CA", "TH", "ST", "ND", "RD"
+    }
 
     for msg in messages:
         m_clean = msg.strip()
         if not m_clean:
             continue
         
+        # Phone numbers & Dealer Name
         phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', m_clean)
         main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else ""
         
-        current_phase = default_phase
-        m_up = m_clean.upper()
-        if "PHASE 12" in m_up or "EME" in m_up:
-            current_phase = "DHA Phase 12 (EME Sector)"
-        elif "PHASE 11" in m_up or "RAHBAR" in m_up:
-            current_phase = "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"
-        elif "IVY GREEN" in m_up or "SECTOR Z" in m_up:
-            current_phase = "DHA Phase 8 (Ivy Green / Sector Z)"
-        elif "PHASE 9 PRISM" in m_up or "9PRISM" in m_up or "9 PRISM" in m_up or "PRISM" in m_up:
-            current_phase = "DHA Phase 9 Prism"
-        elif "PHASE 9 TOWN" in m_up or "9TOWN" in m_up or "9 TOWN" in m_up:
-            current_phase = "DHA Phase 9 Town"
-        elif "PHASE 8" in m_up:
-            current_phase = "DHA Phase 8 (Proper)"
-        elif "PHASE 7" in m_up:
-            current_phase = "DHA Phase 7"
-        elif "PHASE 6" in m_up:
-            current_phase = "DHA Phase 6"
-        elif "PHASE 5" in m_up:
-            current_phase = "DHA Phase 5"
-        elif "PHASE 4" in m_up:
-            current_phase = "DHA Phase 4"
-        elif "PHASE 3" in m_up:
-            current_phase = "DHA Phase 3"
-        elif "PHASE 2" in m_up:
-            current_phase = "DHA Phase 2"
-        elif "PHASE 1" in m_up:
-            current_phase = "DHA Phase 1"
+        active_phase = detect_phase_from_header(m_clean.upper()) or default_phase
+        lines = [clean_line_from_artifacts(l) for l in m_clean.splitlines() if clean_line_from_artifacts(l)]
+        
+        current_section_phase = active_phase
+        current_section_size = ""
+        matched_in_message = False
 
-        lines = [l.strip() for l in m_clean.splitlines() if l.strip()]
-        matched_any = False
         for line in lines:
             l_up = line.upper()
-            m = re.search(r'([A-Z]{1,2}(?:-\d+)?)\s*[-.:_/# ]\s*([0-9]{1,5})(?:\s*[@:]\s*|\s+DEMAND\s*[:@-]?\s*|\s+@\s*|\s+)?([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
             
-            if m:
-                matched_any = True
-                raw_b = m.group(1).replace('-', ' ').strip()
-                blk = f"Block {raw_b}" if (not raw_b.startswith("BLOCK") and len(raw_b) <= 3) else (raw_b if raw_b.startswith("BLOCK") else "Block A")
-                plt_num = m.group(2)
-                raw_prc = m.group(3)
-                unit = m.group(4) if m.group(4) else "Lac"
-                prc_str = f"{raw_prc} {unit}".strip() if raw_prc else ""
+            # Check for intra-message Phase Section Headers
+            ph_found = detect_phase_from_header(l_up)
+            if ph_found:
+                current_section_phase = ph_found
+                continue
+            
+            # Check for Section Size Headers (e.g. *1 Kanal*, *5 Marla*, *4 Marla Commercial*)
+            if "1 KANAL" in l_up:
+                current_section_size = "1 Kanal"
+            elif "2 KANAL" in l_up:
+                current_section_size = "2 Kanal"
+            elif "10 MARLA" in l_up or "10M" in l_up:
+                current_section_size = "10 Marla"
+            elif "5 MARLA" in l_up or "5M" in l_up:
+                current_section_size = "5 Marla"
+            elif "4 MARLA" in l_up or "4M" in l_up:
+                current_section_size = "4 Marla"
+            elif "8 MARLA" in l_up or "8M" in l_up:
+                current_section_size = "8 Marla"
 
-                sz = ""
-                if "5 MARLA" in l_up or "5M" in l_up:
-                    sz = "5 Marla"
-                elif "10 MARLA" in l_up or "10M" in l_up:
-                    sz = "10 Marla"
-                elif "2 KANAL" in l_up or "2K" in l_up:
-                    sz = "2 Kanal"
-                elif "1 KANAL" in l_up or "1K" in l_up:
-                    sz = "1 Kanal"
+            # Check for Commercial CCA Plot (e.g. CCA 1 Q 41 Rs 575 Lac, CCA3-68@365)
+            cca_match = re.search(r'CCA\s*([0-9])?\s*([A-Z])?\s*[-.:_/# ]\s*([0-9]{1,4})\s*(?:@|RS|DEMAND)?\s*([0-9]{2,5})?\s*(LAC|LACS|CRORE|CR)?', l_up)
+            if cca_match:
+                matched_in_message = True
+                cca_num = cca_match.group(1) or "1"
+                blk_cca = f"CCA {cca_num} Commercial"
+                plt_num = cca_match.group(3)
+                prc_val = cca_match.group(4)
+                prc_unit = cca_match.group(5) or "Lac"
+                prc_str = f"{prc_val} {prc_unit}".strip() if prc_val else ""
+                
+                results.append({
+                    "Category": "Selling",
+                    "Phase": current_section_phase,
+                    "Block": blk_cca,
+                    "Plot No": f"Plot {plt_num}",
+                    "Size": current_section_size if current_section_size else "4 Marla",
+                    "Plot Features": "Commercial / CCA",
+                    "Demand / Price": prc_str,
+                    "Seller Type": "Dealer",
+                    "Seller / Dealer Name": "",
+                    "Contact No": main_phone,
+                    "Office / Agency": st.session_state["office_name"],
+                    "Deal Status": "Available",
+                    "Last Conversation / Notes": "Direct Ingestion",
+                    "Raw Listing & Source Material": m_clean
+                })
+                continue
+
+            # Standard Plot Match (e.g. G 292 @ 565lac, X 500/9 @ 310lac, Z2 1308 Rs 225, Q. 18 Rs 325)
+            p_match = re.search(r'(?:^|[\s*])([A-Z]{1,2}[0-9]?)\s*[\.\-_/:\s]+\s*([0-9]{1,5}(?:[+/][0-9]{1,5})?)\s*(?:@|RS|DEMAND|ASKING|[:\s-])?\s*([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
+            
+            if p_match:
+                raw_b = p_match.group(1).strip()
+                if raw_b in FORBIDDEN_BLOCK_WORDS or len(raw_b) > 3:
+                    continue
+                
+                matched_in_message = True
+                raw_p = p_match.group(2).strip()
+                raw_prc = p_match.group(3)
+                raw_unit = p_match.group(4) or "Lac"
+                prc_str = f"{raw_prc} {raw_unit}".strip() if raw_prc else ""
+
+                # Format Block
+                if raw_b.startswith("Z") and len(raw_b) == 2 and raw_b[1].isdigit():
+                    blk_str = f"Block Z-{raw_b[1]}"
+                elif raw_b.startswith("BLOCK"):
+                    blk_str = raw_b
                 else:
-                    sz = resolve_size_text_first_or_map(current_phase, blk, f"Plot {plt_num}", "")
+                    blk_str = f"Block {raw_b}"
 
-                feat = "Corner" if "CORNER" in l_up else ("Park Facing" if "PARK" in l_up else "Standard Layout")
+                # Size Resolution
+                sz_str = ""
+                if "5 MARLA" in l_up or "5M" in l_up:
+                    sz_str = "5 Marla"
+                elif "10 MARLA" in l_up or "10M" in l_up:
+                    sz_str = "10 Marla"
+                elif "2 KANAL" in l_up or "2K" in l_up:
+                    sz_str = "2 Kanal"
+                elif "1 KANAL" in l_up or "1K" in l_up:
+                    sz_str = "1 Kanal"
+                elif current_section_size:
+                    sz_str = current_section_size
+                else:
+                    sz_str = resolve_size_text_first_or_map(current_section_phase, blk_str, f"Plot {raw_p}", "")
+
+                feat = "Corner" if "CORNER" in l_up else ("Park Facing" if "PARK" in l_up else ("Possession" if "POSSESSION" in l_up else "Standard Layout"))
 
                 results.append({
                     "Category": "Selling",
-                    "Phase": current_phase,
-                    "Block": blk,
-                    "Plot No": f"Plot {plt_num}",
-                    "Size": sz,
+                    "Phase": current_section_phase,
+                    "Block": blk_str,
+                    "Plot No": f"Plot {raw_p}",
+                    "Size": sz_str,
                     "Plot Features": feat,
                     "Demand / Price": prc_str,
                     "Seller Type": "Dealer",
@@ -589,17 +675,18 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     "Office / Agency": st.session_state["office_name"],
                     "Deal Status": "Available",
                     "Last Conversation / Notes": "Direct Ingestion",
-                    "Raw Listing & Source Material": m_clean  # Complete original message block
+                    "Raw Listing & Source Material": m_clean
                 })
 
-        if not matched_any and main_phone:
+        # Lead Retention if no plots identified in message
+        if not matched_in_message and main_phone:
             results.append({
                 "Category": "Dealer Lead / General",
-                "Phase": current_phase,
+                "Phase": active_phase,
                 "Block": "General Lead",
                 "Plot No": "General Option / Portfolio",
                 "Size": "",
-                "Plot Features": "Direct Inventory Call",
+                "Plot Features": "Direct Broadcast / Portfolio",
                 "Demand / Price": "",
                 "Seller Type": "Dealer",
                 "Seller / Dealer Name": "",
@@ -616,43 +703,40 @@ def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     
     prompt = f"""You are the Master DHA Lahore Real Estate CRM extraction engine using advanced Gemini 2.5 reasoning.
-Carefully analyze this batch of ~100 WhatsApp broadcasts separated by '===MESSAGE_START==='. 
+Carefully analyze this batch of ~100 WhatsApp broadcasts separated by '===MESSAGE_START==='.
 
-For each property listing or dealer lead found:
-Extract EVERY valid listing into a clean JSON array of objects.
-
-OFFICIAL DHA PHASES:
-'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
-
-CRITICAL INSTRUCTIONS:
-1. "Phase": Contextual phase name or default '{default_phase}'.
-2. "Block": Must match official catalog (e.g. 'Block A', 'Block W', 'Zone 3 Commercial'). NEVER invent fake blocks.
-3. "Plot No": Full plot number (e.g. 'Plot 858', 'Plot 61', 'Plot 654').
-4. "Size": '5 Marla', '10 Marla', '1 Kanal', '2 Kanal' etc.
-5. "Demand / Price": '485 Lac', '260 Lac', '2 Crore' etc.
+CRITICAL RULES:
+1. "Phase": Track section headers inside broadcasts (*Phase 6*, *Phase 7*, *Phase 8*, *Phase 9 Prism*). Assign EACH plot to its respective section phase.
+2. "Block": Must match official catalog (e.g. 'Block G', 'Block X', 'Block Y', 'Block S', 'Block A', 'Block M', 'Block N', 'Block K', 'Block Q', 'Block T', 'Block Z', 'Block Z-2', 'CCA 1 Commercial'). NEVER extract 'Block SE', 'Block CA', 'Block PHA' or header words as blocks!
+3. "Plot No": Extract plot number correctly (e.g. 'Plot 292', 'Plot 500/9', 'Plot 1122/3', 'Plot 4092', 'Plot 864+865', 'Plot 18', 'Plot 274', 'Plot 844/51', 'Plot 450', 'Plot 393', 'Plot 1308').
+4. "Size": '5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '4 Marla', '8 Marla'.
+5. "Demand / Price": '565 Lac', '310 Lac', '325 Lac', '200 Lac', '575 Lac', '930 Lac', '1025 Lac' etc.
 6. "Contact No": Extract dealer phone number.
-7. "Raw Listing & Source Material": MUST CONTAIN THE ENTIRE ORIGINAL MESSAGE/BROADCAST TEXT from which this listing was extracted (do not abbreviate or give just one line).
+7. "Raw Listing & Source Material": MUST CONTAIN THE FULL ORIGINAL BROADCAST MESSAGE.
 
-Input Broadcast Text:
+OFFICIAL DHA BLOCKS CATALOG:
+{catalog_json_str}
+
+Input Text:
 {chunk_text}
 
-Return ONLY a valid JSON Array:
+Return ONLY valid JSON Array:
 [
   {{
     "Category": "Selling",
-    "Phase": "DHA Phase 9 Prism",
-    "Block": "Block A",
-    "Plot No": "Plot 61",
+    "Phase": "DHA Phase 6",
+    "Block": "Block G",
+    "Plot No": "Plot 292",
     "Size": "1 Kanal",
     "Plot Features": "Standard Layout",
-    "Demand / Price": "260 Lac",
+    "Demand / Price": "565 Lac",
     "Seller Type": "Dealer",
-    "Seller / Dealer Name": "",
-    "Contact No": "03204488809",
-    "Office / Agency": "Wali Muhammad Associates",
+    "Seller / Dealer Name": "LIAQAT Ali",
+    "Contact No": "03218322333",
+    "Office / Agency": "Six Sigma Properties",
     "Deal Status": "Available",
     "Last Conversation / Notes": "Direct Ingestion",
-    "Raw Listing & Source Material": "Full broadcast message text here..."
+    "Raw Listing & Source Material": "Full broadcast message text..."
   }}
 ]"""
 
@@ -1061,9 +1145,7 @@ else:
             if st.button("🚀 Extract", use_container_width=True, key="btn_run_stream_inner"):
                 final_input_text = raw_text.strip()
                 if final_input_text:
-                    # 100 Complete Messages per AI Call
                     chunks = split_raw_into_message_chunks(final_input_text, messages_per_chunk=100)
-                    
                     st.session_state["all_chunks"] = chunks
                     st.session_state["current_chunk_idx"] = 0
                     st.session_state["parsed_payloads"] = []
