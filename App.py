@@ -428,7 +428,7 @@ def segment_into_discrete_whatsapp_messages(raw_text):
     return discrete_messages
 
 # ==============================================================================
-# MASTER REAL ESTATE AI SYSTEM PROMPT (12-COLUMN SCHEMA + SHORTHAND DECODER)
+# MASTER REAL ESTATE AI SYSTEM PROMPT WITH CHAIN-OF-THOUGHT & STEP-BY-STEP SCANNER
 # ==============================================================================
 def process_message_batch_via_gemini(message_objects, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
@@ -443,24 +443,19 @@ def process_message_batch_via_gemini(message_objects, default_phase):
     batch_payload_text = "\n\n".join(formatted_input_lines)
 
     prompt = f"""You are the Elite Real Estate Intelligence & Ingestion Agent for Wali Muhammad Associates (DHA Lahore).
-Parse each discrete WhatsApp message directly into the EXACT 12-Column Canonical CRM Schema using the Master Rules below:
+Execute a strict Step-by-Step Chain-of-Thought Scan on each discrete WhatsApp message to extract property listings into the 12-Column CRM Schema:
 
-=== MASTER KNOWLEDGE BASE & RULES ===
-1. PERSONAL & SHORTHAND NOTATION DECODER:
-   - Shorthand Pattern '6-k-220@200' -> Phase: 'DHA Phase 6', Block: 'Block K', Plot No: 'Plot 220', Demand / Price: '200 Lac'.
-   - Block Dash Pattern 'C-654' or 'c-654' -> Block: 'Block C', Plot No: 'Plot 654'.
-   - Slang & Features: 'C/P' or 'CNR PRK' -> 'Corner / Facing Park', 'MB' -> 'Main Boulevard (MB)', 'Direct' -> 'Direct Owner Option'.
-
-2. STRICT BLOCK & PHASE GUARDRAILS:
-   - Never confuse words like 'PHASE' or 'P' with a block name. Never output garbage blocks like 'Block HASE' or 'Block PH'.
-   - Match blocks strictly against the official DHA catalog: {catalog_json_str}.
-   - Fallback Phase if unspecified: '{default_phase}'.
-
-3. EXACT 12-COLUMN SCHEMA MAPPING:
-   Output must map precisely to these 12 columns:
+=== STEP-BY-STEP SCANNING & PARSING PROTOCOL ===
+STEP 1 (SCAN & IDENTIFY): Read the full text of each message carefully. Look for phase names, block designations (including shorthand like 'c-654' or personal shorthand like '6-k-220@200'), plot numbers, and prices.
+STEP 2 (CATALOG MATCHING & GUARDRAILS): Strictly cross-verify blocks against the official catalog: {catalog_json_str}. Never confuse phase names or numbers with block names (e.g. discard fake blocks like 'Block HASE' or 'Block PH').
+STEP 3 (SHORTHAND & NOTATION DECODER):
+   - '6-k-220@200' -> Phase: 'DHA Phase 6', Block: 'Block K', Plot No: 'Plot 220', Price: '200 Lac'.
+   - 'C-654' -> Block: 'Block C', Plot No: 'Plot 654'.
+   - Features: 'C/P' or 'CNR PRK' -> 'Corner / Facing Park', 'MB' -> 'Main Boulevard (MB)', 'Direct' -> 'Direct Owner Option'.
+STEP 4 (EXACT 12-COLUMN MAPPING): Map fields precisely into these 12 columns:
    - "Date / Timestamp": '{now_str}'
-   - "Phase": Official DHA Phase
-   - "Block": Official Block Tab
+   - "Phase": Official DHA Phase (Fallback: '{default_phase}')
+   - "Block": Official Block Tab Name
    - "Plot No": Complete Plot Number (e.g. 'Plot 980')
    - "Size": Explicit or Auto-resolved via Cutting Map
    - "Plot Features": 'Corner / Facing Park', 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Standard Layout', etc.
@@ -472,7 +467,7 @@ Parse each discrete WhatsApp message directly into the EXACT 12-Column Canonical
    - "Last Conversation / Notes": 'Direct Ingestion'
    - "Source": Exact raw text snippet
 
-Input WhatsApp Messages:
+Input WhatsApp Messages / File Data:
 {batch_payload_text}
 
 Return ONLY a valid JSON Array with exact keys:
@@ -598,7 +593,7 @@ def show_backend_connection_dialog(selected_phase, selected_block, target_url):
             <b>🌐 Active Spreadsheet Target:</b> <a href="{target_url}" target="_blank">{selected_phase} Database</a><br>
             <b>🧱 Target Tab Attached:</b> <code>{selected_block}</code><br>
             <b>⚡ Sync Protocols:</b> Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
-            <b>🛡️ Schema Compliance:</b> Master Prompt & 12-Column CRM Strictly Active.
+            <b>🛡️ Schema Compliance:</b> Chain-of-Thought Master Prompt & 12-Col CRM Strictly Active.
         </div>
     """, unsafe_allow_html=True)
 
@@ -692,7 +687,7 @@ else:
             <div class="header-banner">
                 <span class="office-badge">📍 {st.session_state['office_name']}</span>
                 <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-                <div class="header-subtitle">Master Prompt & 12-Column Pipeline Active (Active: {st.session_state['user_email']})</div>
+                <div class="header-subtitle">Chain-of-Thought AI & 12-Column Pipeline Active (Active: {st.session_state['user_email']})</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -942,7 +937,7 @@ else:
     # 4. UNIFIED ALL-IN-ONE INGESTION PROMPT ENCLOSURE
     # ==========================================================================
     if gemini_active:
-        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Master Prompt Active)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Chain-of-Thought Master Prompt Active)</div>', unsafe_allow_html=True)
     else:
         err_msg = st.session_state.get("gemini_last_error", "API Key Missing or Misconfigured")
         st.markdown(f'<div class="ai-badge-inactive">🟡 Gemini Brain Inactive ({err_msg}) — Please check GEMINI_API_KEY in Streamlit Secrets</div>', unsafe_allow_html=True)
@@ -1092,7 +1087,7 @@ else:
                 st.rerun()
 
         if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
-            with st.spinner(f"🧠 Gemini 2.5 Brain Structuring 12 CRM Columns ({curr_idx + 1} of {total_chunks})..."):
+            with st.spinner(f"🧠 Gemini 2.5 Chain-of-Thought Scanning ({curr_idx + 1} of {total_chunks})..."):
                 chunk_messages = chunks[curr_idx]
                 new_listings = process_message_batch_via_gemini(chunk_messages, st.session_state["extraction_default_phase"])
                 st.session_state["parsed_payloads"].extend(new_listings)
