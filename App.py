@@ -149,65 +149,6 @@ DHA_PHASE_SHEET_URLS = {
     "DHA Phase 12 (EME Sector)": "https://docs.google.com/spreadsheets/d/1Ai07OSySM4pcPV9yRr--fsMpKNPXtD2uwJx285_mPho/edit"
 }
 
-DHA_CUTTING_MAP_RULES = {
-    "DHA Phase 5": {
-        "Block A": [(1, 120, "2 Kanal"), (121, 500, "1 Kanal")],
-        "Block B": [(1, 80, "2 Kanal"), (81, 600, "1 Kanal")],
-        "Block C": [(1, 50, "2 Kanal"), (51, 450, "1 Kanal")],
-        "Block G": [(1, 350, "1 Kanal"), (351, 700, "10 Marla")],
-        "Block H": [(1, 400, "10 Marla"), (401, 800, "5 Marla")],
-        "Block J": [(1, 500, "10 Marla"), (501, 950, "5 Marla")],
-    },
-    "DHA Phase 6": {
-        "Block A": [(1, 150, "2 Kanal"), (151, 800, "1 Kanal")],
-        "Block B": [(1, 100, "2 Kanal"), (101, 700, "1 Kanal")],
-        "Block C": [(1, 650, "1 Kanal")],
-        "Block D": [(1, 700, "1 Kanal")],
-        "Block E": [(1, 550, "1 Kanal")],
-        "Block J": [(1, 600, "10 Marla")],
-        "Block L": [(1, 800, "10 Marla"), (801, 1200, "5 Marla")],
-    },
-    "DHA Phase 7": {
-        "Block P": [(1, 1100, "1 Kanal")],
-        "Block Q": [(1, 900, "1 Kanal")],
-        "Block R": [(1, 1050, "1 Kanal")],
-        "Block S": [(1, 950, "1 Kanal")],
-        "Block T": [(1, 1200, "1 Kanal")],
-        "Block U": [(1, 1400, "1 Kanal")],
-        "Block W": [(1, 1400, "10 Marla")],
-        "Block X": [(1, 1300, "10 Marla")],
-        "Block Y": [(1, 900, "5 Marla")],
-        "Block Z": [(1, 1100, "5 Marla")]
-    },
-    "DHA Phase 8 (Proper)": {
-        "Block A": [(1, 100, "2 Kanal"), (101, 550, "1 Kanal")],
-        "Block B": [(1, 80, "2 Kanal"), (81, 500, "1 Kanal")],
-        "Block C": [(1, 70, "2 Kanal"), (71, 480, "1 Kanal")],
-        "Block D": [(1, 600, "1 Kanal")],
-        "Block E": [(1, 550, "1 Kanal")],
-        "Block F": [(1, 500, "1 Kanal")],
-        "Block S": [(1, 750, "10 Marla")],
-        "Block T": [(1, 800, "10 Marla"), (801, 1300, "5 Marla")],
-        "Block U": [(1, 900, "5 Marla")],
-        "Block V": [(1, 850, "5 Marla")],
-        "Block W": [(1, 700, "8 Marla")]
-    },
-    "DHA Phase 9 Prism": {
-        "Block A": [(1, 600, "1 Kanal")],
-        "Block B": [(1, 550, "1 Kanal")],
-        "Block C": [(1, 700, "1 Kanal")],
-        "Block D": [(1, 650, "1 Kanal")],
-        "Block E": [(1, 500, "1 Kanal")],
-        "Block F": [(1, 700, "1 Kanal")],
-        "Block G": [(1, 600, "1 Kanal")],
-        "Block J": [(1, 1200, "10 Marla")],
-        "Block K": [(1, 1100, "10 Marla")],
-        "Block L": [(1, 1300, "10 Marla")],
-        "Block R": [(1, 1800, "5 Marla")],
-        "Block Q": [(1, 1600, "5 Marla")]
-    }
-}
-
 DHA_PHASE_BLOCK_CATALOG = {
     "DHA Phase 1": {
         "residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P"],
@@ -307,9 +248,29 @@ def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
         p_num = int(re.sub(r'[^0-9]', '', str(plot_no)))
     except Exception:
         return ""
-    phase_rules = DHA_CUTTING_MAP_RULES.get(phase, {})
-    block_ranges = phase_rules.get(block, [])
-    for start_n, end_n, official_sz in block_ranges:
+    
+    phase_rules = {
+        "DHA Phase 6": {
+            "Block A": [(1, 150, "2 Kanal"), (151, 800, "1 Kanal")],
+            "Block B": [(1, 100, "2 Kanal"), (101, 700, "1 Kanal")],
+            "Block C": [(1, 650, "1 Kanal")],
+            "Block J": [(1, 600, "10 Marla")],
+            "Block L": [(1, 800, "10 Marla"), (801, 1200, "5 Marla")],
+        },
+        "DHA Phase 7": {
+            "Block P": [(1, 1100, "1 Kanal")],
+            "Block Y": [(1, 900, "5 Marla")],
+            "Block Z": [(1, 1100, "5 Marla")]
+        },
+        "DHA Phase 9 Prism": {
+            "Block A": [(1, 600, "1 Kanal")],
+            "Block J": [(1, 1200, "10 Marla")],
+            "Block R": [(1, 1800, "5 Marla")]
+        }
+    }
+    p_rules = phase_rules.get(phase, {})
+    b_rules = p_rules.get(block, [])
+    for start_n, end_n, official_sz in b_rules:
         if start_n <= p_num <= end_n:
             return official_sz
     return ""
@@ -467,7 +428,7 @@ def segment_into_discrete_whatsapp_messages(raw_text):
     return discrete_messages
 
 # ==============================================================================
-# STRICT 12-COLUMN CRM SCHEMA AI EXTRACTION ENGINE
+# MASTER REAL ESTATE AI SYSTEM PROMPT (12-COLUMN SCHEMA + SHORTHAND DECODER)
 # ==============================================================================
 def process_message_batch_via_gemini(message_objects, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
@@ -481,43 +442,55 @@ def process_message_batch_via_gemini(message_objects, default_phase):
 
     batch_payload_text = "\n\n".join(formatted_input_lines)
 
-    prompt = f"""You are the Master Real Estate Ingestion Engine for DHA Lahore.
-Parse each discrete WhatsApp message directly into the EXACT 12-column canonical Google Sheets CRM schema:
+    prompt = f"""You are the Elite Real Estate Intelligence & Ingestion Agent for Wali Muhammad Associates (DHA Lahore).
+Parse each discrete WhatsApp message directly into the EXACT 12-Column Canonical CRM Schema using the Master Rules below:
 
-COLUMNS SPECIFICATION:
-1. "Date / Timestamp": '{now_str}'.
-2. "Phase": Official DHA Phase ('DHA Phase 1' to 'DHA Phase 12 (EME Sector)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)'). Fallback: '{default_phase}'.
-3. "Block": Must strictly match official block tab from catalog: {catalog_json_str}. (CRITICAL: NEVER output 'Block HASE' or 'Block PH'!).
-4. "Plot No": COMPLETE plot number (e.g. 'Plot 980', 'Plot 432'). NEVER output 'Plot 7' from 'Phase 7'!
-5. "Size": '5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla' or "".
-6. "Plot Features": 'Corner / Facing Park', 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Direct Option', 'Possession Plot', 'Non-Possession Plot' or 'Standard Layout'.
-7. "Demand / Price": Extracted price (e.g. '585 Lac', '3.8 Crore'). If none, leave "".
-8. "Seller / Dealer Name": Extracted dealer/contact name or message sender.
-9. "Contact No": Valid mobile number from header or message body.
-10. "Office / Agency": Extracted agency name or '{st.session_state["office_name"]}'.
-11. "Deal Status": "Available".
-12. "Last Conversation / Notes": "Direct Ingestion".
-13. "Source": Exact raw text of this specific listing.
+=== MASTER KNOWLEDGE BASE & RULES ===
+1. PERSONAL & SHORTHAND NOTATION DECODER:
+   - Shorthand Pattern '6-k-220@200' -> Phase: 'DHA Phase 6', Block: 'Block K', Plot No: 'Plot 220', Demand / Price: '200 Lac'.
+   - Block Dash Pattern 'C-654' or 'c-654' -> Block: 'Block C', Plot No: 'Plot 654'.
+   - Slang & Features: 'C/P' or 'CNR PRK' -> 'Corner / Facing Park', 'MB' -> 'Main Boulevard (MB)', 'Direct' -> 'Direct Owner Option'.
+
+2. STRICT BLOCK & PHASE GUARDRAILS:
+   - Never confuse words like 'PHASE' or 'P' with a block name. Never output garbage blocks like 'Block HASE' or 'Block PH'.
+   - Match blocks strictly against the official DHA catalog: {catalog_json_str}.
+   - Fallback Phase if unspecified: '{default_phase}'.
+
+3. EXACT 12-COLUMN SCHEMA MAPPING:
+   Output must map precisely to these 12 columns:
+   - "Date / Timestamp": '{now_str}'
+   - "Phase": Official DHA Phase
+   - "Block": Official Block Tab
+   - "Plot No": Complete Plot Number (e.g. 'Plot 980')
+   - "Size": Explicit or Auto-resolved via Cutting Map
+   - "Plot Features": 'Corner / Facing Park', 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Standard Layout', etc.
+   - "Demand / Price": Standardized Price (e.g. '585 Lac', '200 Lac')
+   - "Seller / Dealer Name": Extracted from message header/body
+   - "Contact No": Valid Mobile Number
+   - "Office / Agency": Wali Muhammad Associates or Sender Agency
+   - "Deal Status": 'Available'
+   - "Last Conversation / Notes": 'Direct Ingestion'
+   - "Source": Exact raw text snippet
 
 Input WhatsApp Messages:
 {batch_payload_text}
 
-Return ONLY a valid JSON Array with the exact keys:
+Return ONLY a valid JSON Array with exact keys:
 [
   {{
     "Date / Timestamp": "{now_str}",
-    "Phase": "DHA Phase 9 Prism",
-    "Block": "Block A",
-    "Plot No": "Plot 980",
+    "Phase": "DHA Phase 6",
+    "Block": "Block K",
+    "Plot No": "Plot 220",
     "Size": "1 Kanal",
-    "Plot Features": "Corner / Facing Park",
-    "Demand / Price": "585 Lac",
+    "Plot Features": "Standard Layout",
+    "Demand / Price": "200 Lac",
     "Seller / Dealer Name": "Ali Real Estate",
     "Contact No": "03214567890",
     "Office / Agency": "Wali Muhammad Associates",
     "Deal Status": "Available",
     "Last Conversation / Notes": "Direct Ingestion",
-    "Source": "Prism A 980@585 cnr f/park 03214567890"
+    "Source": "6-k-220@200"
   }}
 ]"""
 
@@ -554,7 +527,7 @@ Return ONLY a valid JSON Array with the exact keys:
                 st.session_state["gemini_last_error"] = f"Model {model_name} Error: {e}"
                 time.sleep(0.6)
 
-    # Heuristic Local Fallback
+    # Heuristic Local Fallback with Shorthand Support
     fallback_results = []
     for msg in message_objects:
         fallback_results.extend(fallback_heuristic_parser(msg, default_phase, now_str))
@@ -568,50 +541,52 @@ def fallback_heuristic_parser(msg_obj, default_phase, now_str):
     current_phase = default_phase
     l_up = body.upper()
 
-    if "PHASE 12" in l_up or "EME" in l_up:
-        current_phase = "DHA Phase 12 (EME Sector)"
-    elif "PHASE 11" in l_up or "RAHBAR" in l_up:
-        current_phase = "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"
-    elif "PHASE 9 PRISM" in l_up or "PRISM" in l_up or "9PRISM" in l_up:
-        current_phase = "DHA Phase 9 Prism"
-    elif "PHASE 9 TOWN" in l_up or "9 TOWN" in l_up:
-        current_phase = "DHA Phase 9 Town"
-    elif "PHASE 8" in l_up:
-        current_phase = "DHA Phase 8 (Proper)"
-    elif "PHASE 7" in l_up or "P7" in l_up:
-        current_phase = "DHA Phase 7"
-    elif "PHASE 6" in l_up:
-        current_phase = "DHA Phase 6"
-    elif "PHASE 5" in l_up:
-        current_phase = "DHA Phase 5"
+    shorthand_m = re.search(r'([0-9]{1,2})\s*-\s*([A-Z])\s*-\s*([0-9]{1,5})\s*@\s*([0-9]+(?:\.[0-9]+)?)', l_up)
+    if shorthand_m:
+        p_num = shorthand_m.group(1)
+        current_phase = f"DHA Phase {p_num}"
+        blk_letter = shorthand_m.group(2)
+        blk = clean_and_validate_block_name(current_phase, f"Block {blk_letter}")
+        plt_no = f"Plot {shorthand_m.group(3)}"
+        prc = f"{shorthand_m.group(4)} Lac"
+        return [{
+            "Date / Timestamp": now_str,
+            "Phase": current_phase,
+            "Block": blk,
+            "Plot No": plt_no,
+            "Size": resolve_size_text_first_or_map(current_phase, blk, plt_no, ""),
+            "Plot Features": "Standard Layout",
+            "Demand / Price": prc,
+            "Seller / Dealer Name": dealer_name,
+            "Contact No": phone,
+            "Office / Agency": agency,
+            "Deal Status": "Available",
+            "Last Conversation / Notes": "Direct Ingestion",
+            "Source": body
+        }]
 
-    extracted = []
-    m = re.search(r'(?:BLOCK\s+)?([A-Z0-9-]{1,3})\s*[-.:/# ]\s*([0-9]{2,5})(?:\s*[@:]\s*|\s+DEMAND\s*[:@]?\s*|\s+@\s*|\s+)?([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
-    if m:
-        blk_candidate = m.group(1).upper()
-        if blk_candidate not in ["PH", "HASE", "PHASE", "P"]:
-            blk = clean_and_validate_block_name(current_phase, blk_candidate)
-            plt_num = m.group(2)
-            raw_prc = m.group(3)
-            prc_unit = m.group(4) if m.group(4) else "Lac"
-            prc = f"{raw_prc} {prc_unit}".strip() if (raw_prc and float(raw_prc) > 5) else ""
+    dash_m = re.search(r'([A-Z])\s*-\s*([0-9]{1,5})(?:\s*@\s*([0-9]+(?:\.[0-9]+)?))?', l_up)
+    if dash_m:
+        blk = clean_and_validate_block_name(current_phase, f"Block {dash_m.group(1)}")
+        plt_no = f"Plot {dash_m.group(2)}"
+        prc = f"{dash_m.group(3)} Lac" if dash_m.group(3) else ""
+        return [{
+            "Date / Timestamp": now_str,
+            "Phase": current_phase,
+            "Block": blk,
+            "Plot No": plt_no,
+            "Size": resolve_size_text_first_or_map(current_phase, blk, plt_no, ""),
+            "Plot Features": "Standard Layout",
+            "Demand / Price": prc,
+            "Seller / Dealer Name": dealer_name,
+            "Contact No": phone,
+            "Office / Agency": agency,
+            "Deal Status": "Available",
+            "Last Conversation / Notes": "Direct Ingestion",
+            "Source": body
+        }]
 
-            extracted.append({
-                "Date / Timestamp": now_str,
-                "Phase": current_phase,
-                "Block": blk,
-                "Plot No": f"Plot {plt_num}",
-                "Size": "",
-                "Plot Features": "Standard Layout",
-                "Demand / Price": prc,
-                "Seller / Dealer Name": dealer_name,
-                "Contact No": phone,
-                "Office / Agency": agency,
-                "Deal Status": "Available",
-                "Last Conversation / Notes": "Direct Ingestion",
-                "Source": body
-            })
-    return extracted
+    return []
 
 # Modal Dialogs
 @st.dialog("🔗 Backend Google Sheets Connection Details", width="large")
@@ -623,7 +598,7 @@ def show_backend_connection_dialog(selected_phase, selected_block, target_url):
             <b>🌐 Active Spreadsheet Target:</b> <a href="{target_url}" target="_blank">{selected_phase} Database</a><br>
             <b>🧱 Target Tab Attached:</b> <code>{selected_block}</code><br>
             <b>⚡ Sync Protocols:</b> Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
-            <b>🛡️ Schema Compliance:</b> Updated Clean 12-Column Canonical CRM Headers strictly mapped.
+            <b>🛡️ Schema Compliance:</b> Master Prompt & 12-Column CRM Strictly Active.
         </div>
     """, unsafe_allow_html=True)
 
@@ -717,7 +692,7 @@ else:
             <div class="header-banner">
                 <span class="office-badge">📍 {st.session_state['office_name']}</span>
                 <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-                <div class="header-subtitle">Strict 12-Column Database Schema & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
+                <div class="header-subtitle">Master Prompt & 12-Column Pipeline Active (Active: {st.session_state['user_email']})</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -884,7 +859,7 @@ else:
             
             for idx, ((phase, block), rows_list) in enumerate(grouped_data.items()):
                 pct = int(((idx + 1) / total_groups) * 100)
-                status_placeholder_sync.markdown(f"⏳ **Syncing:** `[{phase} ➔ {block}]` — ({idx+1}/{total_groups} tabs) • **{pct}% Complete**")
+                status_placeholder_sync.markdown(f"⏳ **Syncing:** `[{phase} ➔ {block}]` — ({idx+1}/{total_groups} tabs) • **% Complete**".replace("%", f"{pct}%"))
                 
                 if phase not in workbook_cache:
                     wb = get_phase_workbook(gc_client, phase)
@@ -922,7 +897,6 @@ else:
                     if plot_val_clean:
                         plot_repeat_map[plot_val_clean] = repeat_count + 1
                     
-                    # Direct 1:1 Mapping to 12 CRM Columns
                     row_data = [
                         str(row.get("Date / Timestamp", now_str)),
                         str(phase),
@@ -968,7 +942,7 @@ else:
     # 4. UNIFIED ALL-IN-ONE INGESTION PROMPT ENCLOSURE
     # ==========================================================================
     if gemini_active:
-        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (12-Column Schema Active)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Master Prompt Active)</div>', unsafe_allow_html=True)
     else:
         err_msg = st.session_state.get("gemini_last_error", "API Key Missing or Misconfigured")
         st.markdown(f'<div class="ai-badge-inactive">🟡 Gemini Brain Inactive ({err_msg}) — Please check GEMINI_API_KEY in Streamlit Secrets</div>', unsafe_allow_html=True)
@@ -983,11 +957,11 @@ else:
         "📋 Live Real Estate Ingestion Stream:",
         value=default_box_value,
         height=260,
-        placeholder="Paste thousands of exported WhatsApp chat messages, portal feeds, or use [+] Attach Sources below...",
+        placeholder="Paste thousands of exported WhatsApp chat messages, shorthand entries (e.g. 6-k-220@200), or use [+] Attach Sources...",
         label_visibility="collapsed"
     )
 
-    col_in_attach, col_in_btn = st.columns([3.6, 1.4])
+    col_in_attach, col_in_btn = st.columns([3.4, 1.6])
     
     with col_in_attach:
         with st.expander("➕ **Attach Sources (Files, Drive, OCR, Zameen, Classifieds)**", expanded=False):
