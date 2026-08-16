@@ -28,7 +28,7 @@ except ImportError:
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="DHA Enterprise CRM & Live AI Engine",
+    page_title="DHA Enterprise CRM & Map-Synced AI Engine",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -429,7 +429,7 @@ def segment_into_discrete_whatsapp_messages(raw_text):
     return discrete_messages
 
 # ==============================================================================
-# SMART & SAFE EXTRACTION ENGINE WITH FAIL-SAFE SUMMARY SUPPORT
+# MAP & CATALOG SYNNCED EXTRACTION ENGINE
 # ==============================================================================
 def process_message_batch_via_gemini(message_objects, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
@@ -441,25 +441,24 @@ def process_message_batch_via_gemini(message_objects, default_phase):
 
     batch_payload_text = "\n\n".join(formatted_input_lines)
 
-    prompt = f"""You are the Master Real Estate Ingestion Engine for Wali Muhammad Associates (DHA Lahore).
+    prompt = f"""You are the Master Real Estate Ingestion & Map Matching Engine for Wali Muhammad Associates (DHA Lahore).
 Analyze each WhatsApp listing bundle and extract property listings into a JSON array.
 
-EXTRACTION INSTRUCTIONS:
-1. PHASE DETECTION: Scan text for DHA Phase (e.g., '9 Prism', 'Phase 6', '9 Town'). If found, use it. If not mentioned in text, fallback to '{default_phase}'.
-2. INDIVIDUAL PLOT ROWS: If a single dealer message contains multiple plots, output separate JSON objects for each.
-3. BLOCK & PLOT: Extract Block (match against {catalog_json_str}) and Plot No digits.
-4. DEALER & CONTACT: Extract Seller/Dealer Name and Contact No.
-5. EXACT 12-COLUMN SCHEMA:
+STRICT MAP & CATALOG RULES:
+1. OFFICIAL CATALOG MATCHING: Every extracted Block MUST strictly match the official map catalog for that Phase: {catalog_json_str}. Do not invent fake blocks.
+2. PHASE DETECTION: Scan the message text for the exact DHA Phase (e.g. 'Phase 6', 'Phase 7', '9 Prism', '9 Town'). If found, map it precisely. If missing, use '{default_phase}'.
+3. INDIVIDUAL PLOT ROWS: If a message has multiple plots, split them into separate JSON rows.
+4. EXACT 12-COLUMN SCHEMA:
    - "Date / Timestamp": "{now_str}"
-   - "Phase": Detected DHA Phase
-   - "Block": Official Block Tab
+   - "Phase": Official DHA Phase name
+   - "Block": Official Block Tab name from catalog
    - "Plot No": Plot Number (e.g. 'Plot 61')
-   - "Size": Auto-resolved size
+   - "Size": Auto-resolved size via cutting map
    - "Plot Features": 'Corner / Facing Park', 'Standard Layout', etc.
    - "Demand / Price": Standardized Price (e.g. '260 Lac')
-   - "Seller / Dealer Name": Extracted dealer name or WhatsApp sender
+   - "Seller / Dealer Name": Extracted dealer name
    - "Contact No": Valid Mobile Number
-   - "Office / Agency": Extracted agency name or '{st.session_state["office_name"]}'
+   - "Office / Agency": Extracted agency name
    - "Deal Status": 'Available'
    - "Last Conversation / Notes": 'Direct Ingestion'
    - "Source": Exact text snippet
@@ -521,8 +520,8 @@ def show_backend_connection_dialog(selected_phase, selected_block, target_url):
             <b>🔑 Service Account:</b> <code>dha-bot@dha-property-sync.iam.gserviceaccount.com</code><br>
             <b>🌐 Active Spreadsheet Target:</b> <a href="{target_url}" target="_blank">{selected_phase} Database</a><br>
             <b>🧱 Target Tab Attached:</b> <code>{selected_block}</code><br>
-            <b>⚡ Sync Protocols:</b> Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
-            <b>🛡️ Schema Compliance:</b> Fail-safe Live Summary & 12-Col CRM Active.
+            <b>⚡ Sync Protocols:</b> Map-Synced & Chunked Append (Quota 429 Protection)<br>
+            <b>🛡️ Schema Compliance:</b> Official Catalog & 12-Col CRM Active.
         </div>
     """, unsafe_allow_html=True)
 
@@ -616,7 +615,7 @@ else:
             <div class="header-banner">
                 <span class="office-badge">📍 {st.session_state['office_name']}</span>
                 <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-                <div class="header-subtitle">Fail-Safe Live Summary & 12-Column Pipeline Active (Active: {st.session_state['user_email']})</div>
+                <div class="header-subtitle">Map-Synced Catalog & 12-Column Pipeline Active (Active: {st.session_state['user_email']})</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -866,7 +865,7 @@ else:
     # 4. UNIFIED ALL-IN-ONE INGESTION PROMPT ENCLOSURE
     # ==========================================================================
     if gemini_active:
-        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Fail-Safe Live Summary Active)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Map-Synced Engine Active)</div>', unsafe_allow_html=True)
     else:
         err_msg = st.session_state.get("gemini_last_error", "API Key Missing or Misconfigured")
         st.markdown(f'<div class="ai-badge-inactive">🟡 Gemini Brain Inactive ({err_msg}) — Please check GEMINI_API_KEY in Streamlit Secrets</div>', unsafe_allow_html=True)
@@ -1016,7 +1015,7 @@ else:
                 st.rerun()
 
         if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
-            with st.spinner(f"🧠 Gemini 2.5 Processing ({curr_idx + 1} of {total_chunks})..."):
+            with st.spinner(f"🧠 Gemini 2.5 Map-Synced Processing ({curr_idx + 1} of {total_chunks})..."):
                 chunk_messages = chunks[curr_idx]
                 new_listings = process_message_batch_via_gemini(chunk_messages, st.session_state["extraction_default_phase"])
                 st.session_state["parsed_payloads"].extend(new_listings)
@@ -1025,7 +1024,7 @@ else:
                 if st.session_state["current_chunk_idx"] >= total_chunks:
                     st.session_state["extraction_active"] = False
                     st.session_state["extraction_paused"] = False
-                    st.success(f"🎉 100% Complete! Extracted {len(st.session_state['parsed_payloads'])} listings directly into 12-column database format.")
+                    st.success(f"🎉 100% Complete! Extracted {len(st.session_state['parsed_payloads'])} map-synced listings directly into database format.")
                     st.rerun()
                 else:
                     st.rerun()
