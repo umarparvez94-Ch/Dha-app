@@ -59,9 +59,7 @@ with col_block:
     selected_block = st.selectbox("📦 Filter / Target Block:", ["All Block Tabs / CCAs", "Block A", "Block B", "Block C", "Block D", "Sector Shops", "CCA 1", "CCA 2"])
 
 # --- LOAD SAMPLE / EXTRACTED DATA ---
-# (Agar live data session state me mojood hai to wo use hoga)
 if not st.session_state.extracted_data:
-    # Dummy placeholder generator for testing 487 rows without crashing
     sample_records = []
     for i in range(1, 488):
         sample_records.append({
@@ -123,10 +121,8 @@ st.write("")
 st.subheader("📋 Ingestion Queue Preview")
 
 if not df_filtered.empty:
-    # Notice banner for user clarity
     st.info(f"💡 Showing first **50** records out of **{len(df_filtered)}** for ultra-fast browser loading. The 'Push' button below processes the complete **{len(df_filtered)}** records.")
     
-    # 50 rows render preview (Prevents browser payload overflow)
     df_preview = df_filtered.head(50)
     
     if edit_mode:
@@ -175,13 +171,12 @@ if push_clicked:
                 current_step += 1
                 percent = min(int((current_step / max(1, total_plots)) * 100), 100)
                 
-                # Update status message in real-time
                 status_box.markdown(
                     f'<div class="sync-banner">⏳ <b>Syncing:</b> <span style="color:#00796b;">[{phase_name}]</span> ➔ <span style="color:#2e7d32;">{block_name}</span> — ({current_step}/{total_plots} plots) • {percent}% Complete</div>', 
                     unsafe_allow_html=True
                 )
                 progress_bar.progress(percent / 100)
-                time.sleep(0.01) # Backend gspread batch payload insertion
+                time.sleep(0.01)
         
         status_box.empty()
         progress_bar.empty()
