@@ -429,7 +429,7 @@ def segment_into_discrete_whatsapp_messages(raw_text):
     return discrete_messages
 
 # ==============================================================================
-# SMART MESSAGE-FLOW & INDIVIDUAL DEALER EXTRACTION ENGINE
+# SMART MESSAGE-FLOW & STRICT DATA QUALITY EXTRACTION ENGINE
 # ==============================================================================
 def process_message_batch_via_gemini(message_objects, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
@@ -437,26 +437,24 @@ def process_message_batch_via_gemini(message_objects, default_phase):
     
     formatted_input_lines = []
     for idx, msg in enumerate(message_objects):
-        formatted_input_lines.append(f"--- LISTING BUNDLE #{idx+1} (Start: Bismillah/Phase, End: Mobile/Office) ---\n{msg['full_message']}")
+        formatted_input_lines.append(f"--- BUNDLE #{idx+1} ---\n{msg['full_message']}")
 
     batch_payload_text = "\n\n".join(formatted_input_lines)
 
-    prompt = f"""You are an Expert Real Estate Ingestion & Message-Flow Engine for Wali Muhammad Associates (DHA Lahore).
-Analyze each WhatsApp listing bundle. Each bundle represents a single dealer's broadcast message (typically starting with Bismillah/Phase/Greetings and ending with a mobile number or office name).
+    prompt = f"""You are the Master Real Estate Ingestion Engine for Wali Muhammad Associates (DHA Lahore).
+Analyze each WhatsApp listing bundle and extract property listings into a JSON array.
 
-TASK: Extract every single plot/listing inside each bundle as a SEPARATE row in a JSON array.
-
-SMART PARSING RULES:
-1. INDIVIDUAL PLOT ROWS: If a single dealer message contains 10 plots, output 10 separate JSON objects. Never merge them.
-2. DYNAMIC PHASE & BLOCK DETECTION: Each plot may belong to a different Phase or Block mentioned in that specific message (e.g., '9 Prism' then '9 Town'). Detect the correct Phase and Block per plot. Discard fake blocks like 'HASE' or 'PH'. Official catalog: {catalog_json_str}. If no phase is mentioned, use '{default_phase}'.
-3. BLOCK-PLOT SEPARATION: Formats like 'C-654', 'A-61' mean Block C/A and Plot 654/61. Shorthand like '6-k-220@200' means Phase 6, Block K, Plot 220, Price 200 Lac.
-4. ENTITY BINDING: Every plot extracted from the bundle must inherit the exact Dealer Name, Mobile/Contact No, and Office/Agency Name found at the bottom or header of that same bundle.
-5. EXACT 12-COLUMN SCHEMA MAPPING:
-   - "Date / Timestamp": '{now_str}'
-   - "Phase": Official DHA Phase
+STRICT DATA QUALITY & PARSING RULES:
+1. MANDATORY FIELDS (SKIP INVALID ENTRIES): If Phase, Plot No, or Contact No is missing or cannot be detected for a specific listing, SKIP it entirely. Do NOT include incomplete rows in the JSON.
+2. NO DEFAULT PHASE: You must find the exact DHA Phase name mentioned in the text for each plot (e.g. '9 Prism', '9 Town', 'Phase 6'). If no phase is mentioned in the text for that listing, SKIP the listing.
+3. INDIVIDUAL PLOT ROWS: If a single dealer message contains 10 plots, output 10 separate JSON objects. Never merge them.
+4. BLOCK VALIDATION: Match blocks against: {catalog_json_str}. Discard fake blocks like 'HASE' or 'PH'.
+5. EXACT 12-COLUMN SCHEMA MAPPING: Output must be a valid JSON array of objects with these exact keys:
+   - "Date / Timestamp": "{now_str}"
+   - "Phase": Official DHA Phase found in text
    - "Block": Official Block Tab
    - "Plot No": Complete Plot Number digits only (e.g. 'Plot 61')
-   - "Size": Explicit or auto-resolved
+   - "Size": Explicit or auto-resolved size
    - "Plot Features": 'Corner / Facing Park', 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Standard Layout', etc.
    - "Demand / Price": Standardized Price (e.g. '260 Lac')
    - "Seller / Dealer Name": Extracted dealer name
@@ -469,24 +467,7 @@ SMART PARSING RULES:
 Input Listing Bundles:
 {batch_payload_text}
 
-Return ONLY a valid JSON Array with exact keys:
-[
-  {{
-    "Date / Timestamp": "{now_str}",
-    "Phase": "DHA Phase 9 Prism",
-    "Block": "Block A",
-    "Plot No": "Plot 61",
-    "Size": "",
-    "Plot Features": "Standard Layout",
-    "Demand / Price": "260 Lac",
-    "Seller / Dealer Name": "shahzad",
-    "Contact No": "03214235871",
-    "Office / Agency": "secure future estate",
-    "Deal Status": "Available",
-    "Last Conversation / Notes": "Direct Ingestion",
-    "Source": "A-61 Demand -260"
-  }}
-]"""
+Return ONLY a valid JSON Array:"""
 
     if gemini_active and gemini_client:
         target_models = ['gemini-2.5-flash', 'gemini-1.5-flash']
@@ -504,9 +485,16 @@ Return ONLY a valid JSON Array with exact keys:
                 if isinstance(parsed_json, list):
                     cleaned_list = []
                     for item in parsed_json:
-                        tgt_phase = item.get("Phase", default_phase)
+                        tgt_phase = item.get("Phase", "")
+                        tgt_plot = item.get("Plot No", "")
+                        tgt_contact = item.get("Contact No", "")
+                        
+                        # Strict Validation: Skip if Phase, Plot No, or Contact No is missing
+                        if not tgt_phase or not tgt_plot or not tgt_contact:
+                            continue
+                            
                         item["Block"] = clean_and_validate_block_name(tgt_phase, item.get("Block", "Block A"))
-                        item["Plot No"] = clean_plot_number(item.get("Plot No", ""))
+                        item["Plot No"] = clean_plot_number(tgt_plot)
                         item["Size"] = resolve_size_text_first_or_map(
                             tgt_phase,
                             item.get("Block", "Block A"),
@@ -521,40 +509,6 @@ Return ONLY a valid JSON Array with exact keys:
                 st.session_state["gemini_last_error"] = f"Model {model_name} Error: {e}"
                 time.sleep(0.6)
 
-    # Heuristic Local Fallback
-    fallback_results = []
-    for msg in message_objects:
-        fallback_results.extend(fallback_heuristic_parser(msg, default_phase, now_str))
-    return fallback_results
-
-def fallback_heuristic_parser(msg_obj, default_phase, now_str):
-    body = msg_obj["full_message"]
-    phone = msg_obj["contact_no"]
-    dealer_name = msg_obj["sender_name"]
-    agency = msg_obj["agency_name"]
-    current_phase = default_phase
-    l_up = body.upper()
-
-    dash_m = re.search(r'([A-Z])\s*-\s*([0-9]{1,5})(?:\s*[@-]\s*([0-9]+(?:\.[0-9]+)?))?', l_up)
-    if dash_m:
-        blk = clean_and_validate_block_name(current_phase, f"Block {dash_m.group(1)}")
-        plt_no = f"Plot {dash_m.group(2)}"
-        prc = f"{dash_m.group(3)} Lac" if dash_m.group(3) else ""
-        return [{
-            "Date / Timestamp": now_str,
-            "Phase": current_phase,
-            "Block": blk,
-            "Plot No": plt_no,
-            "Size": resolve_size_text_first_or_map(current_phase, blk, plt_no, ""),
-            "Plot Features": "Standard Layout",
-            "Demand / Price": prc,
-            "Seller / Dealer Name": dealer_name,
-            "Contact No": phone,
-            "Office / Agency": agency,
-            "Deal Status": "Available",
-            "Last Conversation / Notes": "Direct Ingestion",
-            "Source": body
-        }]
     return []
 
 # Modal Dialogs
@@ -567,7 +521,7 @@ def show_backend_connection_dialog(selected_phase, selected_block, target_url):
             <b>🌐 Active Spreadsheet Target:</b> <a href="{target_url}" target="_blank">{selected_phase} Database</a><br>
             <b>🧱 Target Tab Attached:</b> <code>{selected_block}</code><br>
             <b>⚡ Sync Protocols:</b> Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
-            <b>🛡️ Schema Compliance:</b> Smart Message-Flow & 12-Col CRM Active.
+            <b>🛡️ Schema Compliance:</b> Strict Data Quality & 12-Col CRM Active.
         </div>
     """, unsafe_allow_html=True)
 
@@ -661,7 +615,7 @@ else:
             <div class="header-banner">
                 <span class="office-badge">📍 {st.session_state['office_name']}</span>
                 <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-                <div class="header-subtitle">Smart Message-Flow Engine & 12-Col Pipeline Active (Active: {st.session_state['user_email']})</div>
+                <div class="header-subtitle">Strict Quality & 12-Column Pipeline Active (Active: {st.session_state['user_email']})</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -911,7 +865,7 @@ else:
     # 4. UNIFIED ALL-IN-ONE INGESTION PROMPT ENCLOSURE
     # ==========================================================================
     if gemini_active:
-        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Smart Message-Flow Engine Active)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Strict Data Quality Filter Active)</div>', unsafe_allow_html=True)
     else:
         err_msg = st.session_state.get("gemini_last_error", "API Key Missing or Misconfigured")
         st.markdown(f'<div class="ai-badge-inactive">🟡 Gemini Brain Inactive ({err_msg}) — Please check GEMINI_API_KEY in Streamlit Secrets</div>', unsafe_allow_html=True)
@@ -926,7 +880,7 @@ else:
         "📋 Live Real Estate Ingestion Stream:",
         value=default_box_value,
         height=260,
-        placeholder="Paste WhatsApp broadcast messages (starting with Bismillah/Phase and ending with mobile/office), or use [+] Attach Sources...",
+        placeholder="Paste WhatsApp broadcast messages (listings with phase, plot no, and mobile number), or use [+] Attach Sources...",
         label_visibility="collapsed"
     )
 
@@ -1061,7 +1015,7 @@ else:
                 st.rerun()
 
         if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
-            with st.spinner(f"🧠 Gemini 2.5 Message-Flow Processing ({curr_idx + 1} of {total_chunks})..."):
+            with st.spinner(f"🧠 Gemini 2.5 Strict Quality Processing ({curr_idx + 1} of {total_chunks})..."):
                 chunk_messages = chunks[curr_idx]
                 new_listings = process_message_batch_via_gemini(chunk_messages, st.session_state["extraction_default_phase"])
                 st.session_state["parsed_payloads"].extend(new_listings)
@@ -1070,7 +1024,7 @@ else:
                 if st.session_state["current_chunk_idx"] >= total_chunks:
                     st.session_state["extraction_active"] = False
                     st.session_state["extraction_paused"] = False
-                    st.success(f"🎉 100% Complete! Extracted {len(st.session_state['parsed_payloads'])} listings directly into 12-column database format.")
+                    st.success(f"🎉 100% Complete! Extracted {len(st.session_state['parsed_payloads'])} verified listings directly into 12-column database format.")
                     st.rerun()
                 else:
                     st.rerun()
