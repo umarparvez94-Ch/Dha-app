@@ -339,6 +339,44 @@ def show_backend_connection_dialog(selected_phase, selected_block, target_url):
         </div>
     """, unsafe_allow_html=True)
 
+# Modal for Dealer Directory & Partner Activity Ledger
+@st.dialog("👥 Dealer Directory & Market Partner Activity Ledger", width="large")
+def show_dealer_ledger_dialog(payloads):
+    st.markdown("### 📋 Dealer Market Activity & Circulation Ledger")
+    
+    if not payloads:
+        st.info("No dealer records loaded in memory yet. Ingest WhatsApp logs, portals, or classifieds to populate.")
+        return
+
+    dealer_data = []
+    for item in payloads:
+        contact = item.get("Contact No", "").strip()
+        dealer_name = item.get("Seller / Dealer Name", "").strip()
+        plot = f"{item.get('Phase', '')} {item.get('Block', '')} - {item.get('Plot No', '')}"
+        demand = item.get("Demand / Price", "")
+        raw_msg = item.get("Raw Listing & Source Material", "")
+        
+        dealer_key = contact if contact else (dealer_name if dealer_name else "Unknown Direct")
+        dealer_data.append({
+            "Dealer / Phone": dealer_key,
+            "Plot Option": plot,
+            "Demand": demand,
+            "Raw Log": raw_msg
+        })
+
+    df_dealers = pd.DataFrame(dealer_data)
+    if not df_dealers.empty:
+        summary_group = df_dealers.groupby("Dealer / Phone").agg(
+            Total_Listings=("Plot Option", "count"),
+            Active_Demands=("Demand", lambda x: ", ".join([str(v) for v in x if v][:3]))
+        ).reset_index().sort_values(by="Total_Listings", ascending=False)
+
+        st.markdown(f"**Total Active Dealers in Memory:** `{len(summary_group)}`")
+        st.dataframe(summary_group, use_container_width=True, height=280)
+        
+        st.markdown("##### 🔍 Detailed Listing Records per Dealer:")
+        st.dataframe(df_dealers, use_container_width=True, height=240)
+
 def clean_whatsapp_chat_text(raw_bytes):
     try:
         decoded_text = raw_bytes.decode('utf-8', errors='ignore')
@@ -388,6 +426,23 @@ def fetch_content_from_gdrive_url(drive_url):
             return clean_whatsapp_chat_text(file_bytes)
     except Exception as e:
         return f"[Error fetching from Google Drive: {e}]"
+
+# Fetch HTML/Text from Portal URL (Zameen / Web)
+def fetch_text_from_portal_url(url_in):
+    if not url_in.startswith("http"):
+        url_in = "https://" + url_in
+    try:
+        req = urllib.request.Request(
+            url_in,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+        )
+        with urllib.request.urlopen(req, timeout=12) as response:
+            html = response.read().decode('utf-8', errors='ignore')
+            text_only = re.sub(r'<[^>]+>', ' ', html)
+            text_clean = re.sub(r'\s+', ' ', text_only).strip()
+            return f"[Source: {url_in}]\n" + text_clean[:30000]
+    except Exception as e:
+        return f"[Error connecting to Portal URL: {e}]"
 
 def extract_text_from_any_file_or_image(file_obj, is_camera=False):
     if file_obj is None:
@@ -490,7 +545,7 @@ Return ONLY a valid JSON Array with format:
     "Contact No": "",
     "Office / Agency": "Wali Muhammad Associates",
     "Deal Status": "Available",
-    "Last Conversation / Notes": "Direct WhatsApp Ingestion",
+    "Last Conversation / Notes": "Direct Ingestion",
     "Raw Listing & Source Material": "A 980 corner f park"
   }}
 ]"""
@@ -596,7 +651,7 @@ def fallback_regex_tokenizer(text_chunk, default_phase):
                 "Contact No": main_phone,
                 "Office / Agency": st.session_state["office_name"],
                 "Deal Status": "Available",
-                "Last Conversation / Notes": "Direct WhatsApp Ingestion",
+                "Last Conversation / Notes": "Direct Ingestion",
                 "Raw Listing & Source Material": line
             })
     return extracted
@@ -651,13 +706,21 @@ else:
         st.error(f"⚠️ Google Sheets Authentication Error: {e}")
         st.stop()
 
-    st.markdown(f"""
-        <div class="header-banner">
-            <span class="office-badge">📍 {st.session_state['office_name']}</span>
-            <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Live Streaming AI Ingestion & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
-        </div>
-    """, unsafe_allow_html=True)
+    # Header with Dealer Directory Trigger Button
+    col_h1, col_h2 = st.columns([3, 1.2])
+    with col_h1:
+        st.markdown(f"""
+            <div class="header-banner">
+                <span class="office-badge">📍 {st.session_state['office_name']}</span>
+                <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
+                <div class="header-subtitle">Live Streaming AI Ingestion & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col_h2:
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        if st.button("👥 Dealer Ledger & Partner Directory", use_container_width=True):
+            show_dealer_ledger_dialog(st.session_state.get("parsed_payloads", []))
 
     # ==========================================================================
     # 2. TOP DHA PHASE SWITCHER & BLOCK TABS SELECTOR WITH DYNAMIC GID URL
@@ -685,14 +748,12 @@ else:
         key="block_feature_tab_bar"
     )
 
-    # Resolve Specific GID Tab URL so Google Sheets opens exactly at that Block Tab
     try:
         active_wb = get_phase_workbook(gc_client, selected_phase)
         exact_block_tab_url = get_specific_tab_url(active_wb, sheet_base_link, selected_active_block)
     except Exception:
         exact_block_tab_url = sheet_base_link
 
-    # TWO DEDICATED SMART ACTION BUTTONS
     col_btn_info, col_btn_sheet = st.columns([1.5, 2.5])
     with col_btn_info:
         if st.button("ℹ️ Connection Details & Architecture", use_container_width=True):
@@ -735,7 +796,6 @@ else:
             "Contact No", "Category", "Plot Features", "Source Text"
         ])
 
-    # Top Control Bar in Summary Workspace
     col_sc1, col_sc2, col_sc3, col_sc4 = st.columns([1.2, 1.4, 1.4, 1.2])
     
     with col_sc1:
@@ -775,7 +835,6 @@ else:
     with col_sc4:
         st.metric(label="📊 Plots In View", value=f"{len(df_final_summary_display)}", delta=f"{total_parsed_now} Total Loaded")
 
-    # Live Intelligence Metrics Banner
     num_selected_live = len(df_final_summary_display)
     unique_tabs_count_live = df_final_summary_display[["Target Phase", "Target Tab"]].drop_duplicates().shape[0] if num_selected_live > 0 else 0
     with_demand_count_live = df_final_summary_display[df_final_summary_display["Demand / Price"] != ""].shape[0] if num_selected_live > 0 else 0
@@ -791,7 +850,6 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Live Table Display / Editor
     if total_parsed_now > 0:
         if edit_summary_mode:
             st.info("💡 **Edit Mode Active:** Modify cells or delete rows. Only rows shown below will push to Google Sheets.")
@@ -809,7 +867,6 @@ else:
         final_summary_df = df_final_summary_display
         st.info("ℹ️ Summary workspace is ready. Click **'Start AI Extraction'** below to stream listings live into this table.")
 
-    # Action Row for Pushing Data
     final_sync_count_live = len(final_summary_df)
     col_pb1, col_pb2 = st.columns([2, 1])
     with col_pb1:
@@ -867,7 +924,7 @@ else:
                     plot_val_clean = plot_val.lower()
                     
                     repeat_count = plot_repeat_map.get(plot_val_clean, 0)
-                    notes_txt = "Direct WhatsApp Ingestion"
+                    notes_txt = "Direct Ingestion"
                     if repeat_count > 0:
                         repeated_tracked += 1
                         notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
@@ -918,25 +975,26 @@ else:
     st.markdown("---")
 
     # ==========================================================================
-    # 4. BOTTOM SECTION: RAW DATA INGESTION & PLAY/PAUSE CONTROLLER
+    # 4. BOTTOM SECTION: MULTI-SOURCE INGESTION (PORTALS, CLASSIFIEDS, FILES, CHATS)
     # ==========================================================================
     if gemini_active:
         st.markdown('<div class="ai-badge-active">🟢 Google Gemini AI Extraction Engine: Connected & Active</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="ai-badge-inactive">🟡 Gemini API Key Missing — Operating on Fallback Pattern Parser (Add GEMINI_API_KEY to Secrets for full AI power)</div>', unsafe_allow_html=True)
 
-    st.subheader("🧠 Raw Data Input & Extraction Engine")
+    st.subheader("🧠 Multi-Source Data Ingestion Engine")
     
-    col_u1, col_u2 = st.columns([1.5, 1.5])
+    col_u1, col_u2 = st.columns([1.4, 1.6])
     
     with col_u2:
-        tab_upload, tab_gdrive, tab_camera, tab_direct = st.tabs(["📎 Upload File", "☁️ G-Drive Link", "📸 Camera", "📋 Direct Paste"])
+        tab_upload, tab_gdrive, tab_camera, tab_direct, tab_zameen, tab_news = st.tabs([
+            "📎 Files", "☁️ G-Drive", "📸 Camera", "📋 Direct Paste", "🌐 Zameen/Portals", "📰 Classifieds"
+        ])
         
         with tab_upload:
             uploaded_file = st.file_uploader(
                 "Upload TXT, Excel, JSON, PDF, or Image:",
-                type=["txt", "xlsx", "xls", "json", "csv", "pdf", "png", "jpg", "jpeg", "webp"],
-                help="Upload property spreadsheets, JSON lists, flyers, or WhatsApp exported chats."
+                type=["txt", "xlsx", "xls", "json", "csv", "pdf", "png", "jpg", "jpeg", "webp"]
             )
             if uploaded_file is not None:
                 with st.spinner(f"Reading `{uploaded_file.name}`..."):
@@ -944,48 +1002,64 @@ else:
                         extracted_content = extract_text_from_any_file_or_image(uploaded_file, is_camera=False)
                         if extracted_content:
                             st.session_state["extracted_file_text"] = extracted_content
-                            st.success(f"✅ Successfully loaded `{uploaded_file.name}` into the extraction box!")
+                            st.success(f"✅ Loaded `{uploaded_file.name}` into box!")
                     except Exception as e:
                         st.error(f"Error reading file: {e}")
 
         with tab_gdrive:
-            gdrive_url_in = st.text_input("Paste Google Drive Shared Link (TXT / WhatsApp Chat):", placeholder="https://drive.google.com/file/d/1A2B3C.../view?usp=sharing")
-            if st.button("☁️ Push G-Drive File Data to Box", use_container_width=True):
+            gdrive_url_in = st.text_input("Paste Google Drive Link:", placeholder="https://drive.google.com/file/d/...")
+            if st.button("☁️ Push G-Drive File Data", use_container_width=True):
                 if gdrive_url_in.strip():
-                    with st.spinner("Downloading, cleaning chat timestamps and loading into box..."):
+                    with st.spinner("Fetching and cleaning timestamps..."):
                         gdrive_content = fetch_content_from_gdrive_url(gdrive_url_in.strip())
                         if gdrive_content and not gdrive_content.startswith("[Error"):
                             st.session_state["extracted_file_text"] = gdrive_content
-                            st.success("✅ Cleaned WhatsApp data loaded into extraction box below!")
+                            st.success("✅ Google Drive data loaded!")
                         else:
                             st.error(gdrive_content)
-                else:
-                    st.warning("Please enter a valid Google Drive file link.")
-        
+
         with tab_camera:
-            camera_photo = st.camera_input("Take a photo of a property document / map / flyer:")
+            camera_photo = st.camera_input("Take photo of property listing/document:")
             if camera_photo is not None:
                 with st.spinner("🧠 Scanning document via Google Vision OCR..."):
                     camera_text = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
                     if camera_text:
                         st.session_state["extracted_file_text"] = camera_text
-                        st.success("✅ Camera photo transcribed into the extraction box below!")
+                        st.success("✅ Camera OCR loaded!")
 
         with tab_direct:
-            pasted_txt = st.text_area("Paste large WhatsApp exports or text blocks directly:", height=110, placeholder="Paste text here...")
-            if st.button("📥 Push Pasted Text to Box", use_container_width=True):
+            pasted_txt = st.text_area("Paste Raw WhatsApp Broadcasts or Text:", height=110, placeholder="Paste text...")
+            if st.button("📥 Push Pasted Text", use_container_width=True):
                 if pasted_txt.strip():
                     st.session_state["extracted_file_text"] = pasted_txt.strip()
-                    st.success("✅ Text loaded into extraction box below!")
+                    st.success("✅ Direct text loaded!")
+
+        with tab_zameen:
+            portal_url = st.text_input("Paste Zameen / Portal Listing or Search URL:", placeholder="https://www.zameen.com/...")
+            if st.button("🌐 Scrape & Ingest Portal Link", use_container_width=True):
+                if portal_url.strip():
+                    with st.spinner("Connecting and extracting portal property feed..."):
+                        portal_raw = fetch_text_from_portal_url(portal_url.strip())
+                        st.session_state["extracted_file_text"] = portal_raw
+                        st.success("✅ Portal content fetched into box!")
+                else:
+                    st.warning("Please provide a valid property portal URL.")
+
+        with tab_news:
+            news_txt = st.text_area("Paste Newspaper Classified Ads Text (Jang, Dawn, etc.):", height=110, placeholder="Paste newspaper ads...")
+            if st.button("📰 Ingest Classified Ads", use_container_width=True):
+                if news_txt.strip():
+                    st.session_state["extracted_file_text"] = f"[Classified Ads Source]\n" + news_txt.strip()
+                    st.success("✅ Classified ads loaded!")
 
     with col_u1:
         default_box_value = st.session_state.get("extracted_file_text", "")
         
         raw_text = st.text_area(
-            "📋 Raw Real Estate Ingestion Box (Line-Preserving Gemini Engine):",
+            "📋 Raw Real Estate Ingestion Box (Multi-Source Feeds):",
             value=default_box_value,
             height=220,
-            placeholder="Data loaded from files, Google Drive, camera or copy-paste will appear here for processing..."
+            placeholder="Loaded data from WhatsApp, Portals, Files, Classifieds, or Camera will appear here..."
         )
 
     # Ingestion Control Panel (Play / Pause / Resume / Stop)
@@ -1045,7 +1119,6 @@ else:
                 st.session_state["parsed_payloads"] = []
                 st.rerun()
 
-        # Step next chunk if active and not paused
         if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
             with st.spinner(f"🧠 AI Gemini Processing Chunk {curr_idx + 1} of {total_chunks}..."):
                 chunk_to_process = chunks[curr_idx]
