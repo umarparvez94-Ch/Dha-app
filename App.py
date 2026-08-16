@@ -95,7 +95,6 @@ st.markdown("""
     .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 16px 20px; margin: 15px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.08); }
     .backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }
     
-    /* Integrated All-in-One Prompt Enclosure */
     .unified-prompt-card {
         background: #FFFFFF;
         border: 2px solid #CBD5E1;
@@ -395,9 +394,11 @@ def clean_whatsapp_chat_text(raw_bytes):
         except Exception:
             decoded_text = str(raw_bytes)
 
+    # Clean WhatsApp timestamps, dates and sender headers so they don't corrupt plot/price numbers
     chat_patterns = [
         r'^\s*\[?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\]?\s*-?\s*[^:]+:\s*',
-        r'^\s*\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*-\s*[^:]+:\s*'
+        r'^\s*\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*-\s*[^:]+:\s*',
+        r'^\s*\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*-\s*[^:]+:\s*'
     ]
 
     cleaned_lines = []
@@ -511,49 +512,55 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
 
     return clean_whatsapp_chat_text(file_bytes)
 
+# ==============================================================================
+# 5 GOLDEN RULES IMPLEMENTATION: HIGH-INTELLIGENCE GEMINI EXTRACTION ENGINE
+# ==============================================================================
 def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
-    prompt = f"""You are an expert DHA Lahore Real Estate CRM extraction engine.
-Extract EVERY single individual property listing from the provided text into a JSON array of objects.
+    
+    prompt = f"""You are the Master Real Estate Ingestion & Knowledge-Graph Engine for DHA Lahore.
+Parse the raw text into a strictly formatted JSON array of individual property listings adhering to these 5 GOLDEN RULES:
 
-OFFICIAL DHA PHASES:
-'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
+=== 5 GOLDEN RULES FOR DHA WHATSAPP UNDERSTANDING ===
+RULE 1 (SLANG & SHORTCUT DECODER):
+- 'C/P' or 'CNR PRK' or 'C+P' -> 'Plot Features': 'Corner / Facing Park'
+- 'CORNER' or 'CNR' -> 'Plot Features': 'Corner'
+- 'PARK' or 'FACING PARK' or 'F/P' -> 'Plot Features': 'Facing Park'
+- 'MB' or 'M.BVD' or 'MAIN' -> 'Plot Features': 'Main Boulevard (MB)'
+- 'POS' / 'POSSESSION' -> 'Plot Features': 'Possession Plot'
+- 'NON-POS' / 'UNDER DEV' -> 'Plot Features': 'Non-Possession Plot'
+- 'D/A' or 'DIRECT' -> 'Seller Type': 'Direct Owner Option'
 
-OFFICIAL DHA CATALOG BLOCKS:
-{catalog_json_str}
+RULE 2 (EXACT PHASE & BLOCK MAPPING):
+- Official Phases: 'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
+- Official Catalog: {catalog_json_str}
+- If a message says 'Block XX', it MUST be 'DHA Phase 3'.
+- If a message says 'Sector Z', it MUST be 'DHA Phase 8 (Ivy Green / Sector Z)'.
+- Fallback Phase if unspecified: '{default_phase}'.
 
-STRICT EXTRACTION RULES:
-1. "Phase": Identify the phase from context/headers or fallback to '{default_phase}'.
-2. "Block": Must match the official block name (e.g. 'Block A', 'Block W', 'CCA 1 Commercial', 'Broadway Commercial').
-3. "Plot No": Extract the COMPLETE full plot number exactly as written (e.g. 'Plot 980', 'Plot 1008', 'Plot 432', 'Plot 654'). DO NOT cut off digits!
-4. "Demand / Price": Extract full demand (e.g. '585 Lac', '440 Lac', '3.8 Crore'). If no price is mentioned, leave as "". NEVER invent '0 Lac'.
-5. "Size": If size is explicitly mentioned ('5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla', '13 Marla'), write it. If not mentioned in message, leave as "".
-6. "Plot Features": Extract features like 'Corner', 'Park Facing', 'Corner / Park Facing', 'Main Boulevard (MB)', 'Direct Option', 'Possession Plot', 'Non-Possession'. Otherwise 'Standard Layout'.
-7. "Contact No": Extract valid Pakistani phone number from line/section if available, else "".
-8. "Raw Listing & Source Material": Copy the exact line from input text.
+RULE 3 (CANONICAL COMPLETE PLOT NUMBER):
+- NEVER truncate plot numbers! E.g. 'A 980' -> 'Plot No': 'Plot 980'. 'A-432' -> 'Plot No': 'Plot 432'. 'W 1008' -> 'Plot No': 'Plot 1008'.
 
-Input Text:
+RULE 4 (STANDARDIZED PRICE / DEMAND NORMALIZATION):
+- Convert numbers like '@ 585' or 'Demand 585' -> 'Demand / Price': '585 Lac'
+- Convert '5.85 Cr' or '5.85 Crore' -> 'Demand / Price': '5.85 Crore'
+- Convert '@ 75.5' -> 'Demand / Price': '75.5 Lac'
+- If NO price is mentioned in text, leave 'Demand / Price' as empty string "". NEVER write '0 Lac' or invent price!
+
+RULE 5 (EXPLICIT SIZE PRESERVATION & FEW-SHOT EXAMPLES):
+- If size is stated in message ('5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla', '13 Marla'), write it explicitly. If size is missing from message, leave 'Size' as "" (the backend cutting-map rule will resolve it).
+
+=== FEW-SHOT REAL ESTATE EXAMPLES ===
+Example 1 Input: "Prism A 980@585 cnr f/park 03214567890"
+Example 1 Output: {{"Category": "Selling", "Phase": "DHA Phase 9 Prism", "Block": "Block A", "Plot No": "Plot 980", "Size": "1 Kanal", "Plot Features": "Corner / Facing Park", "Demand / Price": "585 Lac", "Seller Type": "Dealer", "Seller / Dealer Name": "", "Contact No": "03214567890", "Office / Agency": "Wali Muhammad Associates", "Deal Status": "Available", "Last Conversation / Notes": "Direct Ingestion", "Raw Listing & Source Material": "Prism A 980@585 cnr f/park 03214567890"}}
+
+Example 2 Input: "P7 U 1450 demand 380 direct 03001234567"
+Example 2 Output: {{"Category": "Selling", "Phase": "DHA Phase 7", "Block": "Block U", "Plot No": "Plot 1450", "Size": "1 Kanal", "Plot Features": "Standard Layout", "Demand / Price": "380 Lac", "Seller Type": "Direct Owner Option", "Seller / Dealer Name": "", "Contact No": "03001234567", "Office / Agency": "Wali Muhammad Associates", "Deal Status": "Available", "Last Conversation / Notes": "Direct Ingestion", "Raw Listing & Source Material": "P7 U 1450 demand 380 direct 03001234567"}}
+
+Raw Input Messages:
 {chunk_text}
 
-Return ONLY a valid JSON Array with format:
-[
-  {{
-    "Category": "Selling",
-    "Phase": "DHA Phase 9 Prism",
-    "Block": "Block A",
-    "Plot No": "Plot 980",
-    "Size": "1 Kanal",
-    "Plot Features": "Corner / Facing Park",
-    "Demand / Price": "585 Lac",
-    "Seller Type": "Dealer",
-    "Seller / Dealer Name": "",
-    "Contact No": "",
-    "Office / Agency": "Wali Muhammad Associates",
-    "Deal Status": "Available",
-    "Last Conversation / Notes": "Direct Ingestion",
-    "Raw Listing & Source Material": "A 980 corner f park"
-  }}
-]"""
+Return ONLY a valid JSON Array:"""
 
     if gemini_active and gemini_client:
         for retry in range(3):
@@ -627,12 +634,14 @@ def fallback_regex_tokenizer(text_chunk, default_phase):
             line_sz = "1 Kanal"
 
         feat = "Standard Layout"
-        if "CORNER" in l_up and "PARK" in l_up:
-            feat = "Corner / Park Facing"
-        elif "CORNER" in l_up:
+        if ("CORNER" in l_up or "CNR" in l_up or "C/P" in l_up) and ("PARK" in l_up or "F/P" in l_up):
+            feat = "Corner / Facing Park"
+        elif "CORNER" in l_up or "CNR" in l_up:
             feat = "Corner"
-        elif "PARK" in l_up:
+        elif "PARK" in l_up or "F/P" in l_up or "FACING PARK" in l_up:
             feat = "Facing Park"
+        elif "MB" in l_up or "MAIN" in l_up:
+            feat = "Main Boulevard (MB)"
 
         m = re.search(r'(?:BLOCK\s*)?([A-Z0-9-]{1,4})\s*[-.:/# ]\s*([0-9]{1,5})(?:\s*[@:]\s*|\s+DEMAND\s*[:@]?\s*|\s+@\s*|\s+)?([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
         if m:
@@ -711,7 +720,6 @@ else:
         st.error(f"⚠️ Google Sheets Authentication Error: {e}")
         st.stop()
 
-    # Header with Dealer Directory Trigger Button
     col_h1, col_h2 = st.columns([3, 1.2])
     with col_h1:
         st.markdown(f"""
@@ -983,7 +991,7 @@ else:
     # 4. UNIFIED ALL-IN-ONE INGESTION PROMPT ENCLOSURE (WITH ATTACH & ACTION BUTTON INSIDE)
     # ==========================================================================
     if gemini_active:
-        st.markdown('<div class="ai-badge-active">🟢 Google Gemini AI Extraction Engine: Connected & Active</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-badge-active">🟢 Google Gemini AI Extraction Engine: Connected & Active (5 Golden Rules Loaded)</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="ai-badge-inactive">🟡 Gemini API Key Missing — Operating on Fallback Pattern Parser (Add GEMINI_API_KEY to Secrets for full AI power)</div>', unsafe_allow_html=True)
 
@@ -991,7 +999,6 @@ else:
     
     default_box_value = st.session_state.get("extracted_file_text", "")
 
-    # Single Unified Box Container
     st.markdown('<div class="unified-prompt-card">', unsafe_allow_html=True)
     
     raw_text = st.text_area(
@@ -1002,7 +1009,6 @@ else:
         label_visibility="collapsed"
     )
 
-    # Bottom Actions Inside Box Container: [+] Attach Expander on Left, [🚀 ➔ Button] on Right
     col_in_attach, col_in_btn = st.columns([3.6, 1.4])
     
     with col_in_attach:
