@@ -310,6 +310,21 @@ def get_or_create_clean_tab_exact(workbook, tab_title):
     except Exception:
         return workbook.sheet1
 
+# Get Specific Tab URL with #gid=
+def get_specific_tab_url(workbook, base_url, tab_title):
+    clean_title = tab_title.strip().lower()
+    try:
+        ws_list = safe_gspread_call(workbook.worksheets)
+        for w in ws_list:
+            if w.title.strip().lower() == clean_title:
+                clean_base = base_url.split("#")[0].rstrip("/")
+                if not clean_base.endswith("/edit"):
+                    clean_base = clean_base + "/edit"
+                return f"{clean_base}#gid={w.id}"
+    except Exception:
+        pass
+    return base_url
+
 # Modal for Backend Connection Architecture
 @st.dialog("🔗 Backend Google Sheets Connection Details", width="large")
 def show_backend_connection_dialog(selected_phase, selected_block, target_url):
@@ -323,8 +338,6 @@ def show_backend_connection_dialog(selected_phase, selected_block, target_url):
             <b>🛡️ Schema Compliance:</b> 15 Canonical CRM Column Headers strictly mapped.
         </div>
     """, unsafe_allow_html=True)
-    if st.button("⬅️ Return to Dashboard", use_container_width=True):
-        st.rerun()
 
 def clean_whatsapp_chat_text(raw_bytes):
     try:
@@ -647,7 +660,7 @@ else:
     """, unsafe_allow_html=True)
 
     # ==========================================================================
-    # 2. TOP DHA PHASE SWITCHER & BLOCK TABS SELECTOR WITH 2 SMART ACTION BUTTONS
+    # 2. TOP DHA PHASE SWITCHER & BLOCK TABS SELECTOR WITH DYNAMIC GID URL
     # ==========================================================================
     col_city, col_phase = st.columns([1.2, 2.5])
     with col_city:
@@ -656,7 +669,7 @@ else:
         phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
         selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook View)", phase_options, index=11)
 
-    sheet_link = DHA_PHASE_SHEET_URLS.get(selected_phase, "")
+    sheet_base_link = DHA_PHASE_SHEET_URLS.get(selected_phase, "")
 
     p_info = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
     res_b = p_info.get("residential", [])
@@ -672,16 +685,23 @@ else:
         key="block_feature_tab_bar"
     )
 
-    # TWO DEDICATED SMART BUTTONS (REPLACED RAW TEXT LINK)
+    # Resolve Specific GID Tab URL so Google Sheets opens exactly at that Block Tab
+    try:
+        active_wb = get_phase_workbook(gc_client, selected_phase)
+        exact_block_tab_url = get_specific_tab_url(active_wb, sheet_base_link, selected_active_block)
+    except Exception:
+        exact_block_tab_url = sheet_base_link
+
+    # TWO DEDICATED SMART ACTION BUTTONS
     col_btn_info, col_btn_sheet = st.columns([1.5, 2.5])
     with col_btn_info:
         if st.button("ℹ️ Connection Details & Architecture", use_container_width=True):
-            show_backend_connection_dialog(selected_phase, selected_active_block, sheet_link)
+            show_backend_connection_dialog(selected_phase, selected_active_block, exact_block_tab_url)
 
     with col_btn_sheet:
         st.link_button(
             f"📑 Open [{selected_active_block}] Tab in Google Sheets ↗",
-            url=sheet_link,
+            url=exact_block_tab_url,
             use_container_width=True
         )
 
@@ -982,7 +1002,7 @@ else:
                 st.session_state["parsed_payloads"] = []
                 st.session_state["extraction_active"] = True
                 st.session_state["extraction_paused"] = False
-                st.session_state["extraction_default_phase"] = "DHA Phase 9 Prism"
+                st.session_state["extraction_default_phase"] = selected_phase
                 st.rerun()
             else:
                 st.warning("Please provide listing text, take a camera photo, or upload a file.")
