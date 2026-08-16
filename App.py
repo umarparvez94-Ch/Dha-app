@@ -275,14 +275,15 @@ def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
     return ""
 
 # ==============================================================================
-# SECURE SERVICE ACCOUNT AUTHENTICATION HANDLER
+# SECURE SERVICE ACCOUNT AUTHENTICATION HANDLER (UPDATED)
 # ==============================================================================
 @st.cache_resource
 def get_gspread_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
-    # Auto-fix newline escapes from Streamlit secrets
-    if "private_key" in creds_dict and isinstance(creds_dict["private_key"], str):
-        creds_dict["private_key"] = creds_dict["private_key"].replace('\\n', '\n')
+    pk = str(creds_dict.get("private_key", ""))
+    if "\\n" in pk:
+        pk = pk.replace("\\n", "\n")
+    creds_dict["private_key"] = pk.strip()
     return gspread.service_account_from_dict(creds_dict)
 
 def safe_gspread_call(func, *args, **kwargs):
