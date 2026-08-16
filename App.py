@@ -7,9 +7,11 @@ import os
 import time
 import math
 import urllib.request
+import base64
 import pandas as pd
 from datetime import datetime
 from PIL import Image
+from google.oauth2 import service_account
 
 try:
     import pypdf
@@ -260,30 +262,36 @@ def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
     return ""
 
 # ==============================================================================
-# SECURE AUTO-FORMATTED SERVICE ACCOUNT AUTHENTICATION
+# SECURE AND ROBUST GOOGLE CREDENTIALS INITIALIZER
 # ==============================================================================
 @st.cache_resource
 def get_gspread_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
-    raw_pk = str(creds_dict.get("private_key", ""))
     
-    # Strip existing markers, escaped slashes, and spaces to isolate pure Base64
-    raw_pk = raw_pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
-    raw_pk = raw_pk.replace("\\n", "").replace("\n", "").replace(" ", "").replace("\r", "")
+    # Extract & sanitize raw key content
+    raw_key = str(creds_dict.get("private_key", ""))
+    raw_key = raw_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
+    raw_key = raw_key.replace("\\n", "").replace("\n", "").replace(" ", "").replace("\r", "").strip()
     
-    # Filter valid Base64 characters only
-    b64_clean = re.sub(r'[^A-Za-z0-9+/]', '', raw_pk)
+    # Strip any corrupt non-base64 characters
+    clean_b64 = re.sub(r'[^A-Za-z0-9+/]', '', raw_key)
     
-    # Auto-balance padding if any characters were shifted
-    missing_padding = len(b64_clean) % 4
-    if missing_padding:
-        b64_clean += '=' * (4 - missing_padding)
+    # Exact modulo padding alignment
+    pad_needed = len(clean_b64) % 4
+    if pad_needed != 0:
+        clean_b64 += '=' * (4 - pad_needed)
         
-    # Format cleanly into 64-character chunks
-    chunked = [b64_clean[i:i+64] for i in range(0, len(b64_clean), 64)]
-    creds_dict["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(chunked) + "\n-----END PRIVATE KEY-----\n"
+    formatted_pem_lines = [clean_b64[i:i+64] for i in range(0, len(clean_b64), 64)]
+    final_pem = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(formatted_pem_lines) + "\n-----END PRIVATE KEY-----\n"
     
-    return gspread.service_account_from_dict(creds_dict)
+    creds_dict["private_key"] = final_pem
+    
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    credentials = service_account.Credentials.from_service_account_info(creds_dict, scopes=scope)
+    return gspread.authorize(credentials)
 
 def safe_gspread_call(func, *args, **kwargs):
     retries = 6
