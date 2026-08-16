@@ -235,8 +235,10 @@ def clean_plot_number(plot_val):
     if not plot_val:
         return ""
     p_str = str(plot_val).strip()
-    if not p_str.lower().startswith("plot ") and any(c.isdigit() for c in p_str):
-        digits_only = re.sub(r'[^0-9A-Za-z-]', '', p_str)
+    # Remove any prefix like 'Plot ' to parse digits safely
+    p_clean = re.sub(r'(?i)^plot\s*', '', p_str).strip()
+    digits_only = re.sub(r'[^0-9A-Za-z-]', '', p_clean)
+    if digits_only:
         return f"Plot {digits_only}"
     return p_str
 
@@ -428,7 +430,7 @@ def segment_into_discrete_whatsapp_messages(raw_text):
     return discrete_messages
 
 # ==============================================================================
-# MASTER REAL ESTATE AI SYSTEM PROMPT WITH CHAIN-OF-THOUGHT & STEP-BY-STEP SCANNER
+# STRICT 12-COLUMN CRM SCHEMA AI EXTRACTION ENGINE WITH CONTEXT-SWITCHING
 # ==============================================================================
 def process_message_batch_via_gemini(message_objects, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
@@ -443,49 +445,49 @@ def process_message_batch_via_gemini(message_objects, default_phase):
     batch_payload_text = "\n\n".join(formatted_input_lines)
 
     prompt = f"""You are the Elite Real Estate Intelligence & Ingestion Agent for Wali Muhammad Associates (DHA Lahore).
-Execute a strict Step-by-Step Chain-of-Thought Scan on each discrete WhatsApp message to extract property listings into the 12-Column CRM Schema:
+Parse each discrete WhatsApp message directly into the EXACT 12-column canonical Google Sheets CRM schema.
 
-=== STEP-BY-STEP SCANNING & PARSING PROTOCOL ===
-STEP 1 (SCAN & IDENTIFY): Read the full text of each message carefully. Look for phase names, block designations (including shorthand like 'c-654' or personal shorthand like '6-k-220@200'), plot numbers, and prices.
-STEP 2 (CATALOG MATCHING & GUARDRAILS): Strictly cross-verify blocks against the official catalog: {catalog_json_str}. Never confuse phase names or numbers with block names (e.g. discard fake blocks like 'Block HASE' or 'Block PH').
-STEP 3 (SHORTHAND & NOTATION DECODER):
-   - '6-k-220@200' -> Phase: 'DHA Phase 6', Block: 'Block K', Plot No: 'Plot 220', Price: '200 Lac'.
-   - 'C-654' -> Block: 'Block C', Plot No: 'Plot 654'.
-   - Features: 'C/P' or 'CNR PRK' -> 'Corner / Facing Park', 'MB' -> 'Main Boulevard (MB)', 'Direct' -> 'Direct Owner Option'.
-STEP 4 (EXACT 12-COLUMN MAPPING): Map fields precisely into these 12 columns:
+=== MASTER RULES & CONTEXT SWITCHING ===
+1. MULTI-PHASE MESSAGES: If a single message contains multiple phases (e.g., '(9 Prism)' then '(9 town)') or switches phase/block mid-text, treat EACH distinct phase/block section as a SEPARATE listing object in the JSON array. Never merge them.
+2. BLOCK-PLOT SEPARATION & SHORTHAND: 
+   - Formats like 'C-654', 'A-61', 'E-654' mean Block C/A/E and Plot 654/61/654 respectively.
+   - Shorthand '6-k-220@200' -> Phase: 'DHA Phase 6', Block: 'Block K', Plot No: 'Plot 220', Demand: '200 Lac'.
+3. PRICE BINDING: Demand/Price (e.g. 'Demand -260', 'Demand -122') binds specifically to the plot immediately preceding it in that section.
+4. CATALOG GUARDRAILS: Match blocks strictly against: {catalog_json_str}. Discard fake blocks like 'HASE' or 'PH'. Fallback Phase: '{default_phase}'.
+5. EXACT 12-COLUMN MAPPING:
    - "Date / Timestamp": '{now_str}'
-   - "Phase": Official DHA Phase (Fallback: '{default_phase}')
-   - "Block": Official Block Tab Name
-   - "Plot No": Complete Plot Number (e.g. 'Plot 980')
+   - "Phase": Official DHA Phase
+   - "Block": Official Block Tab
+   - "Plot No": Complete Plot Number digits only (e.g. 'Plot 61')
    - "Size": Explicit or Auto-resolved via Cutting Map
    - "Plot Features": 'Corner / Facing Park', 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Standard Layout', etc.
-   - "Demand / Price": Standardized Price (e.g. '585 Lac', '200 Lac')
+   - "Demand / Price": Standardized Price (e.g. '260 Lac')
    - "Seller / Dealer Name": Extracted from message header/body
    - "Contact No": Valid Mobile Number
    - "Office / Agency": Wali Muhammad Associates or Sender Agency
    - "Deal Status": 'Available'
    - "Last Conversation / Notes": 'Direct Ingestion'
-   - "Source": Exact raw text snippet
+   - "Source": Exact raw snippet or context of that specific listing
 
-Input WhatsApp Messages / File Data:
+Input WhatsApp Messages:
 {batch_payload_text}
 
 Return ONLY a valid JSON Array with exact keys:
 [
   {{
     "Date / Timestamp": "{now_str}",
-    "Phase": "DHA Phase 6",
-    "Block": "Block K",
-    "Plot No": "Plot 220",
-    "Size": "1 Kanal",
+    "Phase": "DHA Phase 9 Prism",
+    "Block": "Block A",
+    "Plot No": "Plot 61",
+    "Size": "",
     "Plot Features": "Standard Layout",
-    "Demand / Price": "200 Lac",
-    "Seller / Dealer Name": "Ali Real Estate",
-    "Contact No": "03214567890",
-    "Office / Agency": "Wali Muhammad Associates",
+    "Demand / Price": "260 Lac",
+    "Seller / Dealer Name": "shahzad",
+    "Contact No": "03214235871",
+    "Office / Agency": "secure future estate",
     "Deal Status": "Available",
     "Last Conversation / Notes": "Direct Ingestion",
-    "Source": "6-k-220@200"
+    "Source": "A-61 Demand -260"
   }}
 ]"""
 
@@ -522,7 +524,7 @@ Return ONLY a valid JSON Array with exact keys:
                 st.session_state["gemini_last_error"] = f"Model {model_name} Error: {e}"
                 time.sleep(0.6)
 
-    # Heuristic Local Fallback with Shorthand Support
+    # Heuristic Local Fallback
     fallback_results = []
     for msg in message_objects:
         fallback_results.extend(fallback_heuristic_parser(msg, default_phase, now_str))
@@ -536,31 +538,7 @@ def fallback_heuristic_parser(msg_obj, default_phase, now_str):
     current_phase = default_phase
     l_up = body.upper()
 
-    shorthand_m = re.search(r'([0-9]{1,2})\s*-\s*([A-Z])\s*-\s*([0-9]{1,5})\s*@\s*([0-9]+(?:\.[0-9]+)?)', l_up)
-    if shorthand_m:
-        p_num = shorthand_m.group(1)
-        current_phase = f"DHA Phase {p_num}"
-        blk_letter = shorthand_m.group(2)
-        blk = clean_and_validate_block_name(current_phase, f"Block {blk_letter}")
-        plt_no = f"Plot {shorthand_m.group(3)}"
-        prc = f"{shorthand_m.group(4)} Lac"
-        return [{
-            "Date / Timestamp": now_str,
-            "Phase": current_phase,
-            "Block": blk,
-            "Plot No": plt_no,
-            "Size": resolve_size_text_first_or_map(current_phase, blk, plt_no, ""),
-            "Plot Features": "Standard Layout",
-            "Demand / Price": prc,
-            "Seller / Dealer Name": dealer_name,
-            "Contact No": phone,
-            "Office / Agency": agency,
-            "Deal Status": "Available",
-            "Last Conversation / Notes": "Direct Ingestion",
-            "Source": body
-        }]
-
-    dash_m = re.search(r'([A-Z])\s*-\s*([0-9]{1,5})(?:\s*@\s*([0-9]+(?:\.[0-9]+)?))?', l_up)
+    dash_m = re.search(r'([A-Z])\s*-\s*([0-9]{1,5})(?:\s*[@-]\s*([0-9]+(?:\.[0-9]+)?))?', l_up)
     if dash_m:
         blk = clean_and_validate_block_name(current_phase, f"Block {dash_m.group(1)}")
         plt_no = f"Plot {dash_m.group(2)}"
@@ -580,7 +558,6 @@ def fallback_heuristic_parser(msg_obj, default_phase, now_str):
             "Last Conversation / Notes": "Direct Ingestion",
             "Source": body
         }]
-
     return []
 
 # Modal Dialogs
@@ -593,7 +570,7 @@ def show_backend_connection_dialog(selected_phase, selected_block, target_url):
             <b>🌐 Active Spreadsheet Target:</b> <a href="{target_url}" target="_blank">{selected_phase} Database</a><br>
             <b>🧱 Target Tab Attached:</b> <code>{selected_block}</code><br>
             <b>⚡ Sync Protocols:</b> Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
-            <b>🛡️ Schema Compliance:</b> Chain-of-Thought Master Prompt & 12-Col CRM Strictly Active.
+            <b>🛡️ Schema Compliance:</b> Multi-Phase Context Switching & 12-Col CRM Active.
         </div>
     """, unsafe_allow_html=True)
 
@@ -687,7 +664,7 @@ else:
             <div class="header-banner">
                 <span class="office-badge">📍 {st.session_state['office_name']}</span>
                 <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-                <div class="header-subtitle">Chain-of-Thought AI & 12-Column Pipeline Active (Active: {st.session_state['user_email']})</div>
+                <div class="header-subtitle">Multi-Phase Context & 12-Column Pipeline Active (Active: {st.session_state['user_email']})</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -937,7 +914,7 @@ else:
     # 4. UNIFIED ALL-IN-ONE INGESTION PROMPT ENCLOSURE
     # ==========================================================================
     if gemini_active:
-        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Chain-of-Thought Master Prompt Active)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Multi-Phase Context Switching Active)</div>', unsafe_allow_html=True)
     else:
         err_msg = st.session_state.get("gemini_last_error", "API Key Missing or Misconfigured")
         st.markdown(f'<div class="ai-badge-inactive">🟡 Gemini Brain Inactive ({err_msg}) — Please check GEMINI_API_KEY in Streamlit Secrets</div>', unsafe_allow_html=True)
@@ -952,7 +929,7 @@ else:
         "📋 Live Real Estate Ingestion Stream:",
         value=default_box_value,
         height=260,
-        placeholder="Paste thousands of exported WhatsApp chat messages, shorthand entries (e.g. 6-k-220@200), or use [+] Attach Sources...",
+        placeholder="Paste thousands of exported WhatsApp chat messages, shorthand entries, or use [+] Attach Sources...",
         label_visibility="collapsed"
     )
 
@@ -1087,7 +1064,7 @@ else:
                 st.rerun()
 
         if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
-            with st.spinner(f"🧠 Gemini 2.5 Chain-of-Thought Scanning ({curr_idx + 1} of {total_chunks})..."):
+            with st.spinner(f"🧠 Gemini 2.5 Multi-Phase Scanning ({curr_idx + 1} of {total_chunks})..."):
                 chunk_messages = chunks[curr_idx]
                 new_listings = process_message_batch_via_gemini(chunk_messages, st.session_state["extraction_default_phase"])
                 st.session_state["parsed_payloads"].extend(new_listings)
