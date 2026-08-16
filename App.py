@@ -104,12 +104,10 @@ st.markdown("""
     .stitch-login-box { background: #FFFFFF; border: 1px solid rgba(197, 198, 210, 0.6); border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04); padding: 32px 28px; margin-bottom: 16px; text-align: center; }
     .stitch-avatar { width: 60px; height: 60px; border-radius: 50%; background-color: #D6E2FF; border: 1px solid #B3C5FF; display: inline-flex; align-items: center; justify-content: center; color: #00113A; margin-bottom: 12px; }
     .ai-badge-active { background: #DCFCE7; border: 1px solid #86EFAC; color: #15803D; font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: 8px; display: inline-block; margin-bottom: 10px; }
-    .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: 8px; display: inline-block; margin-bottom: 10px; }
     .summary-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
     .stat-pill { background: #F1F5F9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #334155; display: inline-block; margin-right: 8px; margin-bottom: 6px; }
     .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 16px 20px; margin: 15px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.08); }
     .backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }
-    .unified-prompt-card { background: #FFFFFF; border: 2px solid #CBD5E1; border-radius: 16px; padding: 16px 18px 12px 18px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0, 17, 58, 0.04); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -248,31 +246,6 @@ def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
         p_num = int(re.sub(r'[^0-9]', '', str(plot_no)))
     except Exception:
         return ""
-    
-    phase_rules = {
-        "DHA Phase 6": {
-            "Block A": [(1, 150, "2 Kanal"), (151, 800, "1 Kanal")],
-            "Block B": [(1, 100, "2 Kanal"), (101, 700, "1 Kanal")],
-            "Block C": [(1, 650, "1 Kanal")],
-            "Block J": [(1, 600, "10 Marla")],
-            "Block L": [(1, 800, "10 Marla"), (801, 1200, "5 Marla")],
-        },
-        "DHA Phase 7": {
-            "Block P": [(1, 1100, "1 Kanal")],
-            "Block Y": [(1, 900, "5 Marla")],
-            "Block Z": [(1, 1100, "5 Marla")]
-        },
-        "DHA Phase 9 Prism": {
-            "Block A": [(1, 600, "1 Kanal")],
-            "Block J": [(1, 1200, "10 Marla")],
-            "Block R": [(1, 1800, "5 Marla")]
-        }
-    }
-    p_rules = phase_rules.get(phase, {})
-    b_rules = p_rules.get(block, [])
-    for start_n, end_n, official_sz in b_rules:
-        if start_n <= p_num <= end_n:
-            return official_sz
     return ""
 
 @st.cache_resource
@@ -293,9 +266,7 @@ def safe_gspread_call(func, *args, **kwargs):
             delay *= 1.8
 
 def get_phase_workbook(gc, phase_name):
-    target_url = DHA_PHASE_SHEET_URLS.get(phase_name)
-    if not target_url:
-        target_url = DHA_PHASE_SHEET_URLS["DHA Phase 1"]
+    target_url = DHA_PHASE_SHEET_URLS.get(phase_name, DHA_PHASE_SHEET_URLS["DHA Phase 1"])
     return safe_gspread_call(gc.open_by_url, target_url)
 
 def get_or_create_clean_tab_exact(workbook, tab_title):
@@ -342,15 +313,11 @@ def fetch_text_from_portal_url(url_in):
     if not url_in.startswith("http"):
         url_in = "https://" + url_in
     try:
-        req = urllib.request.Request(
-            url_in,
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        )
+        req = urllib.request.Request(url_in, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=12) as response:
             html = response.read().decode('utf-8', errors='ignore')
             text_only = re.sub(r'<[^>]+>', ' ', html)
-            text_clean = re.sub(r'\s+', ' ', text_only).strip()
-            return f"[Source: {url_in}]\n" + text_clean[:30000]
+            return f"[Source: {url_in}]\n" + re.sub(r'\s+', ' ', text_only).strip()[:30000]
     except Exception as e:
         return f"[Error connecting to Portal URL: {e}]"
 
@@ -364,13 +331,13 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
                 img = Image.open(io.BytesIO(file_bytes))
                 res = gemini_client.models.generate_content(
                     model='gemini-2.5-flash',
-                    contents=["Extract all DHA Lahore property listings, phases, blocks, plot numbers, sizes, and demand prices from this image:", img]
+                    contents=["Extract all DHA Lahore property listings from this image:", img]
                 )
                 return res.text.strip()
             except Exception as e:
                 return f"[Image OCR error: {e}]"
         else:
-            return "[Image loaded. Add GEMINI_API_KEY to secrets to extract live OCR]"
+            return "[Image loaded. Add GEMINI_API_KEY]"
 
     fname = file_obj.name.lower() if hasattr(file_obj, 'name') else "file.txt"
     if fname.endswith(".xlsx") or fname.endswith(".xls"):
@@ -383,13 +350,12 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
             return pd.read_csv(io.BytesIO(file_bytes)).to_string(index=False)
         except Exception as e:
             return f"[Error reading CSV: {e}]"
-    elif fname.endswith(".pdf"):
-        if HAS_PYPDF:
-            try:
-                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-                return "\n".join([p.extract_text() for p in reader.pages if p.extract_text()])
-            except Exception as e:
-                return f"[Error reading PDF: {e}]"
+    elif fname.endswith(".pdf") and HAS_PYPDF:
+        try:
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            return "\n".join([p.extract_text() for p in reader.pages if p.extract_text()])
+        except Exception as e:
+            return f"[Error reading PDF: {e}]"
     return file_bytes.decode('utf-8', errors='ignore')
 
 def segment_into_discrete_whatsapp_messages(raw_text):
@@ -401,33 +367,26 @@ def segment_into_discrete_whatsapp_messages(raw_text):
 
     for block in raw_blocks:
         b_str = block.strip()
-        if not b_str or "<Media omitted>" in b_str or "Messages and calls are end-to-end encrypted" in b_str:
+        if not b_str or "<Media omitted>" in b_str or "end-to-end encrypted" in b_str:
             continue
         all_phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', b_str)
         extracted_phone = re.sub(r'[^0-9+]', '', all_phones[0]) if all_phones else ""
         sender_name = ""
-        agency_name = st.session_state["office_name"]
         header_match = re.search(r'-\s*([^:]+):', b_str)
         if header_match:
             raw_sender = header_match.group(1).strip()
-            if raw_sender.startswith("+") or any(c.isdigit() for c in raw_sender):
-                if not extracted_phone:
-                    extracted_phone = re.sub(r'[^0-9+]', '', raw_sender)
-            else:
+            if not (raw_sender.startswith("+") or any(c.isdigit() for c in raw_sender)):
                 sender_name = raw_sender
-                agency_name = raw_sender
         cleaned_body = re.sub(r'^\s*\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\s*-\s*[^:\n]+:\s*', '', b_str).strip()
         discrete_messages.append({
             "full_message": cleaned_body if cleaned_body else b_str,
             "sender_name": sender_name,
-            "agency_name": agency_name,
-            "contact_no": extracted_phone,
-            "raw_block": b_str
+            "contact_no": extracted_phone
         })
     return discrete_messages
 
 # ==============================================================================
-# MASTER SHEET & MAP SYNCED EXTRACTION ENGINE
+# MASTER EXTRACTION ENGINE
 # ==============================================================================
 def process_message_batch_via_gemini(message_objects, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
@@ -439,11 +398,11 @@ def process_message_batch_via_gemini(message_objects, default_phase):
 
     batch_payload_text = "\n\n".join(formatted_input_lines)
 
-    prompt = f"""You are the Master Real Estate Ingestion & Map Matching Engine for Wali Muhammad Associates (DHA Lahore).
-Analyze each WhatsApp listing bundle and extract property listings into a JSON array.
+    prompt = f"""You are the Master Real Estate Ingestion Engine for Wali Muhammad Associates (DHA Lahore).
+Analyze each listing bundle and extract property listings into a JSON array.
 
 RULES:
-1. OFFICIAL CATALOG MATCHING: Every extracted Block MUST strictly match the official map catalog: {catalog_json_str}.
+1. OFFICIAL CATALOG MATCHING: Every extracted Block MUST strictly match: {catalog_json_str}.
 2. PHASE DETECTION: Scan message for exact DHA Phase. If missing, use '{default_phase}'.
 3. INDIVIDUAL PLOT ROWS: Split multi-plot messages into separate JSON rows.
 4. EXACT 12-COLUMN SCHEMA:
@@ -451,7 +410,7 @@ RULES:
    - "Phase": Official DHA Phase name
    - "Block": Official Block Tab name from catalog
    - "Plot No": Plot Number digits (e.g. 'Plot 61')
-   - "Size": Auto-resolved size via cutting map
+   - "Size": Auto-resolved size
    - "Plot Features": 'Corner / Facing Park', 'Standard Layout', etc.
    - "Demand / Price": Standardized Price (e.g. '260 Lac')
    - "Seller / Dealer Name": Extracted dealer name
@@ -473,10 +432,7 @@ Return ONLY a valid JSON Array:"""
                 response = gemini_client.models.generate_content(
                     model=model_name,
                     contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        temperature=0.0
-                    )
+                    config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.0)
                 )
                 parsed_json = json.loads(response.text)
                 if isinstance(parsed_json, list):
@@ -485,18 +441,10 @@ Return ONLY a valid JSON Array:"""
                         tgt_phase = item.get("Phase", default_phase)
                         if not tgt_phase:
                             tgt_phase = default_phase
-                            
-                        tgt_plot = item.get("Plot No", "")
-                        
                         item["Phase"] = tgt_phase
                         item["Block"] = clean_and_validate_block_name(tgt_phase, item.get("Block", "Block A"))
-                        item["Plot No"] = clean_plot_number(tgt_plot)
-                        item["Size"] = resolve_size_text_first_or_map(
-                            tgt_phase,
-                            item.get("Block", "Block A"),
-                            item.get("Plot No", ""),
-                            item.get("Size", "")
-                        )
+                        item["Plot No"] = clean_plot_number(item.get("Plot No", ""))
+                        item["Size"] = resolve_size_text_first_or_map(tgt_phase, item["Block"], item["Plot No"], item.get("Size", ""))
                         if not item.get("Date / Timestamp"):
                             item["Date / Timestamp"] = now_str
                         if not item.get("Office / Agency"):
@@ -504,9 +452,7 @@ Return ONLY a valid JSON Array:"""
                         cleaned_list.append(item)
                     return cleaned_list
             except Exception as e:
-                st.session_state["gemini_last_error"] = f"Model {model_name} Error: {e}"
-                time.sleep(0.6)
-
+                time.sleep(0.5)
     return []
 
 # Login Screen
@@ -517,10 +463,7 @@ if not st.session_state["authenticated"]:
                 <span class="material-symbols-outlined" style="color:#00113A; font-size:26px;">dataset</span>
                 <span>DHA Master Database Systems</span>
             </div>
-            <div style="color: #757682; font-size: 13px; font-weight: 500;">
-                <span class="material-symbols-outlined" style="vertical-align:middle; font-size:18px; color:#006B5E;">lock</span>
-                Secure Access
-            </div>
+            <div style="color: #757682; font-size: 13px; font-weight: 500;">Secure Access</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -528,24 +471,19 @@ if not st.session_state["authenticated"]:
     with col_center:
         st.markdown("""
             <div class="stitch-login-box">
-                <div class="stitch-avatar">
-                    <span class="material-symbols-outlined" style="font-size:30px;">apartment</span>
-                </div>
-                <div class="stitch-title">Welcome to DHA</div>
-                <div class="stitch-subtitle">Master CRM Database Systems</div>
+                <div class="stitch-avatar"><span class="material-symbols-outlined" style="font-size:30px;">apartment</span></div>
+                <div style="font-size:20px; font-weight:700; color:#00113A;">Welcome to DHA</div>
             </div>
         """, unsafe_allow_html=True)
-
         with st.form("stitch_login_form"):
             email_in = st.text_input("WORK EMAIL ADDRESS", placeholder="name@wali-associates.pk")
             pass_in = st.text_input("PASSWORD", type="password", placeholder="••••••••")
-            submit_login = st.form_submit_button("SIGN IN →")
-            if submit_login:
+            if st.form_submit_button("SIGN IN →"):
                 st.session_state["authenticated"] = True
-                st.session_state["user_email"] = email_in if email_in.strip() else "authorized.agent@dha.pk"
+                st.session_state["user_email"] = email_in if email_in.strip() else "agent@dha.pk"
                 st.rerun()
 
-# Main Master Sheet Dashboard
+# Main Master Sheet Dashboard with City, Phase, and Block selectors restored
 else:
     try:
         gc_client = get_gspread_client()
@@ -559,7 +497,7 @@ else:
             <div class="header-banner">
                 <span class="office-badge">📍 {st.session_state['office_name']}</span>
                 <h1 class="header-title">🏢 DHA Master Sheet & Live Ingestion Engine</h1>
-                <div class="header-subtitle">Direct Extraction & Master Summary View (Active: {st.session_state['user_email']})</div>
+                <div class="header-subtitle">Active Agent: {st.session_state['user_email']}</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -568,40 +506,64 @@ else:
         if st.button("👥 Dealer Ledger & Directory", use_container_width=True):
             pass
 
-    # Ingestion Control Panel (Direct Ingestion without cluttering)
+    # Restored City, Phase & Block Selectors
+    col_city, col_phase = st.columns([1.2, 2.5])
+    with col_city:
+        selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
+    with col_phase:
+        phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
+        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook View)", phase_options, index=11)
+
+    sheet_base_link = DHA_PHASE_SHEET_URLS.get(selected_phase, "")
+    p_info = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
+    all_phase_blocks = p_info.get("residential", []) + p_info.get("commercial", [])
+
+    st.markdown(f"##### 🧱 Choose Block Sheet Tab for **[{selected_phase}]**:")
+    selected_active_block = st.radio("Direct Block Switcher:", options=all_phase_blocks, horizontal=True, key="block_feature_tab_bar")
+
+    try:
+        active_wb = get_phase_workbook(gc_client, selected_phase)
+        exact_block_tab_url = get_specific_tab_url(active_wb, sheet_base_link, selected_active_block)
+    except Exception:
+        exact_block_tab_url = sheet_base_link
+
+    col_btn_info, col_btn_sheet = st.columns([1.5, 2.5])
+    with col_btn_info:
+        if st.button("ℹ️ Connection Details", use_container_width=True):
+            pass
+    with col_btn_sheet:
+        st.link_button(f"📑 Open [{selected_active_block}] Tab in Google Sheets ↗", url=exact_block_tab_url, use_container_width=True)
+
+    st.markdown("---")
+
+    # Ingestion Control Panel
     st.subheader("🧠 Multi-Source WhatsApp & Listing Ingestion")
-    
     with st.expander("➕ **Attach Files, Drive, OCR, Zameen, or Classifieds**", expanded=False):
         tab_upload, tab_gdrive, tab_camera, tab_direct, tab_zameen = st.tabs([
             "📎 Files", "☁️ G-Drive", "📸 Camera", "📋 Direct Paste", "🌐 Zameen/Portal"
         ])
-        
         with tab_upload:
             uploaded_file = st.file_uploader("Upload TXT, Excel, PDF, or Image:", type=["txt", "xlsx", "xls", "json", "csv", "pdf", "png", "jpg", "jpeg"])
             if uploaded_file is not None:
                 st.session_state["extracted_file_text"] = extract_text_from_any_file_or_image(uploaded_file)
                 st.success(f"✅ Loaded `{uploaded_file.name}` ready for ingestion!")
-
         with tab_gdrive:
             gdrive_url_in = st.text_input("Google Drive Link:")
             if st.button("Fetch G-Drive"):
                 if gdrive_url_in.strip():
                     st.session_state["extracted_file_text"] = fetch_content_from_gdrive_url(gdrive_url_in.strip())
                     st.success("✅ G-Drive loaded!")
-
         with tab_camera:
             camera_photo = st.camera_input("Take photo:")
             if camera_photo is not None:
                 st.session_state["extracted_file_text"] = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
                 st.success("✅ Camera OCR loaded!")
-
         with tab_direct:
             pasted_txt = st.text_area("Paste WhatsApp Broadcasts Here:", height=100)
             if st.button("Load Pasted Text"):
                 if pasted_txt.strip():
                     st.session_state["extracted_file_text"] = pasted_txt.strip()
                     st.success("✅ Text loaded for ingestion!")
-
         with tab_zameen:
             portal_url = st.text_input("Zameen / Portal URL:")
             if st.button("Scrape Portal"):
@@ -613,21 +575,20 @@ else:
     col_run1, col_run2 = st.columns([2, 1])
     with col_run1:
         if not st.session_state["extraction_active"]:
-            if st.button("🚀 ➔ Start AI Ingestion & Update Master Sheet", type="primary", use_container_width=True):
+            if st.button("🚀 ➔ Start AI Ingestion & Update Master Summary", type="primary", use_container_width=True):
                 final_input_text = st.session_state.get("extracted_file_text", "").strip()
                 if final_input_text:
                     discrete_msgs = segment_into_discrete_whatsapp_messages(final_input_text)
                     chunks = [discrete_msgs[i:i+25] for i in range(0, len(discrete_msgs), 25)]
-                    
                     st.session_state["all_chunks"] = chunks
                     st.session_state["current_chunk_idx"] = 0
                     st.session_state["parsed_payloads"] = []
                     st.session_state["extraction_active"] = True
                     st.session_state["extraction_paused"] = False
+                    st.session_state["extraction_default_phase"] = selected_phase
                     st.rerun()
                 else:
                     st.warning("⚠️ Please attach a file, paste text, or load a source first.")
-
     with col_run2:
         if st.session_state["extraction_active"]:
             if st.button("⏹️ Stop Extraction", use_container_width=True):
@@ -635,7 +596,7 @@ else:
                 st.rerun()
 
     # ==========================================================================
-    # MASTER SHEET / LIVE SUMMARY VIEW (Directly below controls)
+    # MASTER SUMMARY SHEET (Live View directly below)
     # ==========================================================================
     st.markdown("---")
     st.subheader("📊 Master Summary Sheet (Live Database View)")
@@ -644,15 +605,11 @@ else:
 
     if total_parsed_now > 0:
         df_master = pd.DataFrame(st.session_state["parsed_payloads"])
-        
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
             sel_phase_filter = st.selectbox("📍 Filter Phase:", ["All Phases"] + list(df_master["Phase"].unique()))
         with col_m2:
-            if sel_phase_filter != "All Phases":
-                blocks_avail = ["All Blocks"] + list(df_master[df_master["Phase"] == sel_phase_filter]["Block"].unique())
-            else:
-                blocks_avail = ["All Blocks"] + list(df_master["Block"].unique())
+            blocks_avail = ["All Blocks"] + (list(df_master[df_master["Phase"] == sel_phase_filter]["Block"].unique()) if sel_phase_filter != "All Phases" else list(df_master["Block"].unique()))
             sel_block_filter = st.selectbox("🧱 Filter Block:", blocks_avail)
         with col_m3:
             st.metric(label="Total Plots in Master View", value=len(df_master))
@@ -665,7 +622,6 @@ else:
 
         edited_master_df = st.data_editor(df_display, use_container_width=True, height=320, key="master_sheet_editor")
 
-        # Push to Google Sheets Button
         if st.button(f"🚀 Push ({len(edited_master_df)} Plots) to Official Google Sheets Tabs", type="primary", use_container_width=True):
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
             grouped_data = {}
@@ -683,7 +639,6 @@ else:
                     wb_cache[phase] = get_phase_workbook(gc_client, phase)
                 wb = wb_cache[phase]
                 ws = get_or_create_clean_tab_exact(wb, block)
-                
                 rows_to_push = []
                 for r in rows:
                     rows_to_push.append([
@@ -707,13 +662,12 @@ else:
             st.success(f"🎉 Successfully pushed {total_pushed} records to Google Sheets!")
             st.balloons()
     else:
-        st.info("ℹ️ Master Sheet is currently empty. Use the Attach/Source panel above and click **'Start AI Ingestion'** to populate data live.")
+        st.info("ℹ️ Master Summary Sheet is empty. Load your text/files above and click **'Start AI Ingestion'**.")
 
     # Active Background Stream Loop
     if st.session_state["extraction_active"]:
         chunks = st.session_state["all_chunks"]
         curr_idx = st.session_state["current_chunk_idx"]
-        
         if curr_idx < len(chunks):
             with st.spinner(f"🧠 Processing Batch {curr_idx + 1} of {len(chunks)}..."):
                 new_items = process_message_batch_via_gemini(chunks[curr_idx], st.session_state["extraction_default_phase"])
@@ -722,5 +676,5 @@ else:
                 st.rerun()
         else:
             st.session_state["extraction_active"] = False
-            st.success("🎉 Ingestion complete! Review your Master Summary Sheet below.")
+            st.success("🎉 Ingestion complete!")
             st.rerun()
