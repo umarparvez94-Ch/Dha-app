@@ -183,22 +183,24 @@ def get_or_create_clean_tab_exact(workbook, tab_title):
     except Exception:
         return workbook.sheet1
 
-def extract_text_from_any_file_or_image(file_obj, is_camera=False):
+def get_specific_tab_url(workbook, base_url, tab_title):
+    clean_title = tab_title.strip().lower()
+    try:
+        ws_list = workbook.worksheets()
+        for w in ws_list:
+            if w.title.strip().lower() == clean_title:
+                clean_base = base_url.split("#")[0].rstrip("/")
+                if not clean_base.endswith("/edit"):
+                    clean_base = clean_base + "/edit"
+                return f"{clean_base}#gid={w.id}"
+    except Exception:
+        pass
+    return base_url
+
+def extract_text_from_any_file(file_obj):
     if file_obj is None:
         return ""
     file_bytes = file_obj.getvalue()
-    if is_camera or (hasattr(file_obj, 'name') and any(file_obj.name.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"])):
-        if gemini_active and gemini_client:
-            try:
-                img = Image.open(io.BytesIO(file_bytes))
-                res = gemini_client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=["Extract all DHA Lahore property listings from this image:", img]
-                )
-                return res.text.strip()
-            except Exception as e:
-                return f"[Image OCR error: {e}]"
-    
     fname = file_obj.name.lower() if hasattr(file_obj, 'name') else "file.txt"
     if fname.endswith(".xlsx") or fname.endswith(".xls"):
         try:
@@ -245,7 +247,7 @@ def segment_messages(raw_text):
     return messages
 
 # ==============================================================================
-# PURE GEMINI AI PROMPT EXTRACTION ENGINE
+# PURE GEMINI AI EXTRACTION ENGINE
 # ==============================================================================
 def process_message_batch_via_gemini(message_objects, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
@@ -254,10 +256,10 @@ def process_message_batch_via_gemini(message_objects, default_phase):
     formatted_lines = [f"Sender: {m['sender_name']} | Phone: {m['contact_no']}\n{m['full_message']}" for m in message_objects]
     batch_text = "\n\n".join(formatted_lines)
 
-    prompt = f"""You are the Master Real Estate Ingestion & Intelligence Engine powered by Gemini 2.5 Flash for Wali Muhammad Associates (DHA Lahore).
+    prompt = f"""You are the Master Real Estate Ingestion & Intelligence Engine powered by Gemini for Wali Muhammad Associates (DHA Lahore).
 Analyze each broadcast or WhatsApp bundle and extract every individual property listing into a clean JSON array.
 
-MASTER RULES:
+RULES:
 1. PHASE & BLOCK: Detect the correct DHA Phase and Block matching catalog: {catalog_json_str}. Default phase if completely missing: '{default_phase}'.
 2. MULTI-PLOT EXTRACTION: If a single message contains multiple plots/options, create a separate JSON object for each.
 3. EXACT 12-COLUMN SCHEMA KEYS:
@@ -303,10 +305,10 @@ Return ONLY a valid JSON Array:"""
                 return cleaned
             return []
         except Exception as e:
-            st.error(f"⚠️ Gemini API Parsing Error: {str(e)}")
+            st.error(f"⚠️ Gemini API Error: {str(e)}")
             return []
     else:
-        st.error("⚠️ Gemini API is inactive. Please check your API Key in Streamlit Secrets.")
+        st.error("⚠️ Gemini API is inactive. Check API Key in Streamlit Secrets.")
         return []
 
 # Login Screen
@@ -337,7 +339,7 @@ if not st.session_state["authenticated"]:
                 st.session_state["user_email"] = email_in if email_in.strip() else "agent@dha.pk"
                 st.rerun()
 
-# Main Master Sheet Dashboard with full City, Phase, Block selectors
+# Main Master Sheet Dashboard
 else:
     try:
         gc_client = get_gspread_client()
@@ -389,40 +391,15 @@ else:
 
     st.markdown("---")
 
-    # Ingestion Control Panel
+    # Ingestion Control Panel with instant file parsing state persistence
     st.subheader("🧠 Multi-Source WhatsApp & Listing Ingestion")
     with st.expander("➕ **Attach Files, Drive, OCR, Zameen, or Classifieds**", expanded=False):
-        tab_upload, tab_gdrive, tab_camera, tab_direct, tab_zameen = st.tabs([
-            "📎 Files", "☁️ G-Drive", "📸 Camera", "📋 Direct Paste", "🌐 Zameen/Portal"
-        ])
-        with tab_upload:
-            uploaded_file = st.file_uploader("Upload TXT, Excel, PDF, or Image:", type=["txt", "xlsx", "xls", "json", "csv", "pdf", "png", "jpg", "jpeg"])
-            if uploaded_file is not None:
-                st.session_state["extracted_file_text"] = extract_text_from_any_file_or_image(uploaded_file)
-                st.success(f"✅ Loaded `{uploaded_file.name}` ready for ingestion!")
-        with tab_gdrive:
-            gdrive_url_in = st.text_input("Google Drive Link:")
-            if st.button("Fetch G-Drive"):
-                if gdrive_url_in.strip():
-                    st.session_state["extracted_file_text"] = fetch_content_from_gdrive_url(gdrive_url_in.strip())
-                    st.success("✅ G-Drive loaded!")
-        with tab_camera:
-            camera_photo = st.camera_input("Take photo:")
-            if camera_photo is not None:
-                st.session_state["extracted_file_text"] = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
-                st.success("✅ Camera OCR loaded!")
-        with tab_direct:
-            pasted_txt = st.text_area("Paste WhatsApp Broadcasts Here:", height=100)
-            if st.button("Load Pasted Text"):
-                if pasted_txt.strip():
-                    st.session_state["extracted_file_text"] = pasted_txt.strip()
-                    st.success("✅ Text loaded for ingestion!")
-        with tab_zameen:
-            portal_url = st.text_input("Zameen / Portal URL:")
-            if st.button("Scrape Portal"):
-                if portal_url.strip():
-                    st.session_state["extracted_file_text"] = fetch_text_from_portal_url(portal_url.strip())
-                    st.success("✅ Portal content fetched!")
+        uploaded_file = st.file_uploader("Upload WhatsApp TXT or file:", type=["txt", "xlsx", "xls", "json", "csv", "pdf", "png", "jpg", "jpeg"])
+        if uploaded_file is not None:
+            extracted_txt = extract_text_from_any_file(uploaded_file)
+            if extracted_txt and not extracted_txt.startswith("[Error"):
+                st.session_state["extracted_file_text"] = extracted_txt
+                st.success(f"✅ Loaded `{uploaded_file.name}` ({len(extracted_txt)} characters) ready for AI extraction!")
 
     # Start Extraction Button
     col_run1, col_run2 = st.columns([2, 1])
@@ -440,7 +417,7 @@ else:
                     st.session_state["extraction_default_phase"] = selected_phase
                     st.rerun()
                 else:
-                    st.warning("⚠️ Please attach a file, paste text, or load a source first.")
+                    st.warning("⚠️ Please upload a file first using the expander above.")
     with col_run2:
         if st.session_state["extraction_active"]:
             if st.button("⏹️ Stop Extraction", use_container_width=True):
