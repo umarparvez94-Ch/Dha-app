@@ -630,6 +630,36 @@ else:
     """, unsafe_allow_html=True)
 
     # ==========================================================================
+    # 2. TOP DHA PHASE SWITCHER & BLOCK TABS SELECTOR (RESTORED)
+    # ==========================================================================
+    col_city, col_phase = st.columns([1.2, 2.5])
+    with col_city:
+        selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
+    with col_phase:
+        phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
+        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook View)", phase_options, index=11)
+
+    sheet_link = DHA_PHASE_SHEET_URLS.get(selected_phase, "")
+
+    p_info = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
+    res_b = p_info.get("residential", [])
+    com_b = p_info.get("commercial", [])
+    all_phase_blocks = res_b + com_b
+
+    st.markdown(f"##### 🧱 Choose Block Sheet Tab for **[{selected_phase}]**:")
+    
+    selected_active_block = st.radio(
+        "Direct Block Switcher:",
+        options=all_phase_blocks,
+        horizontal=True,
+        key="block_feature_tab_bar"
+    )
+
+    st.markdown(f"🔗 **Active Google Sheet:** [Open {selected_phase} in Google Sheets ↗]({sheet_link}) | Current Tab: **`{selected_active_block}`**")
+
+    st.markdown("---")
+
+    # ==========================================================================
     # 3. LIVE-STREAMING SUMMARY REPORT & INGESTION CONTROL WORKSPACE
     # ==========================================================================
     st.subheader("⚡ Live Summary Report & Multi-Phase Ingestion Center")
@@ -924,7 +954,7 @@ else:
                 st.session_state["parsed_payloads"] = []
                 st.session_state["extraction_active"] = True
                 st.session_state["extraction_paused"] = False
-                st.session_state["extraction_default_phase"] = "DHA Phase 9 Prism"
+                st.session_state["extraction_default_phase"] = selected_phase
                 st.rerun()
             else:
                 st.warning("Please provide listing text, take a camera photo, or upload a file.")
