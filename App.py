@@ -213,7 +213,6 @@ DHA_PHASE_BLOCK_CATALOG = {
     }
 }
 
-# Build Fast Validation Map of all Authorized Blocks per Phase
 AUTHORIZED_BLOCKS_LOOKUP = {}
 for p_name, p_tabs in DHA_PHASE_BLOCK_CATALOG.items():
     AUTHORIZED_BLOCKS_LOOKUP[p_name] = set(b.lower() for b in (p_tabs["residential"] + p_tabs["commercial"]))
@@ -221,34 +220,22 @@ for p_name, p_tabs in DHA_PHASE_BLOCK_CATALOG.items():
 def clean_and_validate_block_name(phase_name, raw_block_str):
     if not raw_block_str:
         return "Block A"
-    
     b_clean = str(raw_block_str).strip()
-    # Remove erroneous "Block HASE" or "Block PH"
     if b_clean.upper() in ["BLOCK HASE", "HASE", "PH", "BLOCK PH", "PHASE", "BLOCK PHASE"]:
         return "Block A"
-
-    # Normalize "A" -> "Block A", "9P" -> "Phase 9 Prism"
     if not b_clean.lower().startswith("block ") and not b_clean.lower().startswith("sector ") and not "commercial" in b_clean.lower() and not "cca" in b_clean.lower():
         b_clean = f"Block {b_clean.upper()}"
-    
-    # Check if block belongs to phase
     valid_blocks = AUTHORIZED_BLOCKS_LOOKUP.get(phase_name, set())
     if b_clean.lower() in valid_blocks:
         for official_b in (DHA_PHASE_BLOCK_CATALOG[phase_name]["residential"] + DHA_PHASE_BLOCK_CATALOG[phase_name]["commercial"]):
             if official_b.lower() == b_clean.lower():
                 return official_b
-    
-    # Default fallback
     return DHA_PHASE_BLOCK_CATALOG.get(phase_name, {}).get("residential", ["Block A"])[0]
 
 def clean_plot_number(plot_val):
     if not plot_val:
         return ""
     p_str = str(plot_val).strip()
-    # Discard if plot number is erroneously extracted as phase number e.g. "Phase 7" -> "Plot 7"
-    if p_str in ["Plot 7", "Plot 8", "Plot 9", "Plot 6", "Plot 5", "Plot 1", "Plot 2", "Plot 3", "Plot 4", "Plot 11", "Plot 12"]:
-        # Allow only if clearly stated, otherwise it's often a false positive from phase text
-        pass
     if not p_str.lower().startswith("plot ") and any(c.isdigit() for c in p_str):
         digits_only = re.sub(r'[^0-9A-Za-z-]', '', p_str)
         return f"Plot {digits_only}"
@@ -304,62 +291,125 @@ def get_specific_tab_url(workbook, base_url, tab_title):
         pass
     return base_url
 
-# Segment WhatsApp Chat by Message Boundary
+# ==============================================================================
+# DATA INGESTION UTILITIES (FIXED & FULLY DEFINED)
+# ==============================================================================
+def clean_whatsapp_chat_text(raw_bytes):
+    try:
+        decoded_text = raw_bytes.decode('utf-8', errors='ignore')
+    except Exception:
+        try:
+            decoded_text = raw_bytes.decode('latin-1', errors='ignore')
+        except Exception:
+            decoded_text = str(raw_bytes)
+    return decoded_text
+
+def fetch_content_from_gdrive_url(drive_url):
+    file_id_match = re.search(r'[-\w]{25,}', drive_url)
+    if not file_id_match:
+        return "[Invalid Google Drive URL format]"
+    file_id = file_id_match.group(0)
+    direct_download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    try:
+        req = urllib.request.Request(direct_download_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            return response.read().decode('utf-8', errors='ignore')
+    except Exception as e:
+        return f"[Error fetching from Google Drive: {e}]"
+
+def fetch_text_from_portal_url(url_in):
+    if not url_in.startswith("http"):
+        url_in = "https://" + url_in
+    try:
+        req = urllib.request.Request(
+            url_in,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        )
+        with urllib.request.urlopen(req, timeout=12) as response:
+            html = response.read().decode('utf-8', errors='ignore')
+            text_only = re.sub(r'<[^>]+>', ' ', html)
+            text_clean = re.sub(r'\s+', ' ', text_only).strip()
+            return f"[Source: {url_in}]\n" + text_clean[:30000]
+    except Exception as e:
+        return f"[Error connecting to Portal URL: {e}]"
+
+def extract_text_from_any_file_or_image(file_obj, is_camera=False):
+    if file_obj is None:
+        return ""
+    file_bytes = file_obj.getvalue()
+    if is_camera or (hasattr(file_obj, 'name') and any(file_obj.name.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"])):
+        if gemini_active and gemini_client:
+            try:
+                img = Image.open(io.BytesIO(file_bytes))
+                res = gemini_client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=["Extract all DHA Lahore property listings, phases, blocks, plot numbers, sizes, and demand prices from this image:", img]
+                )
+                return res.text.strip()
+            except Exception as e:
+                return f"[Image OCR error: {e}]"
+        else:
+            return "[Image loaded. Add GEMINI_API_KEY to secrets to extract live OCR]"
+
+    fname = file_obj.name.lower() if hasattr(file_obj, 'name') else "file.txt"
+    if fname.endswith(".xlsx") or fname.endswith(".xls"):
+        try:
+            return pd.read_excel(io.BytesIO(file_bytes)).to_string(index=False)
+        except Exception as e:
+            return f"[Error reading Excel: {e}]"
+    elif fname.endswith(".csv"):
+        try:
+            return pd.read_csv(io.BytesIO(file_bytes)).to_string(index=False)
+        except Exception as e:
+            return f"[Error reading CSV: {e}]"
+    elif fname.endswith(".pdf"):
+        if HAS_PYPDF:
+            try:
+                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+                return "\n".join([p.extract_text() for p in reader.pages if p.extract_text()])
+            except Exception as e:
+                return f"[Error reading PDF: {e}]"
+    return file_bytes.decode('utf-8', errors='ignore')
+
 def segment_into_discrete_whatsapp_messages(raw_text):
     if not raw_text or not raw_text.strip():
         return []
-    
-    # Regex to split on WhatsApp message headers: e.g. "29/06/2025, 21:14 - D Rizwan R&R Est:"
     ts_split_regex = r'(?:\r?\n|^)(?=(?:\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\s*-\s*[^:\n]+:|\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*-\s*[^:\n]+:))'
     raw_blocks = re.split(ts_split_regex, raw_text.strip())
     discrete_messages = []
 
     for block in raw_blocks:
         b_str = block.strip()
-        if not b_str:
+        if not b_str or "<Media omitted>" in b_str or "Messages and calls are end-to-end encrypted" in b_str:
             continue
-        if "<Media omitted>" in b_str or "Messages and calls are end-to-end encrypted" in b_str:
-            continue
-
-        # 1. Extract phone number anywhere in header or body
         all_phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', b_str)
         extracted_phone = re.sub(r'[^0-9+]', '', all_phones[0]) if all_phones else ""
-
-        # 2. Extract sender/dealer name and agency from WhatsApp header
         sender_name = ""
         agency_name = st.session_state["office_name"]
         header_match = re.search(r'-\s*([^:]+):', b_str)
         if header_match:
             raw_sender = header_match.group(1).strip()
-            # If sender is just a phone number e.g. "+92 300 1234567"
             if raw_sender.startswith("+") or any(c.isdigit() for c in raw_sender):
                 if not extracted_phone:
                     extracted_phone = re.sub(r'[^0-9+]', '', raw_sender)
             else:
                 sender_name = raw_sender
                 agency_name = raw_sender
-
-        # 3. Clean timestamp prefix from body
         cleaned_body = re.sub(r'^\s*\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\s*-\s*[^:\n]+:\s*', '', b_str).strip()
-        if not cleaned_body:
-            cleaned_body = b_str
-
         discrete_messages.append({
-            "full_message": cleaned_body,
+            "full_message": cleaned_body if cleaned_body else b_str,
             "sender_name": sender_name,
             "agency_name": agency_name,
             "contact_no": extracted_phone,
             "raw_block": b_str
         })
-
     return discrete_messages
 
 # ==============================================================================
-# HIGH-PRECISION GEMINI PARSER WITH STRICT CATALOG VALIDATION
+# STRICT GEMINI PARSING ENGINE
 # ==============================================================================
 def process_message_batch_via_gemini(message_objects, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
-    
     formatted_input_lines = []
     for idx, msg in enumerate(message_objects):
         sender_txt = f" | Sender: {msg['sender_name']}" if msg['sender_name'] else ""
@@ -369,20 +419,17 @@ def process_message_batch_via_gemini(message_objects, default_phase):
     batch_payload_text = "\n\n".join(formatted_input_lines)
 
     prompt = f"""You are the Master Real Estate Ingestion Engine for DHA Lahore.
-Parse each discrete WhatsApp message into a JSON array of structured property listings.
+Parse each discrete WhatsApp message into a JSON array of structured property listings adhering strictly to these rules:
 
-STRICT VALIDATION RULES:
-1. "Phase": Identify the DHA Phase mentioned in message ('DHA Phase 1' to 'DHA Phase 12 (EME Sector)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)'). If unspecified in message, fallback to '{default_phase}'.
+RULES:
+1. "Phase": Identify DHA Phase mentioned in message ('DHA Phase 1' to 'DHA Phase 12 (EME Sector)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)'). If unspecified, use '{default_phase}'.
 2. "Block": MUST be an actual block name from the official catalog: {catalog_json_str}.
    - CRITICAL: NEVER write 'Block HASE', 'Block PH', 'HASE', 'PHASE'. Those are misread words from 'Phase 7' or 'Phase 9'!
-   - A valid block is 'Block A', 'Block B', 'Block U', 'CCA 1 Commercial', etc.
-3. "Category": 
-   - If message says 'Required', 'Req', 'Need', 'Chahiye', 'Buyer', set "Category": "Buying / Required".
-   - If selling / direct offer, set "Category": "Selling".
-4. "Plot No": Extract COMPLETE plot number (e.g. 'Plot 980', 'Plot 432', 'Plot 1008'). NEVER write 'Plot 7' if the text was 'Phase 7'! If no specific plot number is given (e.g. 'Required L Block 1 Kanal'), leave "Plot No" as "".
+3. "Category": If message says 'Required', 'Req', 'Need', 'Chahiye', set "Category": "Buying / Required". Otherwise "Selling".
+4. "Plot No": Extract COMPLETE plot number (e.g. 'Plot 980', 'Plot 432'). NEVER write 'Plot 7' if the text was 'Phase 7'! If no specific plot number is given, leave as "".
 5. "Demand / Price": Extract demand like '585 Lac', '3.8 Crore', '720 Lac'. If no price, leave "". NEVER write '0 Lac'.
 6. "Size": '5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla' or "".
-7. "Contact No": Bind the phone number of the message sender or from message body.
+7. "Contact No": Extract mobile number of the sender or from message body.
 8. "Seller / Dealer Name": Extract the dealer/agency name from message header.
 9. "Plot Features": 'Corner / Facing Park', 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Direct Option', 'Possession Plot', 'Non-Possession Plot' or 'Standard Layout'.
 
@@ -408,7 +455,6 @@ Return ONLY a valid JSON Array:"""
                     cleaned_list = []
                     for item in parsed_json:
                         tgt_phase = item.get("Phase", default_phase)
-                        # Strictly clean and sanitize block and plot values
                         item["Block"] = clean_and_validate_block_name(tgt_phase, item.get("Block", "Block A"))
                         item["Plot No"] = clean_plot_number(item.get("Plot No", ""))
                         cleaned_list.append(item)
@@ -428,7 +474,6 @@ def fallback_heuristic_parser(msg_obj, default_phase):
     phone = msg_obj["contact_no"]
     dealer_name = msg_obj["sender_name"]
     agency = msg_obj["agency_name"]
-    
     current_phase = default_phase
     l_up = body.upper()
 
@@ -450,9 +495,7 @@ def fallback_heuristic_parser(msg_obj, default_phase):
         current_phase = "DHA Phase 5"
 
     cat = "Buying / Required" if ("REQUIRED" in l_up or "REQ" in l_up or "CHAHIYE" in l_up or "NEED" in l_up) else "Selling"
-
     extracted = []
-    # Match Block and Plot (Ignore word PHASE)
     m = re.search(r'(?:BLOCK\s+)?([A-Z0-9-]{1,3})\s*[-.:/# ]\s*([0-9]{2,5})(?:\s*[@:]\s*|\s+DEMAND\s*[:@]?\s*|\s+@\s*|\s+)?([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
     if m:
         blk_candidate = m.group(1).upper()
@@ -480,6 +523,54 @@ def fallback_heuristic_parser(msg_obj, default_phase):
                 "Raw Listing & Source Material": body
             })
     return extracted
+
+# Modal Dialogs
+@st.dialog("🔗 Backend Google Sheets Connection Details", width="large")
+def show_backend_connection_dialog(selected_phase, selected_block, target_url):
+    st.markdown(f"#### 🏢 Google Sheets Connection Architecture: [{selected_phase}]")
+    st.markdown(f"""
+        <div class="backend-info-card">
+            <b>🔑 Service Account:</b> <code>dha-bot@dha-property-sync.iam.gserviceaccount.com</code><br>
+            <b>🌐 Active Spreadsheet Target:</b> <a href="{target_url}" target="_blank">{selected_phase} Database</a><br>
+            <b>🧱 Target Tab Attached:</b> <code>{selected_block}</code><br>
+            <b>⚡ Sync Protocols:</b> Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
+            <b>🛡️ Schema Compliance:</b> 15 Canonical CRM Column Headers strictly mapped.
+        </div>
+    """, unsafe_allow_html=True)
+
+@st.dialog("👥 Dealer Directory & Market Partner Activity Ledger", width="large")
+def show_dealer_ledger_dialog(payloads):
+    st.markdown("### 📋 Dealer Market Activity & Circulation Ledger")
+    if not payloads:
+        st.info("No dealer records loaded in memory yet. Ingest WhatsApp logs, portals, or classifieds to populate.")
+        return
+
+    dealer_data = []
+    for item in payloads:
+        contact = item.get("Contact No", "").strip()
+        dealer_name = item.get("Seller / Dealer Name", "").strip()
+        plot = f"{item.get('Phase', '')} {item.get('Block', '')} - {item.get('Plot No', '')}"
+        demand = item.get("Demand / Price", "")
+        raw_msg = item.get("Raw Listing & Source Material", "")
+        dealer_key = contact if contact else (dealer_name if dealer_name else "Unknown Direct")
+        dealer_data.append({
+            "Dealer / Phone": dealer_key,
+            "Plot Option": plot,
+            "Demand": demand,
+            "Raw Log": raw_msg
+        })
+
+    df_dealers = pd.DataFrame(dealer_data)
+    if not df_dealers.empty:
+        summary_group = df_dealers.groupby("Dealer / Phone").agg(
+            Total_Listings=("Plot Option", "count"),
+            Active_Demands=("Demand", lambda x: ", ".join([str(v) for v in x if v][:3]))
+        ).reset_index().sort_values(by="Total_Listings", ascending=False)
+
+        st.markdown(f"**Total Active Dealers in Memory:** `{len(summary_group)}`")
+        st.dataframe(summary_group, use_container_width=True, height=280)
+        st.markdown("##### 🔍 Detailed Listing Records per Dealer:")
+        st.dataframe(df_dealers, use_container_width=True, height=240)
 
 # 8. Login Screen
 if not st.session_state["authenticated"]:
