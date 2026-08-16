@@ -46,7 +46,7 @@ if "parsed_payloads" not in st.session_state:
 if "extracted_file_text" not in st.session_state:
     st.session_state["extracted_file_text"] = ""
 
-# Batch Processing State Machine
+# Batch Processing State Machine (100 msgs/batch)
 if "extraction_active" not in st.session_state:
     st.session_state["extraction_active"] = False
 if "extraction_paused" not in st.session_state:
@@ -393,29 +393,31 @@ def show_dealer_ledger_dialog(payloads):
         st.dataframe(df_dealers, use_container_width=True, height=240)
 
 # ==============================================================================
-# SOURCE FETCHERS & OCR PROCESSORS
+# SOURCE FETCHERS, 100-MESSAGE CHUNKER & OCR PROCESSORS
 # ==============================================================================
-def clean_whatsapp_chat_text(raw_text):
-    chat_patterns = [
-        r'^\s*\[?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\]?\s*-?\s*[^:]+:\s*',
-        r'^\s*\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*-\s*[^:]+:\s*',
-        r'^\s*\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*-\s*'
-    ]
-
-    cleaned_lines = []
-    for line in raw_text.splitlines():
-        line_str = line.strip()
-        if not line_str:
+def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
+    """Splits WhatsApp chat into ~100 complete message blocks using timestamps."""
+    msg_split_pattern = r'(?=\n?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2})'
+    raw_messages = re.split(msg_split_pattern, raw_text)
+    
+    clean_messages = []
+    for msg in raw_messages:
+        m_str = msg.strip()
+        if not m_str:
             continue
-        if "Messages and calls are end-to-end encrypted" in line_str or "<Media omitted>" in line_str or "security code changed" in line_str:
+        if "Messages and calls are end-to-end encrypted" in m_str or "<Media omitted>" in m_str or "security code changed" in m_str:
             continue
-        for pat in chat_patterns:
-            line_str = re.sub(pat, '', line_str)
-        line_str = line_str.strip()
-        if line_str and len(line_str) > 1:
-            cleaned_lines.append(line_str)
+        clean_messages.append(m_str)
+    
+    if not clean_messages:
+        clean_messages = [l.strip() for l in raw_text.splitlines() if l.strip()]
 
-    return "\n".join(cleaned_lines)
+    chunks = []
+    for i in range(0, len(clean_messages), messages_per_chunk):
+        chunk_batch = clean_messages[i:i + messages_per_chunk]
+        chunks.append("\n\n---\n\n".join(chunk_batch))
+        
+    return chunks
 
 def fetch_content_from_gdrive_url(drive_url):
     file_id_match = re.search(r'[-\w]{25,}', drive_url)
@@ -427,7 +429,7 @@ def fetch_content_from_gdrive_url(drive_url):
         req = urllib.request.Request(direct_download_url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
             file_bytes = response.read()
-            return clean_whatsapp_chat_text(file_bytes.decode('utf-8', errors='ignore'))
+            return file_bytes.decode('utf-8', errors='ignore')
     except Exception as e:
         return f"[Error fetching from Google Drive: {e}]"
 
@@ -496,7 +498,7 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
         else:
             return "[pypdf not installed]"
 
-    return clean_whatsapp_chat_text(file_bytes.decode('utf-8', errors='ignore'))
+    return file_bytes.decode('utf-8', errors='ignore')
 
 # ==============================================================================
 # SMART REFINED MULTI-ENGINE PARSER (PURE AI + ACCURATE SMART FALLBACK)
@@ -603,8 +605,10 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
 def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     
-    prompt = f"""You are the Master DHA Lahore Real Estate CRM extraction engine.
-Extract EVERY single valid property listing AND every Dealer Contact / Lead from the text into a JSON array of objects.
+    prompt = f"""You are the Master DHA Lahore Real Estate CRM extraction engine using advanced Gemini 2.5 reasoning.
+Carefully analyze this batch of ~100 WhatsApp broadcasts. 
+
+Extract EVERY valid property listing AND every Dealer Contact / Lead into a clean JSON array of objects.
 
 OFFICIAL DHA PHASES:
 'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
@@ -615,7 +619,7 @@ RULES:
 3. "Plot No": Extract full plot number (e.g. 'Plot 858', 'Plot 61', 'Plot 654').
 4. "Size": '5 Marla', '10 Marla', '1 Kanal', '2 Kanal' etc.
 5. "Demand / Price": '485 Lac', '260 Lac', '2 Crore' etc.
-6. "Contact No": Extract dealer phone number.
+6. "Contact No": Extract dealer phone number for all attached plots.
 
 Text to Extract:
 {chunk_text}
@@ -641,33 +645,33 @@ Return ONLY valid JSON Array:
 ]"""
 
     if gemini_active and gemini_client:
-        for model_choice in ['gemini-2.5-flash', 'gemini-1.5-flash']:
-            try:
-                response = gemini_client.models.generate_content(
-                    model=model_choice,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        temperature=0.0
-                    )
+        try:
+            response = gemini_client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.0
                 )
-                raw_json = response.text.strip()
-                parsed_json = json.loads(raw_json)
-                if isinstance(parsed_json, list) and len(parsed_json) > 0:
-                    for item in parsed_json:
-                        blk = str(item.get("Block", "")).strip()
-                        plt = str(item.get("Plot No", "")).strip()
-                        sz = str(item.get("Size", "")).strip()
-                        if plt and plt.lower() != "general option / portfolio":
-                            item["Size"] = resolve_size_text_first_or_map(
-                                item.get("Phase", default_phase),
-                                blk,
-                                plt,
-                                sz
-                            )
-                    return parsed_json
-            except Exception:
-                continue
+            )
+            raw_json = response.text.strip()
+            parsed_json = json.loads(raw_json)
+            if isinstance(parsed_json, list) and len(parsed_json) > 0:
+                for item in parsed_json:
+                    blk = str(item.get("Block", "")).strip()
+                    plt = str(item.get("Plot No", "")).strip()
+                    sz = str(item.get("Size", "")).strip()
+                    if plt and plt.lower() != "general option / portfolio":
+                        item["Size"] = resolve_size_text_first_or_map(
+                            item.get("Phase", default_phase),
+                            blk,
+                            plt,
+                            sz
+                        )
+                return parsed_json
+        except Exception as e:
+            # Fallback to local rule engine if network timeout occurs
+            pass
 
     return smart_accurate_rule_parser(chunk_text, default_phase)
 
@@ -945,7 +949,6 @@ else:
         label_visibility="collapsed"
     )
 
-    # Action Row: [+] Attach Sources on Left, [🚀 ➔ Start AI Extraction] on Right
     col_in_attach, col_in_btn = st.columns([3.6, 1.4])
     
     with col_in_attach:
@@ -974,7 +977,7 @@ else:
                 gdrive_url_in = st.text_input("Paste Google Drive Link:", placeholder="https://drive.google.com/...", key="inner_gdrive_in")
                 if st.button("☁️ Push G-Drive File Data", use_container_width=True, key="btn_push_gdrive_inner"):
                     if gdrive_url_in.strip():
-                        with st.spinner("Fetching and cleaning timestamps..."):
+                        with st.spinner("Fetching Google Drive file..."):
                             gdrive_content = fetch_content_from_gdrive_url(gdrive_url_in.strip())
                             if gdrive_content and not gdrive_content.startswith("[Error"):
                                 st.session_state["extracted_file_text"] = gdrive_content
@@ -1032,11 +1035,10 @@ else:
         if not st.session_state["extraction_active"]:
             st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
             if st.button("🚀 ➔ Start AI Extraction", use_container_width=True, key="btn_run_stream_inner"):
-                final_input_text = clean_whatsapp_chat_text(raw_text.strip())
+                final_input_text = raw_text.strip()
                 if final_input_text:
-                    all_lines = [l.strip() for l in final_input_text.splitlines() if l.strip()]
-                    LINES_PER_CHUNK = 25
-                    chunks = ["\n".join(all_lines[i:i+LINES_PER_CHUNK]) for i in range(0, len(all_lines), LINES_PER_CHUNK)]
+                    # 100 Complete Messages per AI Call
+                    chunks = split_raw_into_message_chunks(final_input_text, messages_per_chunk=100)
                     
                     st.session_state["all_chunks"] = chunks
                     st.session_state["current_chunk_idx"] = 0
@@ -1059,7 +1061,7 @@ else:
         st.markdown(f"""
             <div class="control-panel-box">
                 <div style="font-size: 16px; font-weight: 700; color: #00113A; margin-bottom: 8px;">
-                    ⚡ Live AI Streaming: Processing Chunk {curr_idx + 1} of {total_chunks} • Streamed: {total_parsed_now} Listings into Summary
+                    ⚡ Live AI Streaming: Processing Chunk {curr_idx + 1} of {total_chunks} (100 msgs/chunk) • Streamed: {total_parsed_now} Listings into Summary
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -1087,7 +1089,7 @@ else:
                 st.rerun()
 
         if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
-            with st.spinner(f"🧠 Processing Chunk {curr_idx + 1} of {total_chunks}..."):
+            with st.spinner(f"🧠 Processing Chunk {curr_idx + 1} of {total_chunks} (100 msgs)..."):
                 chunk_to_process = chunks[curr_idx]
                 new_listings = process_single_chunk_via_gemini(chunk_to_process, st.session_state["extraction_default_phase"])
                 st.session_state["parsed_payloads"].extend(new_listings)
