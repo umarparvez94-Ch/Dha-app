@@ -17,7 +17,8 @@ try:
 except ImportError:
     HAS_PYPDF = False
 
-# Google GenAI SDK
+# Google GenAI SDK Setup
+HAS_GENAI = False
 try:
     from google import genai
     from google.genai import types
@@ -44,6 +45,8 @@ if "parsed_payloads" not in st.session_state:
     st.session_state["parsed_payloads"] = []
 if "extracted_file_text" not in st.session_state:
     st.session_state["extracted_file_text"] = ""
+if "gemini_last_error" not in st.session_state:
+    st.session_state["gemini_last_error"] = ""
 
 # Batch Processing & Pause/Resume State Machine
 if "extraction_active" not in st.session_state:
@@ -57,22 +60,34 @@ if "current_chunk_idx" not in st.session_state:
 if "extraction_default_phase" not in st.session_state:
     st.session_state["extraction_default_phase"] = "DHA Phase 9 Prism"
 
-# Setup Google Gemini AI Client
+# 2. Strict Gemini 2.5 Multi-Source Key Resolver
 gemini_client = None
 gemini_active = False
 
-api_key_val = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+api_key_val = (
+    st.secrets.get("GEMINI_API_KEY") 
+    or st.secrets.get("GOOGLE_API_KEY")
+    or os.environ.get("GEMINI_API_KEY", "")
+    or os.environ.get("GOOGLE_API_KEY", "")
+)
+
 if HAS_GENAI and api_key_val:
     try:
-        gemini_client = genai.Client(api_key=api_key_val)
+        gemini_client = genai.Client(api_key=str(api_key_val).strip())
         gemini_active = True
-    except Exception:
+    except Exception as e:
+        st.session_state["gemini_last_error"] = f"Client Init Error: {e}"
         gemini_active = False
+else:
+    if not HAS_GENAI:
+        st.session_state["gemini_last_error"] = "google-genai SDK package missing."
+    elif not api_key_val:
+        st.session_state["gemini_last_error"] = "Missing GEMINI_API_KEY in Secrets."
 
-# 2. CSS Styling
+# 3. CSS Styling
 st.markdown("""
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
     <style>
@@ -88,8 +103,8 @@ st.markdown("""
     .office-badge { background-color: #006B5E; color: #9FF2E1; padding: 5px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; float: right; }
     .stitch-login-box { background: #FFFFFF; border: 1px solid rgba(197, 198, 210, 0.6); border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04); padding: 32px 28px; margin-bottom: 16px; text-align: center; }
     .stitch-avatar { width: 60px; height: 60px; border-radius: 50%; background-color: #D6E2FF; border: 1px solid #B3C5FF; display: inline-flex; align-items: center; justify-content: center; color: #00113A; margin-bottom: 12px; }
-    .ai-badge-active { background: #DCFCE7; border: 1px solid #86EFAC; color: #15803D; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
-    .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
+    .ai-badge-active { background: #DCFCE7; border: 1px solid #86EFAC; color: #15803D; font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: 8px; display: inline-block; margin-bottom: 10px; }
+    .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: 8px; display: inline-block; margin-bottom: 10px; }
     .summary-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
     .stat-pill { background: #F1F5F9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #334155; display: inline-block; margin-right: 8px; margin-bottom: 6px; }
     .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 16px 20px; margin: 15px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.08); }
@@ -133,65 +148,6 @@ DHA_PHASE_SHEET_URLS = {
     "DHA Phase 9 Town": "https://docs.google.com/spreadsheets/d/1AfidqzYwWWTkouwBkGKosxyK3CzwAyG8AEilS8-Nd0w/edit",
     "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)": "https://docs.google.com/spreadsheets/d/1bVB4maSRNR_pzcqzVzYKPirePrm_I9Yhu1TqodBPypU/edit",
     "DHA Phase 12 (EME Sector)": "https://docs.google.com/spreadsheets/d/1Ai07OSySM4pcPV9yRr--fsMpKNPXtD2uwJx285_mPho/edit"
-}
-
-DHA_CUTTING_MAP_RULES = {
-    "DHA Phase 5": {
-        "Block A": [(1, 120, "2 Kanal"), (121, 500, "1 Kanal")],
-        "Block B": [(1, 80, "2 Kanal"), (81, 600, "1 Kanal")],
-        "Block C": [(1, 50, "2 Kanal"), (51, 450, "1 Kanal")],
-        "Block G": [(1, 350, "1 Kanal"), (351, 700, "10 Marla")],
-        "Block H": [(1, 400, "10 Marla"), (401, 800, "5 Marla")],
-        "Block J": [(1, 500, "10 Marla"), (501, 950, "5 Marla")],
-    },
-    "DHA Phase 6": {
-        "Block A": [(1, 150, "2 Kanal"), (151, 800, "1 Kanal")],
-        "Block B": [(1, 100, "2 Kanal"), (101, 700, "1 Kanal")],
-        "Block C": [(1, 650, "1 Kanal")],
-        "Block D": [(1, 700, "1 Kanal")],
-        "Block E": [(1, 550, "1 Kanal")],
-        "Block J": [(1, 600, "10 Marla")],
-        "Block L": [(1, 800, "10 Marla"), (801, 1200, "5 Marla")],
-    },
-    "DHA Phase 7": {
-        "Block P": [(1, 1100, "1 Kanal")],
-        "Block Q": [(1, 900, "1 Kanal")],
-        "Block R": [(1, 1050, "1 Kanal")],
-        "Block S": [(1, 950, "1 Kanal")],
-        "Block T": [(1, 1200, "1 Kanal")],
-        "Block U": [(1, 1400, "1 Kanal")],
-        "Block W": [(1, 1400, "10 Marla")],
-        "Block X": [(1, 1300, "10 Marla")],
-        "Block Y": [(1, 900, "5 Marla")],
-        "Block Z": [(1, 1100, "5 Marla")]
-    },
-    "DHA Phase 8 (Proper)": {
-        "Block A": [(1, 100, "2 Kanal"), (101, 550, "1 Kanal")],
-        "Block B": [(1, 80, "2 Kanal"), (81, 500, "1 Kanal")],
-        "Block C": [(1, 70, "2 Kanal"), (71, 480, "1 Kanal")],
-        "Block D": [(1, 600, "1 Kanal")],
-        "Block E": [(1, 550, "1 Kanal")],
-        "Block F": [(1, 500, "1 Kanal")],
-        "Block S": [(1, 750, "10 Marla")],
-        "Block T": [(1, 800, "10 Marla"), (801, 1300, "5 Marla")],
-        "Block U": [(1, 900, "5 Marla")],
-        "Block V": [(1, 850, "5 Marla")],
-        "Block W": [(1, 700, "8 Marla")]
-    },
-    "DHA Phase 9 Prism": {
-        "Block A": [(1, 600, "1 Kanal")],
-        "Block B": [(1, 550, "1 Kanal")],
-        "Block C": [(1, 700, "1 Kanal")],
-        "Block D": [(1, 650, "1 Kanal")],
-        "Block E": [(1, 500, "1 Kanal")],
-        "Block F": [(1, 700, "1 Kanal")],
-        "Block G": [(1, 600, "1 Kanal")],
-        "Block J": [(1, 1200, "10 Marla")],
-        "Block K": [(1, 1100, "10 Marla")],
-        "Block L": [(1, 1300, "10 Marla")],
-        "Block R": [(1, 1800, "5 Marla")],
-        "Block Q": [(1, 1600, "5 Marla")]
-    }
 }
 
 DHA_PHASE_BLOCK_CATALOG = {
@@ -257,20 +213,46 @@ DHA_PHASE_BLOCK_CATALOG = {
     }
 }
 
-def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
-    cleaned_size = str(extracted_size).strip() if extracted_size else ""
-    if cleaned_size and cleaned_size.lower() not in ["n/a", "unknown", "none", ""]:
-        return cleaned_size
-    try:
-        p_num = int(re.sub(r'[^0-9]', '', str(plot_no)))
-    except Exception:
+# Build Fast Validation Map of all Authorized Blocks per Phase
+AUTHORIZED_BLOCKS_LOOKUP = {}
+for p_name, p_tabs in DHA_PHASE_BLOCK_CATALOG.items():
+    AUTHORIZED_BLOCKS_LOOKUP[p_name] = set(b.lower() for b in (p_tabs["residential"] + p_tabs["commercial"]))
+
+def clean_and_validate_block_name(phase_name, raw_block_str):
+    if not raw_block_str:
+        return "Block A"
+    
+    b_clean = str(raw_block_str).strip()
+    # Remove erroneous "Block HASE" or "Block PH"
+    if b_clean.upper() in ["BLOCK HASE", "HASE", "PH", "BLOCK PH", "PHASE", "BLOCK PHASE"]:
+        return "Block A"
+
+    # Normalize "A" -> "Block A", "9P" -> "Phase 9 Prism"
+    if not b_clean.lower().startswith("block ") and not b_clean.lower().startswith("sector ") and not "commercial" in b_clean.lower() and not "cca" in b_clean.lower():
+        b_clean = f"Block {b_clean.upper()}"
+    
+    # Check if block belongs to phase
+    valid_blocks = AUTHORIZED_BLOCKS_LOOKUP.get(phase_name, set())
+    if b_clean.lower() in valid_blocks:
+        for official_b in (DHA_PHASE_BLOCK_CATALOG[phase_name]["residential"] + DHA_PHASE_BLOCK_CATALOG[phase_name]["commercial"]):
+            if official_b.lower() == b_clean.lower():
+                return official_b
+    
+    # Default fallback
+    return DHA_PHASE_BLOCK_CATALOG.get(phase_name, {}).get("residential", ["Block A"])[0]
+
+def clean_plot_number(plot_val):
+    if not plot_val:
         return ""
-    phase_rules = DHA_CUTTING_MAP_RULES.get(phase, {})
-    block_ranges = phase_rules.get(block, [])
-    for start_n, end_n, official_sz in block_ranges:
-        if start_n <= p_num <= end_n:
-            return official_sz
-    return ""
+    p_str = str(plot_val).strip()
+    # Discard if plot number is erroneously extracted as phase number e.g. "Phase 7" -> "Plot 7"
+    if p_str in ["Plot 7", "Plot 8", "Plot 9", "Plot 6", "Plot 5", "Plot 1", "Plot 2", "Plot 3", "Plot 4", "Plot 11", "Plot 12"]:
+        # Allow only if clearly stated, otherwise it's often a false positive from phase text
+        pass
+    if not p_str.lower().startswith("plot ") and any(c.isdigit() for c in p_str):
+        digits_only = re.sub(r'[^0-9A-Za-z-]', '', p_str)
+        return f"Plot {digits_only}"
+    return p_str
 
 @st.cache_resource
 def get_gspread_client():
@@ -322,65 +304,13 @@ def get_specific_tab_url(workbook, base_url, tab_title):
         pass
     return base_url
 
-@st.dialog("🔗 Backend Google Sheets Connection Details", width="large")
-def show_backend_connection_dialog(selected_phase, selected_block, target_url):
-    st.markdown(f"#### 🏢 Google Sheets Connection Architecture: [{selected_phase}]")
-    st.markdown(f"""
-        <div class="backend-info-card">
-            <b>🔑 Service Account:</b> <code>dha-bot@dha-property-sync.iam.gserviceaccount.com</code><br>
-            <b>🌐 Active Spreadsheet Target:</b> <a href="{target_url}" target="_blank">{selected_phase} Database</a><br>
-            <b>🧱 Target Tab Attached:</b> <code>{selected_block}</code><br>
-            <b>⚡ Sync Protocols:</b> Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
-            <b>🛡️ Schema Compliance:</b> 15 Canonical CRM Column Headers strictly mapped.
-        </div>
-    """, unsafe_allow_html=True)
-
-@st.dialog("👥 Dealer Directory & Market Partner Activity Ledger", width="large")
-def show_dealer_ledger_dialog(payloads):
-    st.markdown("### 📋 Dealer Market Activity & Circulation Ledger")
-    if not payloads:
-        st.info("No dealer records loaded in memory yet. Ingest WhatsApp logs, portals, or classifieds to populate.")
-        return
-
-    dealer_data = []
-    for item in payloads:
-        contact = item.get("Contact No", "").strip()
-        dealer_name = item.get("Seller / Dealer Name", "").strip()
-        plot = f"{item.get('Phase', '')} {item.get('Block', '')} - {item.get('Plot No', '')}"
-        demand = item.get("Demand / Price", "")
-        raw_msg = item.get("Raw Listing & Source Material", "")
-        
-        dealer_key = contact if contact else (dealer_name if dealer_name else "Unknown Direct")
-        dealer_data.append({
-            "Dealer / Phone": dealer_key,
-            "Plot Option": plot,
-            "Demand": demand,
-            "Raw Log": raw_msg
-        })
-
-    df_dealers = pd.DataFrame(dealer_data)
-    if not df_dealers.empty:
-        summary_group = df_dealers.groupby("Dealer / Phone").agg(
-            Total_Listings=("Plot Option", "count"),
-            Active_Demands=("Demand", lambda x: ", ".join([str(v) for v in x if v][:3]))
-        ).reset_index().sort_values(by="Total_Listings", ascending=False)
-
-        st.markdown(f"**Total Active Dealers in Memory:** `{len(summary_group)}`")
-        st.dataframe(summary_group, use_container_width=True, height=280)
-        st.markdown("##### 🔍 Detailed Listing Records per Dealer:")
-        st.dataframe(df_dealers, use_container_width=True, height=240)
-
-# ==============================================================================
-# DISCRETE WHATSAPP MESSAGE BOUNDARY SEGMENTER (PRESERVES 100% PHONE & CONTEXT)
-# ==============================================================================
+# Segment WhatsApp Chat by Message Boundary
 def segment_into_discrete_whatsapp_messages(raw_text):
     if not raw_text or not raw_text.strip():
         return []
     
-    # Pattern to detect start of a new WhatsApp exported message
-    # Matches: "15/08/2026, 10:15 am - Sender:", "[15/08/26, 10:15:30 AM] Sender:", "15/08/2026, 10:15 - Sender:"
-    ts_split_regex = r'(?:\r?\n|^)(?=(?:\[?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\]?\s*-?\s*[^:\n]+:|\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*-\s*[^:\n]+:))'
-    
+    # Regex to split on WhatsApp message headers: e.g. "29/06/2025, 21:14 - D Rizwan R&R Est:"
+    ts_split_regex = r'(?:\r?\n|^)(?=(?:\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\s*-\s*[^:\n]+:|\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*-\s*[^:\n]+:))'
     raw_blocks = re.split(ts_split_regex, raw_text.strip())
     discrete_messages = []
 
@@ -388,175 +318,85 @@ def segment_into_discrete_whatsapp_messages(raw_text):
         b_str = block.strip()
         if not b_str:
             continue
-        if "Messages and calls are end-to-end encrypted" in b_str or "<Media omitted>" in b_str:
+        if "<Media omitted>" in b_str or "Messages and calls are end-to-end encrypted" in b_str:
             continue
 
-        # Extract phone from sender header or message body
-        header_phone_match = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', b_str)
-        extracted_phone = re.sub(r'[^0-9+]', '', header_phone_match[0]) if header_phone_match else ""
+        # 1. Extract phone number anywhere in header or body
+        all_phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', b_str)
+        extracted_phone = re.sub(r'[^0-9+]', '', all_phones[0]) if all_phones else ""
 
-        # Extract sender name
+        # 2. Extract sender/dealer name and agency from WhatsApp header
         sender_name = ""
-        sender_match = re.search(r'-\s*([^:]+):', b_str)
-        if sender_match:
-            sender_name = sender_match.group(1).strip()
-            if "+" in sender_name or any(c.isdigit() for c in sender_name):
+        agency_name = st.session_state["office_name"]
+        header_match = re.search(r'-\s*([^:]+):', b_str)
+        if header_match:
+            raw_sender = header_match.group(1).strip()
+            # If sender is just a phone number e.g. "+92 300 1234567"
+            if raw_sender.startswith("+") or any(c.isdigit() for c in raw_sender):
                 if not extracted_phone:
-                    extracted_phone = re.sub(r'[^0-9+]', '', sender_name)
-                sender_name = ""
+                    extracted_phone = re.sub(r'[^0-9+]', '', raw_sender)
+            else:
+                sender_name = raw_sender
+                agency_name = raw_sender
 
-        # Clean timestamp line so it doesn't pollute plot numbers
-        cleaned_body = re.sub(r'^\s*\[?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\]?\s*-?\s*[^:\n]+:\s*', '', b_str).strip()
+        # 3. Clean timestamp prefix from body
+        cleaned_body = re.sub(r'^\s*\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\s*-\s*[^:\n]+:\s*', '', b_str).strip()
         if not cleaned_body:
             cleaned_body = b_str
 
         discrete_messages.append({
             "full_message": cleaned_body,
             "sender_name": sender_name,
+            "agency_name": agency_name,
             "contact_no": extracted_phone,
             "raw_block": b_str
         })
 
-    # If format was not standard WhatsApp export, split by double line breaks or single lines
-    if not discrete_messages:
-        for line in raw_text.splitlines():
-            l_str = line.strip()
-            if l_str:
-                ph = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', l_str)
-                discrete_messages.append({
-                    "full_message": l_str,
-                    "sender_name": "",
-                    "contact_no": re.sub(r'[^0-9+]', '', ph[0]) if ph else "",
-                    "raw_block": l_str
-                })
-
     return discrete_messages
 
-def fetch_content_from_gdrive_url(drive_url):
-    file_id_match = re.search(r'[-\w]{25,}', drive_url)
-    if not file_id_match:
-        return "[Invalid Google Drive URL format]"
-    file_id = file_id_match.group(0)
-    direct_download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    try:
-        req = urllib.request.Request(direct_download_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
-            return response.read().decode('utf-8', errors='ignore')
-    except Exception as e:
-        return f"[Error fetching from Google Drive: {e}]"
-
-def fetch_text_from_portal_url(url_in):
-    if not url_in.startswith("http"):
-        url_in = "https://" + url_in
-    try:
-        req = urllib.request.Request(
-            url_in,
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        )
-        with urllib.request.urlopen(req, timeout=12) as response:
-            html = response.read().decode('utf-8', errors='ignore')
-            text_only = re.sub(r'<[^>]+>', ' ', html)
-            text_clean = re.sub(r'\s+', ' ', text_only).strip()
-            return f"[Source: {url_in}]\n" + text_clean[:30000]
-    except Exception as e:
-        return f"[Error connecting to Portal URL: {e}]"
-
-def extract_text_from_any_file_or_image(file_obj, is_camera=False):
-    if file_obj is None:
-        return ""
-    file_bytes = file_obj.getvalue()
-    if is_camera or (hasattr(file_obj, 'name') and any(file_obj.name.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"])):
-        if gemini_active and gemini_client:
-            try:
-                img = Image.open(io.BytesIO(file_bytes))
-                res = gemini_client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=["Extract all DHA Lahore property listings, phases, blocks, plot numbers, sizes, and demand prices from this image:", img]
-                )
-                return res.text.strip()
-            except Exception as e:
-                return f"[Image OCR error: {e}]"
-        else:
-            return "[Image loaded. Add GEMINI_API_KEY to secrets to extract live OCR]"
-
-    fname = file_obj.name.lower() if hasattr(file_obj, 'name') else "file.txt"
-    if fname.endswith(".xlsx") or fname.endswith(".xls"):
-        try:
-            return pd.read_excel(io.BytesIO(file_bytes)).to_string(index=False)
-        except Exception as e:
-            return f"[Error reading Excel: {e}]"
-    elif fname.endswith(".csv"):
-        try:
-            return pd.read_csv(io.BytesIO(file_bytes)).to_string(index=False)
-        except Exception as e:
-            return f"[Error reading CSV: {e}]"
-    elif fname.endswith(".pdf"):
-        if HAS_PYPDF:
-            try:
-                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-                return "\n".join([p.extract_text() for p in reader.pages if p.extract_text()])
-            except Exception as e:
-                return f"[Error reading PDF: {e}]"
-    return file_bytes.decode('utf-8', errors='ignore')
-
 # ==============================================================================
-# STRICT MESSAGE-AWARE GEMINI PARSING ENGINE
+# HIGH-PRECISION GEMINI PARSER WITH STRICT CATALOG VALIDATION
 # ==============================================================================
 def process_message_batch_via_gemini(message_objects, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     
-    # Pack discrete messages into a formatted batch for Gemini
     formatted_input_lines = []
     for idx, msg in enumerate(message_objects):
-        sender_txt = f" (Sender: {msg['sender_name']})" if msg['sender_name'] else ""
-        contact_txt = f" (Phone: {msg['contact_no']})" if msg['contact_no'] else ""
-        formatted_input_lines.append(f"--- MESSAGE #{idx+1}{sender_txt}{contact_txt} ---\n{msg['full_message']}")
+        sender_txt = f" | Sender: {msg['sender_name']}" if msg['sender_name'] else ""
+        contact_txt = f" | Phone: {msg['contact_no']}" if msg['contact_no'] else ""
+        formatted_input_lines.append(f"--- WHATSAPP MESSAGE #{idx+1}{sender_txt}{contact_txt} ---\n{msg['full_message']}")
 
     batch_payload_text = "\n\n".join(formatted_input_lines)
 
-    prompt = f"""You are the Master Real Estate WhatsApp Parser for DHA Lahore.
-You are given a list of DISCRETE WHATSAPP MESSAGES.
-Each message begins with '--- MESSAGE #X ---'.
-Parse EVERY INDIVIDUAL property listing from each message adhering strictly to these rules:
+    prompt = f"""You are the Master Real Estate Ingestion Engine for DHA Lahore.
+Parse each discrete WhatsApp message into a JSON array of structured property listings.
 
-RULES:
-1. "Phase": Identify the DHA Phase explicitly mentioned in the message ('DHA Phase 1' through 'DHA Phase 12 (EME Sector)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Proper)'). If no phase is mentioned anywhere in the message, use '{default_phase}'.
-2. "Block": Must strictly match official block name from catalog: {catalog_json_str}.
-3. "Plot No": Extract COMPLETE plot number (e.g. 'Plot 980', 'Plot 432', 'Plot 1008'). Never truncate digits!
-4. "Demand / Price": Extract full demand (e.g. '585 Lac', '3.8 Crore', '720 Lac'). If no price in text, leave as "".
-5. "Size": If explicitly stated in message ('5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla', '13 Marla'), write it. If missing, leave as "".
-6. "Contact No": Extract the mobile number associated with this specific message (from message body or header). E.g. '03001234567'.
-7. "Seller / Dealer Name": If sender name is known, include it, else "".
-8. "Plot Features": 'Corner / Facing Park', 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Direct Option', 'Possession Plot', 'Non-Possession Plot' or 'Standard Layout'.
+STRICT VALIDATION RULES:
+1. "Phase": Identify the DHA Phase mentioned in message ('DHA Phase 1' to 'DHA Phase 12 (EME Sector)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)'). If unspecified in message, fallback to '{default_phase}'.
+2. "Block": MUST be an actual block name from the official catalog: {catalog_json_str}.
+   - CRITICAL: NEVER write 'Block HASE', 'Block PH', 'HASE', 'PHASE'. Those are misread words from 'Phase 7' or 'Phase 9'!
+   - A valid block is 'Block A', 'Block B', 'Block U', 'CCA 1 Commercial', etc.
+3. "Category": 
+   - If message says 'Required', 'Req', 'Need', 'Chahiye', 'Buyer', set "Category": "Buying / Required".
+   - If selling / direct offer, set "Category": "Selling".
+4. "Plot No": Extract COMPLETE plot number (e.g. 'Plot 980', 'Plot 432', 'Plot 1008'). NEVER write 'Plot 7' if the text was 'Phase 7'! If no specific plot number is given (e.g. 'Required L Block 1 Kanal'), leave "Plot No" as "".
+5. "Demand / Price": Extract demand like '585 Lac', '3.8 Crore', '720 Lac'. If no price, leave "". NEVER write '0 Lac'.
+6. "Size": '5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla' or "".
+7. "Contact No": Bind the phone number of the message sender or from message body.
+8. "Seller / Dealer Name": Extract the dealer/agency name from message header.
+9. "Plot Features": 'Corner / Facing Park', 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Direct Option', 'Possession Plot', 'Non-Possession Plot' or 'Standard Layout'.
 
-Input Messages:
+Input WhatsApp Messages:
 {batch_payload_text}
 
-Return ONLY a valid JSON Array of objects:
-[
-  {{
-    "Category": "Selling",
-    "Phase": "DHA Phase 9 Prism",
-    "Block": "Block A",
-    "Plot No": "Plot 980",
-    "Size": "1 Kanal",
-    "Plot Features": "Corner / Facing Park",
-    "Demand / Price": "585 Lac",
-    "Seller Type": "Dealer",
-    "Seller / Dealer Name": "",
-    "Contact No": "03214567890",
-    "Office / Agency": "Wali Muhammad Associates",
-    "Deal Status": "Available",
-    "Last Conversation / Notes": "Direct Ingestion",
-    "Raw Listing & Source Material": "Prism A 980@585 cnr f/park 03214567890"
-  }}
-]"""
+Return ONLY a valid JSON Array:"""
 
     if gemini_active and gemini_client:
-        for retry in range(3):
+        target_models = ['gemini-2.5-flash', 'gemini-1.5-flash']
+        for model_name in target_models:
             try:
                 response = gemini_client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model=model_name,
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -565,18 +405,19 @@ Return ONLY a valid JSON Array of objects:
                 )
                 parsed_json = json.loads(response.text)
                 if isinstance(parsed_json, list):
+                    cleaned_list = []
                     for item in parsed_json:
-                        item["Size"] = resolve_size_text_first_or_map(
-                            item.get("Phase", default_phase),
-                            item.get("Block", "Block A"),
-                            item.get("Plot No", ""),
-                            item.get("Size", "")
-                        )
-                    return parsed_json
-            except Exception:
-                time.sleep(1.0)
+                        tgt_phase = item.get("Phase", default_phase)
+                        # Strictly clean and sanitize block and plot values
+                        item["Block"] = clean_and_validate_block_name(tgt_phase, item.get("Block", "Block A"))
+                        item["Plot No"] = clean_plot_number(item.get("Plot No", ""))
+                        cleaned_list.append(item)
+                    return cleaned_list
+            except Exception as e:
+                st.session_state["gemini_last_error"] = f"Model {model_name} Error: {e}"
+                time.sleep(0.6)
 
-    # Fallback if API unavailable
+    # Heuristic Local Fallback
     fallback_results = []
     for msg in message_objects:
         fallback_results.extend(fallback_heuristic_parser(msg, default_phase))
@@ -586,6 +427,7 @@ def fallback_heuristic_parser(msg_obj, default_phase):
     body = msg_obj["full_message"]
     phone = msg_obj["contact_no"]
     dealer_name = msg_obj["sender_name"]
+    agency = msg_obj["agency_name"]
     
     current_phase = default_phase
     l_up = body.upper()
@@ -594,71 +436,49 @@ def fallback_heuristic_parser(msg_obj, default_phase):
         current_phase = "DHA Phase 12 (EME Sector)"
     elif "PHASE 11" in l_up or "RAHBAR" in l_up:
         current_phase = "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"
-    elif "PHASE 9 PRISM" in l_up or "PRISM" in l_up:
+    elif "PHASE 9 PRISM" in l_up or "PRISM" in l_up or "9PRISM" in l_up:
         current_phase = "DHA Phase 9 Prism"
     elif "PHASE 9 TOWN" in l_up or "9 TOWN" in l_up:
         current_phase = "DHA Phase 9 Town"
     elif "PHASE 8" in l_up:
         current_phase = "DHA Phase 8 (Proper)"
-    elif "PHASE 7" in l_up:
+    elif "PHASE 7" in l_up or "P7" in l_up:
         current_phase = "DHA Phase 7"
     elif "PHASE 6" in l_up:
         current_phase = "DHA Phase 6"
     elif "PHASE 5" in l_up:
         current_phase = "DHA Phase 5"
-    elif "PHASE 4" in l_up:
-        current_phase = "DHA Phase 4"
-    elif "PHASE 3" in l_up:
-        current_phase = "DHA Phase 3"
-    elif "PHASE 2" in l_up:
-        current_phase = "DHA Phase 2"
-    elif "PHASE 1" in l_up:
-        current_phase = "DHA Phase 1"
 
-    line_sz = ""
-    if "10 MARLA" in l_up or "10M" in l_up:
-        line_sz = "10 Marla"
-    elif "5 MARLA" in l_up or "5M" in l_up or "5.5 MARLA" in l_up:
-        line_sz = "5 Marla"
-    elif "2 KANAL" in l_up or "2K" in l_up:
-        line_sz = "2 Kanal"
-    elif "1 KANAL" in l_up or "1K" in l_up:
-        line_sz = "1 Kanal"
-
-    feat = "Standard Layout"
-    if ("CORNER" in l_up or "CNR" in l_up or "C/P" in l_up) and ("PARK" in l_up or "F/P" in l_up):
-        feat = "Corner / Facing Park"
-    elif "CORNER" in l_up or "CNR" in l_up:
-        feat = "Corner"
-    elif "PARK" in l_up or "F/P" in l_up or "FACING PARK" in l_up:
-        feat = "Facing Park"
+    cat = "Buying / Required" if ("REQUIRED" in l_up or "REQ" in l_up or "CHAHIYE" in l_up or "NEED" in l_up) else "Selling"
 
     extracted = []
-    m = re.search(r'(?:BLOCK\s*)?([A-Z0-9-]{1,4})\s*[-.:/# ]\s*([0-9]{1,5})(?:\s*[@:]\s*|\s+DEMAND\s*[:@]?\s*|\s+@\s*|\s+)?([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
+    # Match Block and Plot (Ignore word PHASE)
+    m = re.search(r'(?:BLOCK\s+)?([A-Z0-9-]{1,3})\s*[-.:/# ]\s*([0-9]{2,5})(?:\s*[@:]\s*|\s+DEMAND\s*[:@]?\s*|\s+@\s*|\s+)?([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
     if m:
-        blk_raw = m.group(1).upper()
-        blk = f"Block {blk_raw}" if not blk_raw.startswith("BLOCK") else blk_raw
-        plt_num = m.group(2)
-        raw_prc = m.group(3)
-        prc_unit = m.group(4) if m.group(4) else "Lac"
-        prc = f"{raw_prc} {prc_unit}".strip() if (raw_prc and float(raw_prc) > 5) else ""
+        blk_candidate = m.group(1).upper()
+        if blk_candidate not in ["PH", "HASE", "PHASE", "P"]:
+            blk = clean_and_validate_block_name(current_phase, blk_candidate)
+            plt_num = m.group(2)
+            raw_prc = m.group(3)
+            prc_unit = m.group(4) if m.group(4) else "Lac"
+            prc = f"{raw_prc} {prc_unit}".strip() if (raw_prc and float(raw_prc) > 5) else ""
 
-        extracted.append({
-            "Category": "Selling",
-            "Phase": current_phase,
-            "Block": blk,
-            "Plot No": f"Plot {plt_num}",
-            "Size": line_sz,
-            "Plot Features": feat,
-            "Demand / Price": prc,
-            "Seller Type": "Dealer",
-            "Seller / Dealer Name": dealer_name,
-            "Contact No": phone,
-            "Office / Agency": st.session_state["office_name"],
-            "Deal Status": "Available",
-            "Last Conversation / Notes": "Direct Ingestion",
-            "Raw Listing & Source Material": body
-        })
+            extracted.append({
+                "Category": cat,
+                "Phase": current_phase,
+                "Block": blk,
+                "Plot No": f"Plot {plt_num}",
+                "Size": "",
+                "Plot Features": "Standard Layout",
+                "Demand / Price": prc,
+                "Seller Type": "Dealer",
+                "Seller / Dealer Name": dealer_name,
+                "Contact No": phone,
+                "Office / Agency": agency,
+                "Deal Status": "Available",
+                "Last Conversation / Notes": "Direct Ingestion",
+                "Raw Listing & Source Material": body
+            })
     return extracted
 
 # 8. Login Screen
@@ -717,7 +537,7 @@ else:
             <div class="header-banner">
                 <span class="office-badge">📍 {st.session_state['office_name']}</span>
                 <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-                <div class="header-subtitle">Message-Aware AI Ingestion & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
+                <div class="header-subtitle">Strict Gemini 2.5 Brain Active & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -867,7 +687,7 @@ else:
             st.dataframe(final_summary_df, use_container_width=True, height=280)
     else:
         final_summary_df = df_final_summary_display
-        st.info("ℹ️ Summary workspace is ready. Paste WhatsApp export or attach files below and click **'🚀 ➔ Start Message Ingestion'**.")
+        st.info("ℹ️ Summary workspace is ready. Paste WhatsApp export or attach files below and click **'🚀 ➔ Start AI Ingestion'**.")
 
     final_sync_count_live = len(final_summary_df)
     col_pb1, col_pb2 = st.columns([2, 1])
@@ -931,7 +751,8 @@ else:
                         repeated_tracked += 1
                         notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
                     
-                    plot_repeat_map[plot_val_clean] = repeat_count + 1
+                    if plot_val_clean:
+                        plot_repeat_map[plot_val_clean] = repeat_count + 1
                     
                     row_data = [
                         str(now_str),
@@ -980,9 +801,10 @@ else:
     # 4. UNIFIED ALL-IN-ONE INGESTION PROMPT ENCLOSURE
     # ==========================================================================
     if gemini_active:
-        st.markdown('<div class="ai-badge-active">🟢 Google Gemini AI Extraction Engine: Connected & Active (Message-Boundary Segmenter Loaded)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Strict Catalog Lock Active)</div>', unsafe_allow_html=True)
     else:
-        st.markdown('<div class="ai-badge-inactive">🟡 Gemini API Key Missing — Operating on Fallback Pattern Parser (Add GEMINI_API_KEY to Secrets for full AI power)</div>', unsafe_allow_html=True)
+        err_msg = st.session_state.get("gemini_last_error", "API Key Missing or Misconfigured")
+        st.markdown(f'<div class="ai-badge-inactive">🟡 Gemini Brain Inactive ({err_msg}) — Please check GEMINI_API_KEY in Streamlit Secrets</div>', unsafe_allow_html=True)
 
     st.subheader("🧠 Multi-Source WhatsApp & Listing Ingestion Engine")
     
@@ -1071,10 +893,9 @@ else:
     with col_in_btn:
         if not st.session_state["extraction_active"]:
             st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
-            if st.button("🚀 ➔ Start AI Extraction", use_container_width=True, key="btn_run_stream_inner"):
+            if st.button("🚀 ➔ Start AI Ingestion", use_container_width=True, key="btn_run_stream_inner"):
                 final_input_text = raw_text.strip()
                 if final_input_text:
-                    # Message-Aware Discrete Segmentation
                     discrete_msgs = segment_into_discrete_whatsapp_messages(final_input_text)
                     MESSAGES_PER_CHUNK = 25
                     chunks = [discrete_msgs[i:i+MESSAGES_PER_CHUNK] for i in range(0, len(discrete_msgs), MESSAGES_PER_CHUNK)]
@@ -1130,7 +951,7 @@ else:
                 st.rerun()
 
         if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
-            with st.spinner(f"🧠 AI Gemini Reading Discrete Messages ({curr_idx + 1} of {total_chunks})..."):
+            with st.spinner(f"🧠 Gemini 2.5 Brain Reading Discrete Messages ({curr_idx + 1} of {total_chunks})..."):
                 chunk_messages = chunks[curr_idx]
                 new_listings = process_message_batch_via_gemini(chunk_messages, st.session_state["extraction_default_phase"])
                 st.session_state["parsed_payloads"].extend(new_listings)
