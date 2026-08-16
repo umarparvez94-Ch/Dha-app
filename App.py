@@ -272,12 +272,6 @@ DHA_PHASE_BLOCK_CATALOG = {
     }
 }
 
-VALID_DHA_BLOCK_NAMES = set()
-for p, d in DHA_PHASE_BLOCK_CATALOG.items():
-    for b in d["residential"] + d["commercial"]:
-        VALID_DHA_BLOCK_NAMES.add(b.upper())
-        VALID_DHA_BLOCK_NAMES.add(b.replace("Block ", "").upper())
-
 def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
     cleaned_size = str(extracted_size).strip() if extracted_size else ""
     if cleaned_size and cleaned_size.lower() not in ["n/a", "unknown", "none", ""]:
@@ -396,9 +390,9 @@ def show_dealer_ledger_dialog(payloads):
         ).reset_index().sort_values(by="Total_Listings", ascending=False)
 
         st.markdown(f"**Total Active Dealers in Memory:** `{len(summary_group)}`")
-        st.dataframe(summary_group, use_container_width=True, height=280)
+        st.dataframe(summary_group, height=280)
         st.markdown("##### 🔍 Detailed Listing Records per Dealer:")
-        st.dataframe(df_dealers, use_container_width=True, height=240)
+        st.dataframe(df_dealers, height=240)
 
 # ==============================================================================
 # SOURCE FETCHERS, 100-MESSAGE CHUNKER & OCR PROCESSORS
@@ -546,7 +540,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
     messages = chunk_text.split("===MESSAGE_START===")
     results = []
 
-    # Words that must NEVER be treated as Block letters
     FORBIDDEN_BLOCK_WORDS = {
         "PHASE", "PH", "SECTOR", "DHA", "CCA", "COMMERCIAL", "PAIR", "DEMAND", "ASKING",
         "OFFER", "FINAL", "DIRECT", "MEETING", "COMPLETE", "FILE", "PAPER", "CORNER", "PARK",
@@ -559,7 +552,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
         if not m_clean:
             continue
         
-        # Phone numbers & Dealer Name
         phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', m_clean)
         main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else ""
         
@@ -573,13 +565,11 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
         for line in lines:
             l_up = line.upper()
             
-            # Check for intra-message Phase Section Headers
             ph_found = detect_phase_from_header(l_up)
             if ph_found:
                 current_section_phase = ph_found
                 continue
             
-            # Check for Section Size Headers (e.g. *1 Kanal*, *5 Marla*, *4 Marla Commercial*)
             if "1 KANAL" in l_up:
                 current_section_size = "1 Kanal"
             elif "2 KANAL" in l_up:
@@ -593,7 +583,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
             elif "8 MARLA" in l_up or "8M" in l_up:
                 current_section_size = "8 Marla"
 
-            # Check for Commercial CCA Plot (e.g. CCA 1 Q 41 Rs 575 Lac, CCA3-68@365)
             cca_match = re.search(r'CCA\s*([0-9])?\s*([A-Z])?\s*[-.:_/# ]\s*([0-9]{1,4})\s*(?:@|RS|DEMAND)?\s*([0-9]{2,5})?\s*(LAC|LACS|CRORE|CR)?', l_up)
             if cca_match:
                 matched_in_message = True
@@ -622,7 +611,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 })
                 continue
 
-            # Standard Plot Match (e.g. G 292 @ 565lac, X 500/9 @ 310lac, Z2 1308 Rs 225, Q. 18 Rs 325)
             p_match = re.search(r'(?:^|[\s*])([A-Z]{1,2}[0-9]?)\s*[\.\-_/:\s]+\s*([0-9]{1,5}(?:[+/][0-9]{1,5})?)\s*(?:@|RS|DEMAND|ASKING|[:\s-])?\s*([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
             
             if p_match:
@@ -636,7 +624,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 raw_unit = p_match.group(4) or "Lac"
                 prc_str = f"{raw_prc} {raw_unit}".strip() if raw_prc else ""
 
-                # Format Block
                 if raw_b.startswith("Z") and len(raw_b) == 2 and raw_b[1].isdigit():
                     blk_str = f"Block Z-{raw_b[1]}"
                 elif raw_b.startswith("BLOCK"):
@@ -644,7 +631,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 else:
                     blk_str = f"Block {raw_b}"
 
-                # Size Resolution
                 sz_str = ""
                 if "5 MARLA" in l_up or "5M" in l_up:
                     sz_str = "5 Marla"
@@ -678,7 +664,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     "Raw Listing & Source Material": m_clean
                 })
 
-        # Lead Retention if no plots identified in message
         if not matched_in_message and main_phone:
             results.append({
                 "Category": "Dealer Lead / General",
@@ -807,7 +792,7 @@ if not st.session_state["authenticated"]:
                 st.rerun()
 
         st.markdown("<div style='text-align:center; margin: 10px 0; color:#757682; font-size:12px;'>OR</div>", unsafe_allow_html=True)
-        if st.button("🔑 CONTINUE WITH SINGLE SIGN-ON (SSO)", use_container_width=True):
+        if st.button("🔑 CONTINUE WITH SINGLE SIGN-ON (SSO)"):
             st.session_state["authenticated"] = True
             st.session_state["user_email"] = "sso.agent@dha.pk"
             st.rerun()
@@ -833,7 +818,7 @@ else:
 
     with col_h2:
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        if st.button("👥 Dealer Ledger & Directory", use_container_width=True):
+        if st.button("👥 Dealer Ledger & Directory"):
             show_dealer_ledger_dialog(st.session_state.get("parsed_payloads", []))
 
     # Top Selectors
@@ -859,10 +844,10 @@ else:
 
     col_btn_info, col_btn_sheet = st.columns([1.5, 2.5])
     with col_btn_info:
-        if st.button("ℹ️ Connection Details & Architecture", use_container_width=True):
+        if st.button("ℹ️ Connection Details & Architecture"):
             show_backend_connection_dialog(selected_phase, selected_active_block, exact_block_tab_url)
     with col_btn_sheet:
-        st.link_button(f"📑 Open [{selected_active_block}] Tab in Google Sheets ↗", url=exact_block_tab_url, use_container_width=True)
+        st.link_button(f"📑 Open [{selected_active_block}] Tab in Google Sheets ↗", url=exact_block_tab_url)
 
     st.markdown("---")
 
@@ -937,15 +922,15 @@ else:
     """, unsafe_allow_html=True)
 
     if edit_summary_mode and total_parsed_now > 0:
-        final_summary_df = st.data_editor(df_final_summary_display, use_container_width=True, num_rows="dynamic", height=280, key="summary_active_live_editor")
+        final_summary_df = st.data_editor(df_final_summary_display, num_rows="dynamic", height=280, key="summary_active_live_editor")
     else:
         final_summary_df = df_final_summary_display
-        st.dataframe(final_summary_df, use_container_width=True, height=280)
+        st.dataframe(final_summary_df, height=280)
 
     final_sync_count_live = len(final_summary_df)
     col_pb1, col_pb2 = st.columns([2, 1])
     with col_pb1:
-        if st.button(f"🚀 Push ({final_sync_count_live} Filtered Plots) to Sheet Tabs", use_container_width=True, disabled=(final_sync_count_live == 0)):
+        if st.button(f"🚀 Push ({final_sync_count_live} Filtered Plots) to Sheet Tabs", disabled=(final_sync_count_live == 0)):
             now_dt = datetime.now()
             now_str = now_dt.strftime("%Y-%m-%d %H:%M")
             grouped_data = {}
@@ -1020,7 +1005,7 @@ else:
             st.balloons()
 
     with col_pb2:
-        if st.button("🗑️ Clear Extracted Summary Data", use_container_width=True):
+        if st.button("🗑️ Clear Extracted Summary Data"):
             st.session_state["parsed_payloads"] = []
             st.session_state["extraction_active"] = False
             st.session_state["extraction_paused"] = False
@@ -1069,7 +1054,7 @@ else:
                             st.error(f"Error reading file: {e}")
                 
                 if st.session_state.get("uploaded_temp_text", ""):
-                    if st.button("📥 Push to Box", use_container_width=True, key="btn_push_file_to_box"):
+                    if st.button("📥 Push to Box", key="btn_push_file_to_box"):
                         st.session_state["extracted_file_text"] = st.session_state["uploaded_temp_text"]
                         st.session_state["uploaded_temp_text"] = ""
                         st.success("✅ Pushed file text into stream box!")
@@ -1077,7 +1062,7 @@ else:
 
             with tab_gdrive:
                 gdrive_url_in = st.text_input("Paste Google Drive Link:", placeholder="https://drive.google.com/...", key="inner_gdrive_in")
-                if st.button("📥 Push to Box (G-Drive)", use_container_width=True, key="btn_push_gdrive_inner"):
+                if st.button("📥 Push to Box (G-Drive)", key="btn_push_gdrive_inner"):
                     if gdrive_url_in.strip():
                         with st.spinner("Fetching Google Drive file..."):
                             gdrive_content = fetch_content_from_gdrive_url(gdrive_url_in.strip())
@@ -1095,14 +1080,14 @@ else:
                     with st.spinner("🧠 Scanning document via Google Vision OCR..."):
                         camera_text = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
                         if camera_text:
-                            if st.button("📥 Push to Box (Camera OCR)", use_container_width=True, key="btn_push_cam_inner"):
+                            if st.button("📥 Push to Box (Camera OCR)", key="btn_push_cam_inner"):
                                 st.session_state["extracted_file_text"] = camera_text
                                 st.success("✅ Camera OCR loaded into box!")
                                 st.rerun()
 
             with tab_direct:
                 pasted_txt = st.text_area("Paste Raw WhatsApp Broadcasts or Text:", height=80, placeholder="Paste text...", key="inner_paste_in")
-                if st.button("📥 Push to Box (Direct Text)", use_container_width=True, key="btn_push_direct_inner"):
+                if st.button("📥 Push to Box (Direct Text)", key="btn_push_direct_inner"):
                     if pasted_txt.strip():
                         st.session_state["extracted_file_text"] = pasted_txt.strip()
                         st.success("✅ Direct text loaded into box!")
@@ -1110,7 +1095,7 @@ else:
 
             with tab_zameen:
                 portal_url = st.text_input("Paste Zameen / Portal Listing URL:", placeholder="https://www.zameen.com/...", key="inner_portal_in")
-                if st.button("🌐 Scrape & Push to Box", use_container_width=True, key="btn_push_portal_inner"):
+                if st.button("🌐 Scrape & Push to Box", key="btn_push_portal_inner"):
                     if portal_url.strip():
                         with st.spinner("Connecting and extracting portal property feed..."):
                             portal_raw = fetch_text_from_portal_url(portal_url.strip())
@@ -1133,7 +1118,7 @@ else:
                 """, unsafe_allow_html=True)
                 st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
                 news_txt = st.text_area("Paste Newspaper Classified Ads Text (Jang, Dawn, Express etc.):", height=90, placeholder="مثلاً: ڈی ایچ اے فیز 9 پرزم 1 کنال پلاٹ برائے فروخت...", key="inner_news_in")
-                if st.button("📥 Push to Box (Newspaper Ads)", use_container_width=True, key="btn_push_news_inner"):
+                if st.button("📥 Push to Box (Newspaper Ads)", key="btn_push_news_inner"):
                     if news_txt.strip():
                         st.session_state["extracted_file_text"] = f"[Newspaper Classified Source]\n" + news_txt.strip()
                         st.success("✅ Newspaper classified ads loaded into box!")
@@ -1142,7 +1127,7 @@ else:
     with col_in_btn:
         if not st.session_state["extraction_active"]:
             st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
-            if st.button("🚀 Extract", use_container_width=True, key="btn_run_stream_inner"):
+            if st.button("🚀 Extract", key="btn_run_stream_inner"):
                 final_input_text = raw_text.strip()
                 if final_input_text:
                     chunks = split_raw_into_message_chunks(final_input_text, messages_per_chunk=100)
@@ -1175,20 +1160,20 @@ else:
         col_p1, col_p2, col_p3 = st.columns([1, 1, 1.2])
         with col_p1:
             if not st.session_state["extraction_paused"]:
-                if st.button("⏸️ Pause Extraction", use_container_width=True):
+                if st.button("⏸️ Pause Extraction"):
                     st.session_state["extraction_paused"] = True
                     st.rerun()
             else:
-                if st.button("▶️ Resume Extraction", use_container_width=True):
+                if st.button("▶️ Resume Extraction"):
                     st.session_state["extraction_paused"] = False
                     st.rerun()
         with col_p2:
-            if st.button("⏹️ Stop & Keep Extracted Data", use_container_width=True):
+            if st.button("⏹️ Stop & Keep Extracted Data"):
                 st.session_state["extraction_active"] = False
                 st.session_state["extraction_paused"] = False
                 st.rerun()
         with col_p3:
-            if st.button("❌ Cancel / Reset", use_container_width=True):
+            if st.button("❌ Cancel / Reset"):
                 st.session_state["extraction_active"] = False
                 st.session_state["extraction_paused"] = False
                 st.session_state["parsed_payloads"] = []
