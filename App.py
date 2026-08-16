@@ -96,7 +96,6 @@ st.markdown("""
     .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 16px 20px; margin: 15px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.08); }
     .backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }
     
-    /* Integrated All-in-One Prompt Enclosure */
     .unified-prompt-card {
         background: #FFFFFF;
         border: 2px solid #CBD5E1;
@@ -289,9 +288,14 @@ def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
 
 @st.cache_resource
 def get_gspread_client():
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    if "private_key" in creds_dict:
-        creds_dict["private_key"] = creds_dict["private_key"].replace('\\n', '\n')
+    if "GCP_SERVICE_ACCOUNT_JSON" in st.secrets:
+        json_str = st.secrets["GCP_SERVICE_ACCOUNT_JSON"].strip()
+        creds_dict = json.loads(json_str)
+    else:
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        if "private_key" in creds_dict:
+            creds_dict["private_key"] = creds_dict["private_key"].replace('\\n', '\n')
+            
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     credentials = service_account.Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(credentials)
