@@ -94,6 +94,7 @@ st.markdown("""
     .stat-pill { background: #F1F5F9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #334155; display: inline-block; margin-right: 8px; margin-bottom: 6px; }
     .eta-box { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 10px 14px; margin: 10px 0; color: #166534; font-size: 13px; }
     .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 16px 20px; margin: 15px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.08); }
+    .backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -308,6 +309,22 @@ def get_or_create_clean_tab_exact(workbook, tab_title):
         return ws
     except Exception:
         return workbook.sheet1
+
+# Modal for Backend Connection Architecture
+@st.dialog("🔗 Backend Google Sheets Connection Details", width="large")
+def show_backend_connection_dialog(selected_phase, selected_block, target_url):
+    st.markdown(f"#### 🏢 Google Sheets Connection Architecture: [{selected_phase}]")
+    st.markdown(f"""
+        <div class="backend-info-card">
+            <b>🔑 Service Account:</b> <code>dha-bot@dha-property-sync.iam.gserviceaccount.com</code><br>
+            <b>🌐 Active Spreadsheet Target:</b> <a href="{target_url}" target="_blank">{selected_phase} Database</a><br>
+            <b>🧱 Target Tab Attached:</b> <code>{selected_block}</code><br>
+            <b>⚡ Sync Protocols:</b> Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
+            <b>🛡️ Schema Compliance:</b> 15 Canonical CRM Column Headers strictly mapped.
+        </div>
+    """, unsafe_allow_html=True)
+    if st.button("⬅️ Return to Dashboard", use_container_width=True):
+        st.rerun()
 
 def clean_whatsapp_chat_text(raw_bytes):
     try:
@@ -630,7 +647,7 @@ else:
     """, unsafe_allow_html=True)
 
     # ==========================================================================
-    # 2. TOP DHA PHASE SWITCHER & BLOCK TABS SELECTOR (RESTORED)
+    # 2. TOP DHA PHASE SWITCHER & BLOCK TABS SELECTOR WITH 2 SMART ACTION BUTTONS
     # ==========================================================================
     col_city, col_phase = st.columns([1.2, 2.5])
     with col_city:
@@ -655,7 +672,18 @@ else:
         key="block_feature_tab_bar"
     )
 
-    st.markdown(f"🔗 **Active Google Sheet:** [Open {selected_phase} in Google Sheets ↗]({sheet_link}) | Current Tab: **`{selected_active_block}`**")
+    # TWO DEDICATED SMART BUTTONS (REPLACED RAW TEXT LINK)
+    col_btn_info, col_btn_sheet = st.columns([1.5, 2.5])
+    with col_btn_info:
+        if st.button("ℹ️ Connection Details & Architecture", use_container_width=True):
+            show_backend_connection_dialog(selected_phase, selected_active_block, sheet_link)
+
+    with col_btn_sheet:
+        st.link_button(
+            f"📑 Open [{selected_active_block}] Tab in Google Sheets ↗",
+            url=sheet_link,
+            use_container_width=True
+        )
 
     st.markdown("---")
 
@@ -756,7 +784,7 @@ else:
             )
         else:
             final_summary_df = df_final_summary_display
-            st.dataframe(final_summary_df, use_container_width=True, height=260)
+            st.dataframe(final_summary_df, use_container_width=True, height=280)
     else:
         final_summary_df = df_final_summary_display
         st.info("ℹ️ Summary workspace is ready. Click **'Start AI Extraction'** below to stream listings live into this table.")
@@ -954,7 +982,7 @@ else:
                 st.session_state["parsed_payloads"] = []
                 st.session_state["extraction_active"] = True
                 st.session_state["extraction_paused"] = False
-                st.session_state["extraction_default_phase"] = selected_phase
+                st.session_state["extraction_default_phase"] = "DHA Phase 9 Prism"
                 st.rerun()
             else:
                 st.warning("Please provide listing text, take a camera photo, or upload a file.")
