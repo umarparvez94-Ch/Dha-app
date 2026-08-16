@@ -92,9 +92,12 @@ st.markdown("""
     .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     .summary-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
     .stat-pill { background: #F1F5F9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #334155; display: inline-block; margin-right: 8px; margin-bottom: 6px; }
-    .eta-box { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 10px 14px; margin: 10px 0; color: #166534; font-size: 13px; }
     .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 16px 20px; margin: 15px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.08); }
     .backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }
+    
+    /* Integrated Action Prompt Container */
+    .ingest-box-container { background: #FFFFFF; border: 1.5px solid #CBD5E1; border-radius: 12px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+    .chat-bottom-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -310,7 +313,6 @@ def get_or_create_clean_tab_exact(workbook, tab_title):
     except Exception:
         return workbook.sheet1
 
-# Get Specific Tab URL with #gid=
 def get_specific_tab_url(workbook, base_url, tab_title):
     clean_title = tab_title.strip().lower()
     try:
@@ -325,7 +327,6 @@ def get_specific_tab_url(workbook, base_url, tab_title):
         pass
     return base_url
 
-# Modal for Backend Connection Architecture
 @st.dialog("🔗 Backend Google Sheets Connection Details", width="large")
 def show_backend_connection_dialog(selected_phase, selected_block, target_url):
     st.markdown(f"#### 🏢 Google Sheets Connection Architecture: [{selected_phase}]")
@@ -339,7 +340,6 @@ def show_backend_connection_dialog(selected_phase, selected_block, target_url):
         </div>
     """, unsafe_allow_html=True)
 
-# Modal for Dealer Directory & Partner Activity Ledger
 @st.dialog("👥 Dealer Directory & Market Partner Activity Ledger", width="large")
 def show_dealer_ledger_dialog(payloads):
     st.markdown("### 📋 Dealer Market Activity & Circulation Ledger")
@@ -427,7 +427,6 @@ def fetch_content_from_gdrive_url(drive_url):
     except Exception as e:
         return f"[Error fetching from Google Drive: {e}]"
 
-# Fetch HTML/Text from Portal URL (Zameen / Web)
 def fetch_text_from_portal_url(url_in):
     if not url_in.startswith("http"):
         url_in = "https://" + url_in
@@ -503,9 +502,6 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
 
     return clean_whatsapp_chat_text(file_bytes)
 
-# ==============================================================================
-# LINE-PRESERVING GEMINI AI EXTRACTION ENGINE (ZERO TRUNCATION)
-# ==============================================================================
 def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     prompt = f"""You are an expert DHA Lahore Real Estate CRM extraction engine.
@@ -719,7 +715,7 @@ else:
 
     with col_h2:
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        if st.button("👥 Dealer Ledger & Partner Directory", use_container_width=True):
+        if st.button("👥 Dealer Ledger & Directory", use_container_width=True):
             show_dealer_ledger_dialog(st.session_state.get("parsed_payloads", []))
 
     # ==========================================================================
@@ -865,7 +861,7 @@ else:
             st.dataframe(final_summary_df, use_container_width=True, height=280)
     else:
         final_summary_df = df_final_summary_display
-        st.info("ℹ️ Summary workspace is ready. Click **'Start AI Extraction'** below to stream listings live into this table.")
+        st.info("ℹ️ Summary workspace is ready. Paste text or attach sources below and click **'🚀 / ➔ Start Extraction'**.")
 
     final_sync_count_live = len(final_summary_df)
     col_pb1, col_pb2 = st.columns([2, 1])
@@ -975,7 +971,7 @@ else:
     st.markdown("---")
 
     # ==========================================================================
-    # 4. BOTTOM SECTION: MULTI-SOURCE INGESTION (PORTALS, CLASSIFIEDS, FILES, CHATS)
+    # 4. FULL-WIDTH CHAT-STYLE INGESTION BOX WITH [+] ATTACH & [➔] ACTION BUTTON
     # ==========================================================================
     if gemini_active:
         st.markdown('<div class="ai-badge-active">🟢 Google Gemini AI Extraction Engine: Connected & Active</div>', unsafe_allow_html=True)
@@ -984,104 +980,107 @@ else:
 
     st.subheader("🧠 Multi-Source Data Ingestion Engine")
     
-    col_u1, col_u2 = st.columns([1.4, 1.6])
+    default_box_value = st.session_state.get("extracted_file_text", "")
     
-    with col_u2:
-        tab_upload, tab_gdrive, tab_camera, tab_direct, tab_zameen, tab_news = st.tabs([
-            "📎 Files", "☁️ G-Drive", "📸 Camera", "📋 Direct Paste", "🌐 Zameen/Portals", "📰 Classifieds"
-        ])
-        
-        with tab_upload:
-            uploaded_file = st.file_uploader(
-                "Upload TXT, Excel, JSON, PDF, or Image:",
-                type=["txt", "xlsx", "xls", "json", "csv", "pdf", "png", "jpg", "jpeg", "webp"]
-            )
-            if uploaded_file is not None:
-                with st.spinner(f"Reading `{uploaded_file.name}`..."):
-                    try:
-                        extracted_content = extract_text_from_any_file_or_image(uploaded_file, is_camera=False)
-                        if extracted_content:
-                            st.session_state["extracted_file_text"] = extracted_content
-                            st.success(f"✅ Loaded `{uploaded_file.name}` into box!")
-                    except Exception as e:
-                        st.error(f"Error reading file: {e}")
+    # 1. Full-Width & Vertically Expanded Text Box
+    raw_text = st.text_area(
+        "📋 Live Real Estate Ingestion Stream (Expanded Workspace):",
+        value=default_box_value,
+        height=320,
+        placeholder="Paste thousands of WhatsApp chat messages, portal feeds, or load files/images using the [+] Attach button below..."
+    )
 
-        with tab_gdrive:
-            gdrive_url_in = st.text_input("Paste Google Drive Link:", placeholder="https://drive.google.com/file/d/...")
-            if st.button("☁️ Push G-Drive File Data", use_container_width=True):
-                if gdrive_url_in.strip():
-                    with st.spinner("Fetching and cleaning timestamps..."):
-                        gdrive_content = fetch_content_from_gdrive_url(gdrive_url_in.strip())
-                        if gdrive_content and not gdrive_content.startswith("[Error"):
-                            st.session_state["extracted_file_text"] = gdrive_content
-                            st.success("✅ Google Drive data loaded!")
-                        else:
-                            st.error(gdrive_content)
+    # 2. Bottom Action Bar: [+] Attach on Left, [➔ Action Button] on Right
+    col_attach_expander, col_action_trigger = st.columns([3.5, 1.5])
 
-        with tab_camera:
-            camera_photo = st.camera_input("Take photo of property listing/document:")
-            if camera_photo is not None:
-                with st.spinner("🧠 Scanning document via Google Vision OCR..."):
-                    camera_text = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
-                    if camera_text:
-                        st.session_state["extracted_file_text"] = camera_text
-                        st.success("✅ Camera OCR loaded!")
+    with col_attach_expander:
+        with st.expander("➕ **Attach Sources (Files, Google Drive, Camera OCR, Zameen Links, Classifieds)**", expanded=False):
+            tab_upload, tab_gdrive, tab_camera, tab_direct, tab_zameen, tab_news = st.tabs([
+                "📎 Files", "☁️ G-Drive", "📸 Camera", "📋 Direct Paste", "🌐 Zameen/Portals", "📰 Classifieds"
+            ])
+            
+            with tab_upload:
+                uploaded_file = st.file_uploader(
+                    "Upload TXT, Excel, JSON, PDF, or Image:",
+                    type=["txt", "xlsx", "xls", "json", "csv", "pdf", "png", "jpg", "jpeg", "webp"]
+                )
+                if uploaded_file is not None:
+                    with st.spinner(f"Reading `{uploaded_file.name}`..."):
+                        try:
+                            extracted_content = extract_text_from_any_file_or_image(uploaded_file, is_camera=False)
+                            if extracted_content:
+                                st.session_state["extracted_file_text"] = extracted_content
+                                st.success(f"✅ Loaded `{uploaded_file.name}` into main box above!")
+                        except Exception as e:
+                            st.error(f"Error reading file: {e}")
 
-        with tab_direct:
-            pasted_txt = st.text_area("Paste Raw WhatsApp Broadcasts or Text:", height=110, placeholder="Paste text...")
-            if st.button("📥 Push Pasted Text", use_container_width=True):
-                if pasted_txt.strip():
-                    st.session_state["extracted_file_text"] = pasted_txt.strip()
-                    st.success("✅ Direct text loaded!")
+            with tab_gdrive:
+                gdrive_url_in = st.text_input("Paste Google Drive Link:", placeholder="https://drive.google.com/file/d/...")
+                if st.button("☁️ Push G-Drive File Data", use_container_width=True):
+                    if gdrive_url_in.strip():
+                        with st.spinner("Fetching and cleaning timestamps..."):
+                            gdrive_content = fetch_content_from_gdrive_url(gdrive_url_in.strip())
+                            if gdrive_content and not gdrive_content.startswith("[Error"):
+                                st.session_state["extracted_file_text"] = gdrive_content
+                                st.success("✅ Google Drive data loaded into box above!")
+                            else:
+                                st.error(gdrive_content)
 
-        with tab_zameen:
-            portal_url = st.text_input("Paste Zameen / Portal Listing or Search URL:", placeholder="https://www.zameen.com/...")
-            if st.button("🌐 Scrape & Ingest Portal Link", use_container_width=True):
-                if portal_url.strip():
-                    with st.spinner("Connecting and extracting portal property feed..."):
-                        portal_raw = fetch_text_from_portal_url(portal_url.strip())
-                        st.session_state["extracted_file_text"] = portal_raw
-                        st.success("✅ Portal content fetched into box!")
+            with tab_camera:
+                camera_photo = st.camera_input("Take photo of property listing/document:")
+                if camera_photo is not None:
+                    with st.spinner("🧠 Scanning document via Google Vision OCR..."):
+                        camera_text = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
+                        if camera_text:
+                            st.session_state["extracted_file_text"] = camera_text
+                            st.success("✅ Camera OCR loaded into box above!")
+
+            with tab_direct:
+                pasted_txt = st.text_area("Paste Raw WhatsApp Broadcasts or Text:", height=90, placeholder="Paste text...")
+                if st.button("📥 Push Pasted Text to Box", use_container_width=True):
+                    if pasted_txt.strip():
+                        st.session_state["extracted_file_text"] = pasted_txt.strip()
+                        st.success("✅ Direct text loaded into box above!")
+
+            with tab_zameen:
+                portal_url = st.text_input("Paste Zameen / Portal Listing URL:", placeholder="https://www.zameen.com/...")
+                if st.button("🌐 Scrape & Ingest Portal Link", use_container_width=True):
+                    if portal_url.strip():
+                        with st.spinner("Connecting and extracting portal property feed..."):
+                            portal_raw = fetch_text_from_portal_url(portal_url.strip())
+                            st.session_state["extracted_file_text"] = portal_raw
+                            st.success("✅ Portal content fetched into box above!")
+                    else:
+                        st.warning("Please provide a valid property portal URL.")
+
+            with tab_news:
+                news_txt = st.text_area("Paste Newspaper Classified Ads Text (Jang, Dawn, etc.):", height=90, placeholder="Paste newspaper ads...")
+                if st.button("📰 Ingest Classified Ads", use_container_width=True):
+                    if news_txt.strip():
+                        st.session_state["extracted_file_text"] = f"[Classified Ads Source]\n" + news_txt.strip()
+                        st.success("✅ Classified ads loaded into box above!")
+
+    with col_action_trigger:
+        if not st.session_state["extraction_active"]:
+            st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
+            if st.button("🚀 ➔ Start AI Extraction", use_container_width=True):
+                final_input_text = raw_text.strip()
+                if final_input_text:
+                    all_lines = [l.strip() for l in final_input_text.splitlines() if l.strip()]
+                    LINES_PER_CHUNK = 60
+                    chunks = ["\n".join(all_lines[i:i+LINES_PER_CHUNK]) for i in range(0, len(all_lines), LINES_PER_CHUNK)]
+                    
+                    st.session_state["all_chunks"] = chunks
+                    st.session_state["current_chunk_idx"] = 0
+                    st.session_state["parsed_payloads"] = []
+                    st.session_state["extraction_active"] = True
+                    st.session_state["extraction_paused"] = False
+                    st.session_state["extraction_default_phase"] = selected_phase
+                    st.rerun()
                 else:
-                    st.warning("Please provide a valid property portal URL.")
+                    st.warning("Please provide listing text, take a camera photo, or attach a file.")
 
-        with tab_news:
-            news_txt = st.text_area("Paste Newspaper Classified Ads Text (Jang, Dawn, etc.):", height=110, placeholder="Paste newspaper ads...")
-            if st.button("📰 Ingest Classified Ads", use_container_width=True):
-                if news_txt.strip():
-                    st.session_state["extracted_file_text"] = f"[Classified Ads Source]\n" + news_txt.strip()
-                    st.success("✅ Classified ads loaded!")
-
-    with col_u1:
-        default_box_value = st.session_state.get("extracted_file_text", "")
-        
-        raw_text = st.text_area(
-            "📋 Raw Real Estate Ingestion Box (Multi-Source Feeds):",
-            value=default_box_value,
-            height=220,
-            placeholder="Loaded data from WhatsApp, Portals, Files, Classifieds, or Camera will appear here..."
-        )
-
-    # Ingestion Control Panel (Play / Pause / Resume / Stop)
-    if not st.session_state["extraction_active"]:
-        if st.button("🚀 Start AI Extraction & Stream Live to Summary", use_container_width=True):
-            final_input_text = raw_text.strip()
-            if final_input_text:
-                all_lines = [l.strip() for l in final_input_text.splitlines() if l.strip()]
-                LINES_PER_CHUNK = 60
-                chunks = ["\n".join(all_lines[i:i+LINES_PER_CHUNK]) for i in range(0, len(all_lines), LINES_PER_CHUNK)]
-                
-                st.session_state["all_chunks"] = chunks
-                st.session_state["current_chunk_idx"] = 0
-                st.session_state["parsed_payloads"] = []
-                st.session_state["extraction_active"] = True
-                st.session_state["extraction_paused"] = False
-                st.session_state["extraction_default_phase"] = selected_phase
-                st.rerun()
-            else:
-                st.warning("Please provide listing text, take a camera photo, or upload a file.")
-
-    # Active Live Streaming Loop
+    # Active Live Streaming Loop (Pause / Resume / Cancel)
     if st.session_state["extraction_active"]:
         chunks = st.session_state["all_chunks"]
         curr_idx = st.session_state["current_chunk_idx"]
