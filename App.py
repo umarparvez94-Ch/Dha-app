@@ -114,22 +114,21 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# 4. Strict 12-Column Official CRM Schema
 CRM_SHEET_HEADERS = [
     "Date / Timestamp",
-    "Category",
     "Phase",
     "Block",
     "Plot No",
     "Size",
     "Plot Features",
     "Demand / Price",
-    "Seller Type",
     "Seller / Dealer Name",
     "Contact No",
     "Office / Agency",
     "Deal Status",
     "Last Conversation / Notes",
-    "Raw Listing & Source Material"
+    "Source"
 ]
 
 DHA_PHASE_SHEET_URLS = {
@@ -148,6 +147,65 @@ DHA_PHASE_SHEET_URLS = {
     "DHA Phase 9 Town": "https://docs.google.com/spreadsheets/d/1AfidqzYwWWTkouwBkGKosxyK3CzwAyG8AEilS8-Nd0w/edit",
     "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)": "https://docs.google.com/spreadsheets/d/1bVB4maSRNR_pzcqzVzYKPirePrm_I9Yhu1TqodBPypU/edit",
     "DHA Phase 12 (EME Sector)": "https://docs.google.com/spreadsheets/d/1Ai07OSySM4pcPV9yRr--fsMpKNPXtD2uwJx285_mPho/edit"
+}
+
+DHA_CUTTING_MAP_RULES = {
+    "DHA Phase 5": {
+        "Block A": [(1, 120, "2 Kanal"), (121, 500, "1 Kanal")],
+        "Block B": [(1, 80, "2 Kanal"), (81, 600, "1 Kanal")],
+        "Block C": [(1, 50, "2 Kanal"), (51, 450, "1 Kanal")],
+        "Block G": [(1, 350, "1 Kanal"), (351, 700, "10 Marla")],
+        "Block H": [(1, 400, "10 Marla"), (401, 800, "5 Marla")],
+        "Block J": [(1, 500, "10 Marla"), (501, 950, "5 Marla")],
+    },
+    "DHA Phase 6": {
+        "Block A": [(1, 150, "2 Kanal"), (151, 800, "1 Kanal")],
+        "Block B": [(1, 100, "2 Kanal"), (101, 700, "1 Kanal")],
+        "Block C": [(1, 650, "1 Kanal")],
+        "Block D": [(1, 700, "1 Kanal")],
+        "Block E": [(1, 550, "1 Kanal")],
+        "Block J": [(1, 600, "10 Marla")],
+        "Block L": [(1, 800, "10 Marla"), (801, 1200, "5 Marla")],
+    },
+    "DHA Phase 7": {
+        "Block P": [(1, 1100, "1 Kanal")],
+        "Block Q": [(1, 900, "1 Kanal")],
+        "Block R": [(1, 1050, "1 Kanal")],
+        "Block S": [(1, 950, "1 Kanal")],
+        "Block T": [(1, 1200, "1 Kanal")],
+        "Block U": [(1, 1400, "1 Kanal")],
+        "Block W": [(1, 1400, "10 Marla")],
+        "Block X": [(1, 1300, "10 Marla")],
+        "Block Y": [(1, 900, "5 Marla")],
+        "Block Z": [(1, 1100, "5 Marla")]
+    },
+    "DHA Phase 8 (Proper)": {
+        "Block A": [(1, 100, "2 Kanal"), (101, 550, "1 Kanal")],
+        "Block B": [(1, 80, "2 Kanal"), (81, 500, "1 Kanal")],
+        "Block C": [(1, 70, "2 Kanal"), (71, 480, "1 Kanal")],
+        "Block D": [(1, 600, "1 Kanal")],
+        "Block E": [(1, 550, "1 Kanal")],
+        "Block F": [(1, 500, "1 Kanal")],
+        "Block S": [(1, 750, "10 Marla")],
+        "Block T": [(1, 800, "10 Marla"), (801, 1300, "5 Marla")],
+        "Block U": [(1, 900, "5 Marla")],
+        "Block V": [(1, 850, "5 Marla")],
+        "Block W": [(1, 700, "8 Marla")]
+    },
+    "DHA Phase 9 Prism": {
+        "Block A": [(1, 600, "1 Kanal")],
+        "Block B": [(1, 550, "1 Kanal")],
+        "Block C": [(1, 700, "1 Kanal")],
+        "Block D": [(1, 650, "1 Kanal")],
+        "Block E": [(1, 500, "1 Kanal")],
+        "Block F": [(1, 700, "1 Kanal")],
+        "Block G": [(1, 600, "1 Kanal")],
+        "Block J": [(1, 1200, "10 Marla")],
+        "Block K": [(1, 1100, "10 Marla")],
+        "Block L": [(1, 1300, "10 Marla")],
+        "Block R": [(1, 1800, "5 Marla")],
+        "Block Q": [(1, 1600, "5 Marla")]
+    }
 }
 
 DHA_PHASE_BLOCK_CATALOG = {
@@ -241,6 +299,21 @@ def clean_plot_number(plot_val):
         return f"Plot {digits_only}"
     return p_str
 
+def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
+    cleaned_size = str(extracted_size).strip() if extracted_size else ""
+    if cleaned_size and cleaned_size.lower() not in ["n/a", "unknown", "none", ""]:
+        return cleaned_size
+    try:
+        p_num = int(re.sub(r'[^0-9]', '', str(plot_no)))
+    except Exception:
+        return ""
+    phase_rules = DHA_CUTTING_MAP_RULES.get(phase, {})
+    block_ranges = phase_rules.get(block, [])
+    for start_n, end_n, official_sz in block_ranges:
+        if start_n <= p_num <= end_n:
+            return official_sz
+    return ""
+
 @st.cache_resource
 def get_gspread_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
@@ -291,19 +364,7 @@ def get_specific_tab_url(workbook, base_url, tab_title):
         pass
     return base_url
 
-# ==============================================================================
-# DATA INGESTION UTILITIES (FIXED & FULLY DEFINED)
-# ==============================================================================
-def clean_whatsapp_chat_text(raw_bytes):
-    try:
-        decoded_text = raw_bytes.decode('utf-8', errors='ignore')
-    except Exception:
-        try:
-            decoded_text = raw_bytes.decode('latin-1', errors='ignore')
-        except Exception:
-            decoded_text = str(raw_bytes)
-    return decoded_text
-
+# Ingestion Utilities
 def fetch_content_from_gdrive_url(drive_url):
     file_id_match = re.search(r'[-\w]{25,}', drive_url)
     if not file_id_match:
@@ -406,10 +467,12 @@ def segment_into_discrete_whatsapp_messages(raw_text):
     return discrete_messages
 
 # ==============================================================================
-# STRICT GEMINI PARSING ENGINE
+# STRICT 12-COLUMN CRM SCHEMA AI EXTRACTION ENGINE
 # ==============================================================================
 def process_message_batch_via_gemini(message_objects, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    
     formatted_input_lines = []
     for idx, msg in enumerate(message_objects):
         sender_txt = f" | Sender: {msg['sender_name']}" if msg['sender_name'] else ""
@@ -419,24 +482,44 @@ def process_message_batch_via_gemini(message_objects, default_phase):
     batch_payload_text = "\n\n".join(formatted_input_lines)
 
     prompt = f"""You are the Master Real Estate Ingestion Engine for DHA Lahore.
-Parse each discrete WhatsApp message into a JSON array of structured property listings adhering strictly to these rules:
+Parse each discrete WhatsApp message directly into the EXACT 12-column canonical Google Sheets CRM schema:
 
-RULES:
-1. "Phase": Identify DHA Phase mentioned in message ('DHA Phase 1' to 'DHA Phase 12 (EME Sector)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)'). If unspecified, use '{default_phase}'.
-2. "Block": MUST be an actual block name from the official catalog: {catalog_json_str}.
-   - CRITICAL: NEVER write 'Block HASE', 'Block PH', 'HASE', 'PHASE'. Those are misread words from 'Phase 7' or 'Phase 9'!
-3. "Category": If message says 'Required', 'Req', 'Need', 'Chahiye', set "Category": "Buying / Required". Otherwise "Selling".
-4. "Plot No": Extract COMPLETE plot number (e.g. 'Plot 980', 'Plot 432'). NEVER write 'Plot 7' if the text was 'Phase 7'! If no specific plot number is given, leave as "".
-5. "Demand / Price": Extract demand like '585 Lac', '3.8 Crore', '720 Lac'. If no price, leave "". NEVER write '0 Lac'.
-6. "Size": '5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla' or "".
-7. "Contact No": Extract mobile number of the sender or from message body.
-8. "Seller / Dealer Name": Extract the dealer/agency name from message header.
-9. "Plot Features": 'Corner / Facing Park', 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Direct Option', 'Possession Plot', 'Non-Possession Plot' or 'Standard Layout'.
+COLUMNS SPECIFICATION:
+1. "Date / Timestamp": '{now_str}'.
+2. "Phase": Official DHA Phase ('DHA Phase 1' to 'DHA Phase 12 (EME Sector)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)'). Fallback: '{default_phase}'.
+3. "Block": Must strictly match official block tab from catalog: {catalog_json_str}. (CRITICAL: NEVER output 'Block HASE' or 'Block PH'!).
+4. "Plot No": COMPLETE plot number (e.g. 'Plot 980', 'Plot 432'). NEVER output 'Plot 7' from 'Phase 7'!
+5. "Size": '5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '8 Marla', '4 Marla' or "".
+6. "Plot Features": 'Corner / Facing Park', 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Direct Option', 'Possession Plot', 'Non-Possession Plot' or 'Standard Layout'.
+7. "Demand / Price": Extracted price (e.g. '585 Lac', '3.8 Crore'). If none, leave "".
+8. "Seller / Dealer Name": Extracted dealer/contact name or message sender.
+9. "Contact No": Valid mobile number from header or message body.
+10. "Office / Agency": Extracted agency name or '{st.session_state["office_name"]}'.
+11. "Deal Status": "Available".
+12. "Last Conversation / Notes": "Direct Ingestion".
+13. "Source": Exact raw text of this specific listing.
 
 Input WhatsApp Messages:
 {batch_payload_text}
 
-Return ONLY a valid JSON Array:"""
+Return ONLY a valid JSON Array with the exact keys:
+[
+  {{
+    "Date / Timestamp": "{now_str}",
+    "Phase": "DHA Phase 9 Prism",
+    "Block": "Block A",
+    "Plot No": "Plot 980",
+    "Size": "1 Kanal",
+    "Plot Features": "Corner / Facing Park",
+    "Demand / Price": "585 Lac",
+    "Seller / Dealer Name": "Ali Real Estate",
+    "Contact No": "03214567890",
+    "Office / Agency": "Wali Muhammad Associates",
+    "Deal Status": "Available",
+    "Last Conversation / Notes": "Direct Ingestion",
+    "Source": "Prism A 980@585 cnr f/park 03214567890"
+  }}
+]"""
 
     if gemini_active and gemini_client:
         target_models = ['gemini-2.5-flash', 'gemini-1.5-flash']
@@ -457,6 +540,14 @@ Return ONLY a valid JSON Array:"""
                         tgt_phase = item.get("Phase", default_phase)
                         item["Block"] = clean_and_validate_block_name(tgt_phase, item.get("Block", "Block A"))
                         item["Plot No"] = clean_plot_number(item.get("Plot No", ""))
+                        item["Size"] = resolve_size_text_first_or_map(
+                            tgt_phase,
+                            item.get("Block", "Block A"),
+                            item.get("Plot No", ""),
+                            item.get("Size", "")
+                        )
+                        if not item.get("Date / Timestamp"):
+                            item["Date / Timestamp"] = now_str
                         cleaned_list.append(item)
                     return cleaned_list
             except Exception as e:
@@ -466,10 +557,10 @@ Return ONLY a valid JSON Array:"""
     # Heuristic Local Fallback
     fallback_results = []
     for msg in message_objects:
-        fallback_results.extend(fallback_heuristic_parser(msg, default_phase))
+        fallback_results.extend(fallback_heuristic_parser(msg, default_phase, now_str))
     return fallback_results
 
-def fallback_heuristic_parser(msg_obj, default_phase):
+def fallback_heuristic_parser(msg_obj, default_phase, now_str):
     body = msg_obj["full_message"]
     phone = msg_obj["contact_no"]
     dealer_name = msg_obj["sender_name"]
@@ -494,7 +585,6 @@ def fallback_heuristic_parser(msg_obj, default_phase):
     elif "PHASE 5" in l_up:
         current_phase = "DHA Phase 5"
 
-    cat = "Buying / Required" if ("REQUIRED" in l_up or "REQ" in l_up or "CHAHIYE" in l_up or "NEED" in l_up) else "Selling"
     extracted = []
     m = re.search(r'(?:BLOCK\s+)?([A-Z0-9-]{1,3})\s*[-.:/# ]\s*([0-9]{2,5})(?:\s*[@:]\s*|\s+DEMAND\s*[:@]?\s*|\s+@\s*|\s+)?([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
     if m:
@@ -507,20 +597,19 @@ def fallback_heuristic_parser(msg_obj, default_phase):
             prc = f"{raw_prc} {prc_unit}".strip() if (raw_prc and float(raw_prc) > 5) else ""
 
             extracted.append({
-                "Category": cat,
+                "Date / Timestamp": now_str,
                 "Phase": current_phase,
                 "Block": blk,
                 "Plot No": f"Plot {plt_num}",
                 "Size": "",
                 "Plot Features": "Standard Layout",
                 "Demand / Price": prc,
-                "Seller Type": "Dealer",
                 "Seller / Dealer Name": dealer_name,
                 "Contact No": phone,
                 "Office / Agency": agency,
                 "Deal Status": "Available",
                 "Last Conversation / Notes": "Direct Ingestion",
-                "Raw Listing & Source Material": body
+                "Source": body
             })
     return extracted
 
@@ -534,7 +623,7 @@ def show_backend_connection_dialog(selected_phase, selected_block, target_url):
             <b>🌐 Active Spreadsheet Target:</b> <a href="{target_url}" target="_blank">{selected_phase} Database</a><br>
             <b>🧱 Target Tab Attached:</b> <code>{selected_block}</code><br>
             <b>⚡ Sync Protocols:</b> Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
-            <b>🛡️ Schema Compliance:</b> 15 Canonical CRM Column Headers strictly mapped.
+            <b>🛡️ Schema Compliance:</b> Updated Clean 12-Column Canonical CRM Headers strictly mapped.
         </div>
     """, unsafe_allow_html=True)
 
@@ -547,11 +636,11 @@ def show_dealer_ledger_dialog(payloads):
 
     dealer_data = []
     for item in payloads:
-        contact = item.get("Contact No", "").strip()
-        dealer_name = item.get("Seller / Dealer Name", "").strip()
+        contact = str(item.get("Contact No", "")).strip()
+        dealer_name = str(item.get("Seller / Dealer Name", "")).strip()
         plot = f"{item.get('Phase', '')} {item.get('Block', '')} - {item.get('Plot No', '')}"
         demand = item.get("Demand / Price", "")
-        raw_msg = item.get("Raw Listing & Source Material", "")
+        raw_msg = item.get("Source", "")
         dealer_key = contact if contact else (dealer_name if dealer_name else "Unknown Direct")
         dealer_data.append({
             "Dealer / Phone": dealer_key,
@@ -628,7 +717,7 @@ else:
             <div class="header-banner">
                 <span class="office-badge">📍 {st.session_state['office_name']}</span>
                 <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-                <div class="header-subtitle">Strict Gemini 2.5 Brain Active & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
+                <div class="header-subtitle">Strict 12-Column Database Schema & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -681,33 +770,22 @@ else:
     st.markdown("---")
 
     # ==========================================================================
-    # 3. LIVE-STREAMING SUMMARY REPORT & INGESTION CONTROL WORKSPACE
+    # 3. LIVE 12-COLUMN DATABASE SUMMARY REPORT & CONTROL WORKSPACE
     # ==========================================================================
-    st.subheader("⚡ Live Summary Report & Multi-Phase Ingestion Center")
+    st.subheader("⚡ Live Summary Report (Exact 12-Column Google Sheets Database Replica)")
 
     total_parsed_now = len(st.session_state["parsed_payloads"])
 
     if total_parsed_now > 0:
         base_data = []
         for item in st.session_state["parsed_payloads"]:
-            base_data.append({
-                "Target Phase": str(item.get("Phase", "DHA Phase 1")),
-                "Target Tab": str(item.get("Block", "Block A")),
-                "Plot No": str(item.get("Plot No", "")),
-                "Size": str(item.get("Size", "")),
-                "Demand / Price": str(item.get("Demand / Price", "")),
-                "Contact No": str(item.get("Contact No", "")),
-                "Dealer": str(item.get("Seller / Dealer Name", "")),
-                "Category": str(item.get("Category", "Selling")),
-                "Plot Features": str(item.get("Plot Features", "Standard Layout")),
-                "Source Text": str(item.get("Raw Listing & Source Material", ""))
-            })
+            row_dict = {}
+            for col in CRM_SHEET_HEADERS:
+                row_dict[col] = str(item.get(col, ""))
+            base_data.append(row_dict)
         df_all_live = pd.DataFrame(base_data)
     else:
-        df_all_live = pd.DataFrame(columns=[
-            "Target Phase", "Target Tab", "Plot No", "Size", "Demand / Price",
-            "Contact No", "Dealer", "Category", "Plot Features", "Source Text"
-        ])
+        df_all_live = pd.DataFrame(columns=CRM_SHEET_HEADERS)
 
     col_sc1, col_sc2, col_sc3, col_sc4 = st.columns([1.2, 1.4, 1.4, 1.2])
     
@@ -724,13 +802,13 @@ else:
         )
 
     if selected_summary_phase == "All Phases (Everything)":
-        available_summary_tabs = ["All Block Tabs / CCAs"] + (sorted(list(df_all_live["Target Tab"].unique())) if total_parsed_now > 0 else [])
+        available_summary_tabs = ["All Block Tabs / CCAs"] + (sorted(list(df_all_live["Block"].unique())) if total_parsed_now > 0 else [])
         df_filtered_summary_phase = df_all_live
     else:
         p_data = DHA_PHASE_BLOCK_CATALOG.get(selected_summary_phase, {})
         full_catalog_blocks = p_data.get("residential", []) + p_data.get("commercial", [])
         available_summary_tabs = ["All Block Tabs / CCAs"] + full_catalog_blocks
-        df_filtered_summary_phase = df_all_live[df_all_live["Target Phase"] == selected_summary_phase] if total_parsed_now > 0 else df_all_live
+        df_filtered_summary_phase = df_all_live[df_all_live["Phase"] == selected_summary_phase] if total_parsed_now > 0 else df_all_live
 
     with col_sc3:
         selected_summary_block = st.selectbox(
@@ -741,25 +819,25 @@ else:
         )
 
     if selected_summary_block != "All Block Tabs / CCAs" and total_parsed_now > 0:
-        df_final_summary_display = df_filtered_summary_phase[df_filtered_summary_phase["Target Tab"] == selected_summary_block]
+        df_final_summary_display = df_filtered_summary_phase[df_filtered_summary_phase["Block"] == selected_summary_block]
     else:
         df_final_summary_display = df_filtered_summary_phase
 
     with col_sc4:
-        st.metric(label="📊 Plots In View", value=f"{len(df_final_summary_display)}", delta=f"{total_parsed_now} Total Loaded")
+        st.metric(label="📊 Plots In View", value=f"{len(df_final_summary_display)}", delta=f"{total_parsed_now} Total Ingested")
 
     num_selected_live = len(df_final_summary_display)
-    unique_tabs_count_live = df_final_summary_display[["Target Phase", "Target Tab"]].drop_duplicates().shape[0] if num_selected_live > 0 else 0
+    unique_tabs_count_live = df_final_summary_display[["Phase", "Block"]].drop_duplicates().shape[0] if num_selected_live > 0 else 0
     with_demand_count_live = df_final_summary_display[df_final_summary_display["Demand / Price"] != ""].shape[0] if num_selected_live > 0 else 0
     with_contact_count_live = df_final_summary_display[df_final_summary_display["Contact No"] != ""].shape[0] if num_selected_live > 0 else 0
 
     st.markdown(f"""
         <div class="summary-card">
             <span class="stat-pill">📊 <b>Selected View:</b> {num_selected_live} Plots</span>
-            <span class="stat-pill">📁 <b>Target Tabs:</b> {unique_tabs_count_live} Tabs</span>
+            <span class="stat-pill">📁 <b>Target Sheet Tabs:</b> {unique_tabs_count_live} Tabs</span>
             <span class="stat-pill">💰 <b>Prices Identified:</b> {with_demand_count_live}</span>
             <span class="stat-pill">📞 <b>Contacts Identified:</b> {with_contact_count_live}</span>
-            <span class="stat-pill">⚡ <b>Total Extracted So Far:</b> {total_parsed_now} Listings</span>
+            <span class="stat-pill">⚡ <b>Total Ingested So Far:</b> {total_parsed_now} Listings</span>
         </div>
     """, unsafe_allow_html=True)
 
@@ -778,20 +856,19 @@ else:
             st.dataframe(final_summary_df, use_container_width=True, height=280)
     else:
         final_summary_df = df_final_summary_display
-        st.info("ℹ️ Summary workspace is ready. Paste WhatsApp export or attach files below and click **'🚀 ➔ Start AI Ingestion'**.")
+        st.info("ℹ️ 12-Column Live Database Summary is ready. Attach files or paste WhatsApp chats below and click **'🚀 ➔ Start AI Ingestion'**.")
 
     final_sync_count_live = len(final_summary_df)
     col_pb1, col_pb2 = st.columns([2, 1])
     with col_pb1:
         if st.button(f"🚀 Push ({final_sync_count_live} Filtered Plots) to Sheet Tabs", use_container_width=True, disabled=(final_sync_count_live == 0)):
             now_dt = datetime.now()
-            today_str = now_dt.strftime("%Y-%m-%d")
             now_str = now_dt.strftime("%Y-%m-%d %H:%M")
             
             grouped_data = {}
             for _, row in final_summary_df.iterrows():
-                target_phase = str(row.get("Target Phase", "DHA Phase 1")).strip()
-                target_block = str(row.get("Target Tab", "Block A")).strip()
+                target_phase = str(row.get("Phase", "DHA Phase 1")).strip()
+                target_block = str(row.get("Block", "Block A")).strip()
                 key = (target_phase, target_block)
                 if key not in grouped_data:
                     grouped_data[key] = []
@@ -827,7 +904,7 @@ else:
                 plot_repeat_map = {}
                 if len(existing_rows) > 1:
                     for r in existing_rows[1:]:
-                        r_plot = str(r[4]).strip().lower() if len(r) > 4 else ""
+                        r_plot = str(r[3]).strip().lower() if len(r) > 3 else ""
                         if r_plot:
                             plot_repeat_map[r_plot] = plot_repeat_map.get(r_plot, 0) + 1
                 
@@ -837,7 +914,7 @@ else:
                     plot_val_clean = plot_val.lower()
                     
                     repeat_count = plot_repeat_map.get(plot_val_clean, 0)
-                    notes_txt = "Direct Ingestion"
+                    notes_txt = str(row.get("Last Conversation / Notes", "Direct Ingestion"))
                     if repeat_count > 0:
                         repeated_tracked += 1
                         notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
@@ -845,22 +922,21 @@ else:
                     if plot_val_clean:
                         plot_repeat_map[plot_val_clean] = repeat_count + 1
                     
+                    # Direct 1:1 Mapping to 12 CRM Columns
                     row_data = [
-                        str(now_str),
-                        str(row.get("Category", "Selling")),
+                        str(row.get("Date / Timestamp", now_str)),
                         str(phase),
                         str(block),
                         str(plot_val),
                         str(row.get("Size", "")),
                         str(row.get("Plot Features", "Standard Layout")),
                         str(row.get("Demand / Price", "")),
-                        "Dealer",
-                        str(row.get("Dealer", "")),
+                        str(row.get("Seller / Dealer Name", "")),
                         str(row.get("Contact No", "")),
-                        str(st.session_state['office_name']),
-                        "Available",
+                        str(row.get("Office / Agency", st.session_state['office_name'])),
+                        str(row.get("Deal Status", "Available")),
                         str(notes_txt),
-                        f"[AI Ingest] {str(row.get('Source Text', ''))}"
+                        str(row.get("Source", ""))
                     ]
                     rows_to_append.append(row_data)
                 
@@ -892,7 +968,7 @@ else:
     # 4. UNIFIED ALL-IN-ONE INGESTION PROMPT ENCLOSURE
     # ==========================================================================
     if gemini_active:
-        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (Strict Catalog Lock Active)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-badge-active">🟢 Google Gemini 2.5 Flash Brain: Connected & Active (12-Column Schema Active)</div>', unsafe_allow_html=True)
     else:
         err_msg = st.session_state.get("gemini_last_error", "API Key Missing or Misconfigured")
         st.markdown(f'<div class="ai-badge-inactive">🟡 Gemini Brain Inactive ({err_msg}) — Please check GEMINI_API_KEY in Streamlit Secrets</div>', unsafe_allow_html=True)
@@ -1042,7 +1118,7 @@ else:
                 st.rerun()
 
         if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
-            with st.spinner(f"🧠 Gemini 2.5 Brain Reading Discrete Messages ({curr_idx + 1} of {total_chunks})..."):
+            with st.spinner(f"🧠 Gemini 2.5 Brain Structuring 12 CRM Columns ({curr_idx + 1} of {total_chunks})..."):
                 chunk_messages = chunks[curr_idx]
                 new_listings = process_message_batch_via_gemini(chunk_messages, st.session_state["extraction_default_phase"])
                 st.session_state["parsed_payloads"].extend(new_listings)
@@ -1051,7 +1127,7 @@ else:
                 if st.session_state["current_chunk_idx"] >= total_chunks:
                     st.session_state["extraction_active"] = False
                     st.session_state["extraction_paused"] = False
-                    st.success(f"🎉 100% Complete! Extracted {len(st.session_state['parsed_payloads'])} listings into summary workspace.")
+                    st.success(f"🎉 100% Complete! Extracted {len(st.session_state['parsed_payloads'])} listings directly into 12-column database format.")
                     st.rerun()
                 else:
                     st.rerun()
