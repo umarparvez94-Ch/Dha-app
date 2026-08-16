@@ -88,12 +88,6 @@ st.markdown("""
     .office-badge { background-color: #006B5E; color: #9FF2E1; padding: 5px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; float: right; }
     .stitch-login-box { background: #FFFFFF; border: 1px solid rgba(197, 198, 210, 0.6); border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04); padding: 32px 28px; margin-bottom: 16px; text-align: center; }
     .stitch-avatar { width: 60px; height: 60px; border-radius: 50%; background-color: #D6E2FF; border: 1px solid #B3C5FF; display: inline-flex; align-items: center; justify-content: center; color: #00113A; margin-bottom: 12px; }
-    .property-card { background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
-    .badge { display: inline-block; padding: 3px 8px; border-radius: 5px; font-size: 11.5px; font-weight: 700; margin-right: 5px; }
-    .badge-selling { background-color: #FEE2E2; color: #DC2626; }
-    .badge-price { background-color: #ECFDF5; color: #059669; font-weight: 800; }
-    .badge-repeat { background-color: #FEF3C7; color: #B45309; font-weight: 700; }
-    .badge-feature { background-color: #EEF2FF; color: #4338CA; font-weight: 600; }
     .ai-badge-active { background: #DCFCE7; border: 1px solid #86EFAC; color: #15803D; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     .summary-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
@@ -619,7 +613,7 @@ if not st.session_state["authenticated"]:
             st.session_state["user_email"] = "sso.agent@dha.pk"
             st.rerun()
 
-# 9. Main Dashboard & Streaming Summary Control Center
+# 9. Main Clean Live Summary Dashboard
 else:
     try:
         gc_client = get_gspread_client()
@@ -631,110 +625,9 @@ else:
         <div class="header-banner">
             <span class="office-badge">📍 {st.session_state['office_name']}</span>
             <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-            <div class="header-subtitle">Live Streaming Ingestion & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
+            <div class="header-subtitle">Live Streaming AI Ingestion & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
         </div>
     """, unsafe_allow_html=True)
-
-    col_city, col_phase = st.columns([1.2, 2.5])
-    with col_city:
-        selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
-    with col_phase:
-        phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
-        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook View)", phase_options, index=11)
-
-    try:
-        phase_workbook = get_phase_workbook(gc_client, selected_phase)
-    except Exception as e:
-        st.error(f"Could not open spreadsheet for {selected_phase}. Please share sheet with `dha-bot@dha-property-sync.iam.gserviceaccount.com` as Editor.")
-        st.stop()
-
-    p_info = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
-    res_b = p_info.get("residential", [])
-    com_b = p_info.get("commercial", [])
-    all_phase_blocks = res_b + com_b
-
-    st.markdown(f"##### 🧱 Choose Block Sheet Tab for **[{selected_phase}]**:")
-    
-    selected_active_block = st.radio(
-        "Direct Block Switcher:",
-        options=all_phase_blocks,
-        horizontal=True,
-        key="block_feature_tab_bar"
-    )
-
-    sheet_link = DHA_PHASE_SHEET_URLS.get(selected_phase, "")
-    st.markdown(f"🔗 **Active Google Sheet:** [Open {selected_phase} in Google Sheets ↗]({sheet_link}) | Current Tab: **`{selected_active_block}`**")
-
-    st.subheader(f"📊 Live Inventory Table: [{selected_phase} ➔ Tab: `{selected_active_block}`]")
-    
-    col_t1, col_t2 = st.columns([2, 1])
-    with col_t1:
-        edit_mode = st.toggle("✏️ Enable Live Edit Mode (Edit Data on Screen)", value=False)
-    with col_t2:
-        if st.button("🔄 Refresh Table from Google Sheet"):
-            st.rerun()
-
-    try:
-        current_ws = get_or_create_clean_tab_exact(phase_workbook, selected_active_block)
-        records = safe_gspread_call(current_ws.get_all_values)
-        
-        if len(records) > 1:
-            df = pd.DataFrame(records[1:], columns=CRM_SHEET_HEADERS[:len(records[1])])
-            
-            if edit_mode:
-                st.info("💡 **Edit Mode ON:** Edit any cell below, add rows, or delete rows. Click **'Save Changes'** when done.")
-                edited_df = st.data_editor(
-                    df,
-                    use_container_width=True,
-                    num_rows="dynamic",
-                    height=320,
-                    key=f"editor_{selected_phase}_{selected_active_block}"
-                )
-                
-                if st.button("💾 Save Changes to Google Sheet", use_container_width=True):
-                    with st.spinner("Updating Google Sheet Tab..."):
-                        try:
-                            updated_values = [CRM_SHEET_HEADERS] + edited_df.fillna("").values.tolist()
-                            safe_gspread_call(current_ws.clear)
-                            safe_gspread_call(current_ws.update, updated_values)
-                            st.success(f"✅ Google Sheet Tab **[{selected_active_block}]** successfully updated!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Update error: {e}")
-            else:
-                st.dataframe(df, use_container_width=True, height=280)
-                
-                for idx, r in df.iterrows():
-                    dem_val = r.get('Demand / Price', '')
-                    phn_val = r.get('Contact No', '')
-                    plt_val = r.get('Plot No', '')
-                    sz_val = r.get('Size', '')
-                    sz_display = f"({sz_val})" if sz_val else ""
-                    feat_val = r.get('Plot Features', '')
-                    feat_badge = f'<span class="badge badge-feature">⭐ {feat_val}</span>' if feat_val else ""
-                    cat_val = r.get('Category', 'Selling')
-                    notes_val = r.get('Last Conversation / Notes', '')
-                    raw_val = r.get('Raw Listing & Source Material', '')
-
-                    repeat_badge = f'<span class="badge badge-repeat">{notes_val}</span>' if "Repeated" in notes_val else ""
-
-                    st.markdown(f"""
-                        <div class="property-card">
-                            <span class="badge badge-selling">{cat_val}</span>
-                            <span class="badge badge-price">💰 {dem_val if dem_val else 'Demand N/A'}</span>
-                            {feat_badge}
-                            {repeat_badge}
-                            <b>{selected_phase} {selected_active_block} — {plt_val} {sz_display}</b>
-                            <div style="margin-top: 5px; font-size: 13px; color: #475569;">📞 Contact: <b>{phn_val if phn_val else '—'}</b> | Added: {r.get('Date / Timestamp', '')}</div>
-                            <div style="margin-top: 4px; font-size: 12px; color: #64748B; background: #F8FAFC; padding: 5px 8px; border-radius: 6px;">📝 {raw_val}</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-        else:
-            st.info(f"Tab **[{selected_active_block}]** is active in Google Sheets. Currently 0 entries found. Add listings in the box below to see them appear here!")
-    except Exception as e:
-        st.error(f"Error connecting to Tab [{selected_active_block}]: {e}")
-
-    st.markdown("---")
 
     # ==========================================================================
     # 3. LIVE-STREAMING SUMMARY REPORT & INGESTION CONTROL WORKSPACE
@@ -743,7 +636,6 @@ else:
 
     total_parsed_now = len(st.session_state["parsed_payloads"])
 
-    # Prepare DataFrame for Live View
     if total_parsed_now > 0:
         base_data = []
         for item in st.session_state["parsed_payloads"]:
@@ -837,7 +729,7 @@ else:
             st.dataframe(final_summary_df, use_container_width=True, height=260)
     else:
         final_summary_df = df_final_summary_display
-        st.info("ℹ️ Summary is ready. Click **'Start AI Extraction'** below to stream listings live into this table.")
+        st.info("ℹ️ Summary workspace is ready. Click **'Start AI Extraction'** below to stream listings live into this table.")
 
     # Action Row for Pushing Data
     final_sync_count_live = len(final_summary_df)
@@ -948,7 +840,7 @@ else:
     st.markdown("---")
 
     # ==========================================================================
-    # 4. BOTTOM SECTION: AI MULTI-SOURCE INGESTION & PLAY/PAUSE CONTROLLER
+    # 4. BOTTOM SECTION: RAW DATA INGESTION & PLAY/PAUSE CONTROLLER
     # ==========================================================================
     if gemini_active:
         st.markdown('<div class="ai-badge-active">🟢 Google Gemini AI Extraction Engine: Connected & Active</div>', unsafe_allow_html=True)
@@ -1032,7 +924,7 @@ else:
                 st.session_state["parsed_payloads"] = []
                 st.session_state["extraction_active"] = True
                 st.session_state["extraction_paused"] = False
-                st.session_state["extraction_default_phase"] = selected_phase
+                st.session_state["extraction_default_phase"] = "DHA Phase 9 Prism"
                 st.rerun()
             else:
                 st.warning("Please provide listing text, take a camera photo, or upload a file.")
