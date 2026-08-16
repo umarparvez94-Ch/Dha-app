@@ -45,6 +45,8 @@ if "parsed_payloads" not in st.session_state:
     st.session_state["parsed_payloads"] = []
 if "extracted_file_text" not in st.session_state:
     st.session_state["extracted_file_text"] = ""
+if "uploaded_temp_text" not in st.session_state:
+    st.session_state["uploaded_temp_text"] = ""
 
 # Batch Processing State Machine (100 msgs/batch)
 if "extraction_active" not in st.session_state:
@@ -396,7 +398,7 @@ def show_dealer_ledger_dialog(payloads):
 # SOURCE FETCHERS, 100-MESSAGE CHUNKER & OCR PROCESSORS
 # ==============================================================================
 def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
-    """Splits WhatsApp chat into ~100 complete message blocks using timestamps."""
+    """Splits WhatsApp chat into ~100 complete message blocks preserving full context."""
     msg_split_pattern = r'(?=\n?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2})'
     raw_messages = re.split(msg_split_pattern, raw_text)
     
@@ -415,7 +417,7 @@ def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
     chunks = []
     for i in range(0, len(clean_messages), messages_per_chunk):
         chunk_batch = clean_messages[i:i + messages_per_chunk]
-        chunks.append("\n\n---\n\n".join(chunk_batch))
+        chunks.append("\n\n===MESSAGE_START===\n" + "\n\n===MESSAGE_START===\n".join(chunk_batch))
         
     return chunks
 
@@ -504,100 +506,108 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
 # SMART REFINED MULTI-ENGINE PARSER (PURE AI + ACCURATE SMART FALLBACK)
 # ==============================================================================
 def smart_accurate_rule_parser(chunk_text, default_phase):
-    lines = [l.strip() for l in chunk_text.splitlines() if l.strip()]
-    phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', chunk_text)
-    main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else ""
-    
-    current_phase = default_phase
+    messages = chunk_text.split("===MESSAGE_START===")
     results = []
 
-    for line in lines:
-        l_up = line.upper()
-        if "PHASE 12" in l_up or "EME" in l_up:
-            current_phase = "DHA Phase 12 (EME Sector)"
+    for msg in messages:
+        m_clean = msg.strip()
+        if not m_clean:
             continue
-        elif "PHASE 11" in l_up or "RAHBAR" in l_up:
-            current_phase = "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"
-            continue
-        elif "IVY GREEN" in l_up or "SECTOR Z" in l_up:
-            current_phase = "DHA Phase 8 (Ivy Green / Sector Z)"
-            continue
-        elif "PHASE 9 PRISM" in l_up or "9PRISM" in l_up or "9 PRISM" in l_up or "PRISM" in l_up:
-            current_phase = "DHA Phase 9 Prism"
-            continue
-        elif "PHASE 9 TOWN" in l_up or "9TOWN" in l_up or "9 TOWN" in l_up:
-            current_phase = "DHA Phase 9 Town"
-            continue
-        elif "PHASE 8" in l_up:
-            current_phase = "DHA Phase 8 (Proper)"
-            continue
-        elif "PHASE 7" in l_up:
-            current_phase = "DHA Phase 7"
-            continue
-        elif "PHASE 6" in l_up:
-            current_phase = "DHA Phase 6"
-            continue
-        elif "PHASE 5" in l_up:
-            current_phase = "DHA Phase 5"
-            continue
-        elif "PHASE 4" in l_up:
-            current_phase = "DHA Phase 4"
-            continue
-        elif "PHASE 3" in l_up:
-            current_phase = "DHA Phase 3"
-            continue
-        elif "PHASE 2" in l_up:
-            current_phase = "DHA Phase 2"
-            continue
-        elif "PHASE 1" in l_up:
-            current_phase = "DHA Phase 1"
-            continue
-
-        m = re.search(r'([A-Z]{1,2}(?:-\d+)?)\s*[-.:_/# ]\s*([0-9]{1,5})(?:\s*[@:]\s*|\s+DEMAND\s*[:@-]?\s*|\s+@\s*|\s+)?([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
         
-        if m:
-            raw_b = m.group(1).replace('-', ' ').strip()
-            if not raw_b.startswith("BLOCK") and len(raw_b) <= 3:
-                blk = f"Block {raw_b}"
-            elif raw_b.startswith("BLOCK"):
-                blk = raw_b
-            else:
-                blk = "Block A"
+        phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', m_clean)
+        main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else ""
+        
+        current_phase = default_phase
+        m_up = m_clean.upper()
+        if "PHASE 12" in m_up or "EME" in m_up:
+            current_phase = "DHA Phase 12 (EME Sector)"
+        elif "PHASE 11" in m_up or "RAHBAR" in m_up:
+            current_phase = "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)"
+        elif "IVY GREEN" in m_up or "SECTOR Z" in m_up:
+            current_phase = "DHA Phase 8 (Ivy Green / Sector Z)"
+        elif "PHASE 9 PRISM" in m_up or "9PRISM" in m_up or "9 PRISM" in m_up or "PRISM" in m_up:
+            current_phase = "DHA Phase 9 Prism"
+        elif "PHASE 9 TOWN" in m_up or "9TOWN" in m_up or "9 TOWN" in m_up:
+            current_phase = "DHA Phase 9 Town"
+        elif "PHASE 8" in m_up:
+            current_phase = "DHA Phase 8 (Proper)"
+        elif "PHASE 7" in m_up:
+            current_phase = "DHA Phase 7"
+        elif "PHASE 6" in m_up:
+            current_phase = "DHA Phase 6"
+        elif "PHASE 5" in m_up:
+            current_phase = "DHA Phase 5"
+        elif "PHASE 4" in m_up:
+            current_phase = "DHA Phase 4"
+        elif "PHASE 3" in m_up:
+            current_phase = "DHA Phase 3"
+        elif "PHASE 2" in m_up:
+            current_phase = "DHA Phase 2"
+        elif "PHASE 1" in m_up:
+            current_phase = "DHA Phase 1"
 
-            plt_num = m.group(2)
-            raw_prc = m.group(3)
-            unit = m.group(4) if m.group(4) else "Lac"
-            prc_str = f"{raw_prc} {unit}".strip() if raw_prc else ""
+        lines = [l.strip() for l in m_clean.splitlines() if l.strip()]
+        matched_any = False
+        for line in lines:
+            l_up = line.upper()
+            m = re.search(r'([A-Z]{1,2}(?:-\d+)?)\s*[-.:_/# ]\s*([0-9]{1,5})(?:\s*[@:]\s*|\s+DEMAND\s*[:@-]?\s*|\s+@\s*|\s+)?([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
+            
+            if m:
+                matched_any = True
+                raw_b = m.group(1).replace('-', ' ').strip()
+                blk = f"Block {raw_b}" if (not raw_b.startswith("BLOCK") and len(raw_b) <= 3) else (raw_b if raw_b.startswith("BLOCK") else "Block A")
+                plt_num = m.group(2)
+                raw_prc = m.group(3)
+                unit = m.group(4) if m.group(4) else "Lac"
+                prc_str = f"{raw_prc} {unit}".strip() if raw_prc else ""
 
-            sz = ""
-            if "5 MARLA" in l_up or "5M" in l_up:
-                sz = "5 Marla"
-            elif "10 MARLA" in l_up or "10M" in l_up:
-                sz = "10 Marla"
-            elif "2 KANAL" in l_up or "2K" in l_up:
-                sz = "2 Kanal"
-            elif "1 KANAL" in l_up or "1K" in l_up:
-                sz = "1 Kanal"
-            else:
-                sz = resolve_size_text_first_or_map(current_phase, blk, f"Plot {plt_num}", "")
+                sz = ""
+                if "5 MARLA" in l_up or "5M" in l_up:
+                    sz = "5 Marla"
+                elif "10 MARLA" in l_up or "10M" in l_up:
+                    sz = "10 Marla"
+                elif "2 KANAL" in l_up or "2K" in l_up:
+                    sz = "2 Kanal"
+                elif "1 KANAL" in l_up or "1K" in l_up:
+                    sz = "1 Kanal"
+                else:
+                    sz = resolve_size_text_first_or_map(current_phase, blk, f"Plot {plt_num}", "")
 
-            feat = "Corner" if "CORNER" in l_up else ("Park Facing" if "PARK" in l_up else "Standard Layout")
+                feat = "Corner" if "CORNER" in l_up else ("Park Facing" if "PARK" in l_up else "Standard Layout")
 
+                results.append({
+                    "Category": "Selling",
+                    "Phase": current_phase,
+                    "Block": blk,
+                    "Plot No": f"Plot {plt_num}",
+                    "Size": sz,
+                    "Plot Features": feat,
+                    "Demand / Price": prc_str,
+                    "Seller Type": "Dealer",
+                    "Seller / Dealer Name": "",
+                    "Contact No": main_phone,
+                    "Office / Agency": st.session_state["office_name"],
+                    "Deal Status": "Available",
+                    "Last Conversation / Notes": "Direct Ingestion",
+                    "Raw Listing & Source Material": m_clean  # Complete original message block
+                })
+
+        if not matched_any and main_phone:
             results.append({
-                "Category": "Selling",
+                "Category": "Dealer Lead / General",
                 "Phase": current_phase,
-                "Block": blk,
-                "Plot No": f"Plot {plt_num}",
-                "Size": sz,
-                "Plot Features": feat,
-                "Demand / Price": prc_str,
+                "Block": "General Lead",
+                "Plot No": "General Option / Portfolio",
+                "Size": "",
+                "Plot Features": "Direct Inventory Call",
+                "Demand / Price": "",
                 "Seller Type": "Dealer",
                 "Seller / Dealer Name": "",
                 "Contact No": main_phone,
                 "Office / Agency": st.session_state["office_name"],
                 "Deal Status": "Available",
                 "Last Conversation / Notes": "Direct Ingestion",
-                "Raw Listing & Source Material": line
+                "Raw Listing & Source Material": m_clean
             })
 
     return results
@@ -606,25 +616,27 @@ def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     
     prompt = f"""You are the Master DHA Lahore Real Estate CRM extraction engine using advanced Gemini 2.5 reasoning.
-Carefully analyze this batch of ~100 WhatsApp broadcasts. 
+Carefully analyze this batch of ~100 WhatsApp broadcasts separated by '===MESSAGE_START==='. 
 
-Extract EVERY valid property listing AND every Dealer Contact / Lead into a clean JSON array of objects.
+For each property listing or dealer lead found:
+Extract EVERY valid listing into a clean JSON array of objects.
 
 OFFICIAL DHA PHASES:
 'DHA Phase 1', 'DHA Phase 2', 'DHA Phase 3', 'DHA Phase 4', 'DHA Phase 5', 'DHA Phase 6', 'DHA Phase 7', 'DHA Phase 8 (Proper)', 'DHA Phase 8 (Ivy Green / Sector Z)', 'DHA Phase 8 (Park View)', 'DHA Phase 8 (Air Avenue / Sector AA)', 'DHA Phase 9 Prism', 'DHA Phase 9 Town', 'DHA Phase 11 (Rahbar 1 to 4 & Sec 5)', 'DHA Phase 12 (EME Sector)'.
 
-RULES:
-1. "Phase": Identify the phase from context or fallback to '{default_phase}'.
-2. "Block": Must match official blocks (e.g. 'Block A', 'Block W', 'Zone 3 Commercial'). NEVER invent fake blocks.
-3. "Plot No": Extract full plot number (e.g. 'Plot 858', 'Plot 61', 'Plot 654').
+CRITICAL INSTRUCTIONS:
+1. "Phase": Contextual phase name or default '{default_phase}'.
+2. "Block": Must match official catalog (e.g. 'Block A', 'Block W', 'Zone 3 Commercial'). NEVER invent fake blocks.
+3. "Plot No": Full plot number (e.g. 'Plot 858', 'Plot 61', 'Plot 654').
 4. "Size": '5 Marla', '10 Marla', '1 Kanal', '2 Kanal' etc.
 5. "Demand / Price": '485 Lac', '260 Lac', '2 Crore' etc.
-6. "Contact No": Extract dealer phone number for all attached plots.
+6. "Contact No": Extract dealer phone number.
+7. "Raw Listing & Source Material": MUST CONTAIN THE ENTIRE ORIGINAL MESSAGE/BROADCAST TEXT from which this listing was extracted (do not abbreviate or give just one line).
 
-Text to Extract:
+Input Broadcast Text:
 {chunk_text}
 
-Return ONLY valid JSON Array:
+Return ONLY a valid JSON Array:
 [
   {{
     "Category": "Selling",
@@ -636,11 +648,11 @@ Return ONLY valid JSON Array:
     "Demand / Price": "260 Lac",
     "Seller Type": "Dealer",
     "Seller / Dealer Name": "",
-    "Contact No": "",
+    "Contact No": "03204488809",
     "Office / Agency": "Wali Muhammad Associates",
     "Deal Status": "Available",
     "Last Conversation / Notes": "Direct Ingestion",
-    "Raw Listing & Source Material": "A-61 Demand -260"
+    "Raw Listing & Source Material": "Full broadcast message text here..."
   }}
 ]"""
 
@@ -669,8 +681,7 @@ Return ONLY valid JSON Array:
                             sz
                         )
                 return parsed_json
-        except Exception as e:
-            # Fallback to local rule engine if network timeout occurs
+        except Exception:
             pass
 
     return smart_accurate_rule_parser(chunk_text, default_phase)
@@ -934,7 +945,7 @@ else:
     st.markdown("---")
 
     # ==========================================================================
-    # 4. UNIFIED ALL-IN-ONE INGESTION PROMPT ENCLOSURE (WITH [+] ATTACH SOURCES)
+    # 4. UNIFIED INGESTION PROMPT ENCLOSURE (WITH PUSH TO BOX & EXTRACT)
     # ==========================================================================
     st.subheader("🧠 Multi-Source Data Ingestion Engine")
     default_box_value = st.session_state.get("extracted_file_text", "")
@@ -945,7 +956,7 @@ else:
         "📋 Live Real Estate Ingestion Stream:",
         value=default_box_value,
         height=240,
-        placeholder="Paste thousands of WhatsApp chat messages, newspaper ads, portal feeds, or use [+] Attach Sources below...",
+        placeholder="Paste WhatsApp broadcasts, newspaper ads, portal feeds, or use [+] Attach Sources below...",
         label_visibility="collapsed"
     )
 
@@ -968,20 +979,28 @@ else:
                         try:
                             extracted_content = extract_text_from_any_file_or_image(uploaded_file, is_camera=False)
                             if extracted_content:
-                                st.session_state["extracted_file_text"] = extracted_content
-                                st.success(f"✅ Loaded `{uploaded_file.name}` into box!")
+                                st.session_state["uploaded_temp_text"] = extracted_content
+                                st.success(f"✅ File `{uploaded_file.name}` ready! Click '📥 Push to Box' below.")
                         except Exception as e:
                             st.error(f"Error reading file: {e}")
+                
+                if st.session_state.get("uploaded_temp_text", ""):
+                    if st.button("📥 Push to Box", use_container_width=True, key="btn_push_file_to_box"):
+                        st.session_state["extracted_file_text"] = st.session_state["uploaded_temp_text"]
+                        st.session_state["uploaded_temp_text"] = ""
+                        st.success("✅ Pushed file text into stream box!")
+                        st.rerun()
 
             with tab_gdrive:
                 gdrive_url_in = st.text_input("Paste Google Drive Link:", placeholder="https://drive.google.com/...", key="inner_gdrive_in")
-                if st.button("☁️ Push G-Drive File Data", use_container_width=True, key="btn_push_gdrive_inner"):
+                if st.button("📥 Push to Box (G-Drive)", use_container_width=True, key="btn_push_gdrive_inner"):
                     if gdrive_url_in.strip():
                         with st.spinner("Fetching Google Drive file..."):
                             gdrive_content = fetch_content_from_gdrive_url(gdrive_url_in.strip())
                             if gdrive_content and not gdrive_content.startswith("[Error"):
                                 st.session_state["extracted_file_text"] = gdrive_content
                                 st.success("✅ Google Drive data loaded into box!")
+                                st.rerun()
                             else:
                                 st.error(gdrive_content)
 
@@ -989,27 +1008,31 @@ else:
                 st.caption("📷 Take photo of Property Document or Newspaper Classified Page:")
                 camera_photo = st.camera_input("Snap picture:", key="inner_cam_in")
                 if camera_photo is not None:
-                    with st.spinner("🧠 Scanning document / newspaper via Google Vision OCR..."):
+                    with st.spinner("🧠 Scanning document via Google Vision OCR..."):
                         camera_text = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
                         if camera_text:
-                            st.session_state["extracted_file_text"] = camera_text
-                            st.success("✅ Camera OCR loaded into box!")
+                            if st.button("📥 Push to Box (Camera OCR)", use_container_width=True, key="btn_push_cam_inner"):
+                                st.session_state["extracted_file_text"] = camera_text
+                                st.success("✅ Camera OCR loaded into box!")
+                                st.rerun()
 
             with tab_direct:
                 pasted_txt = st.text_area("Paste Raw WhatsApp Broadcasts or Text:", height=80, placeholder="Paste text...", key="inner_paste_in")
-                if st.button("📥 Push Pasted Text", use_container_width=True, key="btn_push_direct_inner"):
+                if st.button("📥 Push to Box (Direct Text)", use_container_width=True, key="btn_push_direct_inner"):
                     if pasted_txt.strip():
                         st.session_state["extracted_file_text"] = pasted_txt.strip()
                         st.success("✅ Direct text loaded into box!")
+                        st.rerun()
 
             with tab_zameen:
                 portal_url = st.text_input("Paste Zameen / Portal Listing URL:", placeholder="https://www.zameen.com/...", key="inner_portal_in")
-                if st.button("🌐 Scrape & Ingest Portal Link", use_container_width=True, key="btn_push_portal_inner"):
+                if st.button("🌐 Scrape & Push to Box", use_container_width=True, key="btn_push_portal_inner"):
                     if portal_url.strip():
                         with st.spinner("Connecting and extracting portal property feed..."):
                             portal_raw = fetch_text_from_portal_url(portal_url.strip())
                             st.session_state["extracted_file_text"] = portal_raw
                             st.success("✅ Portal content fetched into box!")
+                            st.rerun()
                     else:
                         st.warning("Please provide a valid property portal URL.")
 
@@ -1026,15 +1049,16 @@ else:
                 """, unsafe_allow_html=True)
                 st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
                 news_txt = st.text_area("Paste Newspaper Classified Ads Text (Jang, Dawn, Express etc.):", height=90, placeholder="مثلاً: ڈی ایچ اے فیز 9 پرزم 1 کنال پلاٹ برائے فروخت...", key="inner_news_in")
-                if st.button("📰 Ingest Classified Ads", use_container_width=True, key="btn_push_news_inner"):
+                if st.button("📥 Push to Box (Newspaper Ads)", use_container_width=True, key="btn_push_news_inner"):
                     if news_txt.strip():
                         st.session_state["extracted_file_text"] = f"[Newspaper Classified Source]\n" + news_txt.strip()
                         st.success("✅ Newspaper classified ads loaded into box!")
+                        st.rerun()
 
     with col_in_btn:
         if not st.session_state["extraction_active"]:
             st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
-            if st.button("🚀 ➔ Start AI Extraction", use_container_width=True, key="btn_run_stream_inner"):
+            if st.button("🚀 Extract", use_container_width=True, key="btn_run_stream_inner"):
                 final_input_text = raw_text.strip()
                 if final_input_text:
                     # 100 Complete Messages per AI Call
