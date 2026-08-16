@@ -7,7 +7,6 @@ import os
 import time
 import math
 import urllib.request
-import base64
 import pandas as pd
 from datetime import datetime
 from PIL import Image
@@ -267,25 +266,6 @@ def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
 @st.cache_resource
 def get_gspread_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
-    
-    # Extract & sanitize raw key content
-    raw_key = str(creds_dict.get("private_key", ""))
-    raw_key = raw_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
-    raw_key = raw_key.replace("\\n", "").replace("\n", "").replace(" ", "").replace("\r", "").strip()
-    
-    # Strip any corrupt non-base64 characters
-    clean_b64 = re.sub(r'[^A-Za-z0-9+/]', '', raw_key)
-    
-    # Exact modulo padding alignment
-    pad_needed = len(clean_b64) % 4
-    if pad_needed != 0:
-        clean_b64 += '=' * (4 - pad_needed)
-        
-    formatted_pem_lines = [clean_b64[i:i+64] for i in range(0, len(clean_b64), 64)]
-    final_pem = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(formatted_pem_lines) + "\n-----END PRIVATE KEY-----\n"
-    
-    creds_dict["private_key"] = final_pem
-    
     scope = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
