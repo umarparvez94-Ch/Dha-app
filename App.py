@@ -89,8 +89,6 @@ st.markdown("""
     .office-badge { background-color: #006B5E; color: #9FF2E1; padding: 5px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; float: right; }
     .stitch-login-box { background: #FFFFFF; border: 1px solid rgba(197, 198, 210, 0.6); border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04); padding: 32px 28px; margin-bottom: 16px; text-align: center; }
     .stitch-avatar { width: 60px; height: 60px; border-radius: 50%; background-color: #D6E2FF; border: 1px solid #B3C5FF; display: inline-flex; align-items: center; justify-content: center; color: #00113A; margin-bottom: 12px; }
-    .ai-badge-active { background: #DCFCE7; border: 1px solid #86EFAC; color: #15803D; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
-    .ai-badge-inactive { background: #FEF3C7; border: 1px solid #FCD34D; color: #B45309; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
     .summary-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
     .stat-pill { background: #F1F5F9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #334155; display: inline-block; margin-right: 8px; margin-bottom: 6px; }
     .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 16px 20px; margin: 15px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.08); }
@@ -100,12 +98,27 @@ st.markdown("""
         background: #FFFFFF;
         border: 2px solid #CBD5E1;
         border-radius: 16px;
-        padding: 16px 18px 12px 18px;
+        padding: 16px 18px 14px 18px;
         margin-bottom: 16px;
         box-shadow: 0 4px 16px rgba(0, 17, 58, 0.04);
     }
     .unified-prompt-card:focus-within {
         border-color: #00113A;
+    }
+    .news-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        margin: 3px 2px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        color: #00113A;
+        background: #E2E8F0;
+        border: 1px solid #CBD5E1;
+    }
+    .news-badge:hover {
+        background: #D6E2FF;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -379,8 +392,10 @@ def show_dealer_ledger_dialog(payloads):
         st.markdown("##### 🔍 Detailed Listing Records per Dealer:")
         st.dataframe(df_dealers, use_container_width=True, height=240)
 
+# ==============================================================================
+# SOURCE FETCHERS & OCR PROCESSORS
+# ==============================================================================
 def clean_whatsapp_chat_text(raw_text):
-    """Deep WhatsApp chat cleaner to strip headers, dates and noise."""
     chat_patterns = [
         r'^\s*\[?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\]?\s*-?\s*[^:]+:\s*',
         r'^\s*\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*-\s*[^:]+:\s*',
@@ -402,8 +417,89 @@ def clean_whatsapp_chat_text(raw_text):
 
     return "\n".join(cleaned_lines)
 
+def fetch_content_from_gdrive_url(drive_url):
+    file_id_match = re.search(r'[-\w]{25,}', drive_url)
+    if not file_id_match:
+        return "[Invalid Google Drive URL format]"
+    file_id = file_id_match.group(0)
+    direct_download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    try:
+        req = urllib.request.Request(direct_download_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            file_bytes = response.read()
+            return clean_whatsapp_chat_text(file_bytes.decode('utf-8', errors='ignore'))
+    except Exception as e:
+        return f"[Error fetching from Google Drive: {e}]"
+
+def fetch_text_from_portal_url(url_in):
+    if not url_in.startswith("http"):
+        url_in = "https://" + url_in
+    try:
+        req = urllib.request.Request(url_in, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        with urllib.request.urlopen(req, timeout=12) as response:
+            html = response.read().decode('utf-8', errors='ignore')
+            text_only = re.sub(r'<[^>]+>', ' ', html)
+            text_clean = re.sub(r'\s+', ' ', text_only).strip()
+            return f"[Source: {url_in}]\n" + text_clean[:30000]
+    except Exception as e:
+        return f"[Error connecting to Portal URL: {e}]"
+
+def extract_text_from_any_file_or_image(file_obj, is_camera=False):
+    if file_obj is None:
+        return ""
+    file_bytes = file_obj.getvalue()
+    
+    if is_camera or (hasattr(file_obj, 'name') and any(file_obj.name.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"])):
+        if gemini_active and gemini_client:
+            try:
+                img = Image.open(io.BytesIO(file_bytes))
+                res = gemini_client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=[
+                        "Extract all DHA Lahore property listings, newspaper classified ads, phases, blocks, plot numbers, sizes, and demand prices from this image:",
+                        img
+                    ]
+                )
+                return res.text.strip()
+            except Exception as e:
+                return f"[Image OCR extraction error: {e}]"
+        else:
+            return "[Image loaded. Add GEMINI_API_KEY to secrets to extract live OCR]"
+
+    fname = file_obj.name.lower() if hasattr(file_obj, 'name') else "file.txt"
+    if fname.endswith(".xlsx") or fname.endswith(".xls"):
+        try:
+            excel_df = pd.read_excel(io.BytesIO(file_bytes))
+            return excel_df.to_string(index=False)
+        except Exception as e:
+            return f"[Error reading Excel file: {e}]"
+    elif fname.endswith(".csv"):
+        try:
+            csv_df = pd.read_csv(io.BytesIO(file_bytes))
+            return csv_df.to_string(index=False)
+        except Exception as e:
+            return f"[Error reading CSV file: {e}]"
+    elif fname.endswith(".json"):
+        try:
+            json_data = json.loads(file_bytes.decode('utf-8', errors='ignore'))
+            return json.dumps(json_data, indent=2)
+        except Exception as e:
+            return f"[Error reading JSON file: {e}]"
+    elif fname.endswith(".pdf"):
+        if HAS_PYPDF:
+            try:
+                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+                pdf_text = [p.extract_text() for p in reader.pages if p.extract_text()]
+                return "\n".join(pdf_text)
+            except Exception as e:
+                return f"[Error reading PDF: {e}]"
+        else:
+            return "[pypdf not installed]"
+
+    return clean_whatsapp_chat_text(file_bytes.decode('utf-8', errors='ignore'))
+
 # ==============================================================================
-# SMART REFINED MULTI-ENGINE PARSER (LINE-PRESERVING & RESILIENT)
+# SMART REFINED MULTI-ENGINE PARSER (PURE AI + ACCURATE SMART FALLBACK)
 # ==============================================================================
 def smart_accurate_rule_parser(chunk_text, default_phase):
     lines = [l.strip() for l in chunk_text.splitlines() if l.strip()]
@@ -573,7 +669,6 @@ Return ONLY valid JSON Array:
             except Exception:
                 continue
 
-    # Fallback to accurate rule engine
     return smart_accurate_rule_parser(chunk_text, default_phase)
 
 # 8. Login Screen
@@ -618,7 +713,7 @@ if not st.session_state["authenticated"]:
             st.session_state["user_email"] = "sso.agent@dha.pk"
             st.rerun()
 
-# 9. Main Live Summary Dashboard
+# 9. Main Clean Live Summary Dashboard
 else:
     try:
         gc_client = get_gspread_client()
@@ -673,7 +768,7 @@ else:
     st.markdown("---")
 
     # ==========================================================================
-    # ALWAYS LIVE VISIBLE SUMMARY WORKSPACE (REAL-TIME STREAMING)
+    # ALWAYS-LIVE REAL-TIME SUMMARY DASHBOARD TABLE
     # ==========================================================================
     st.subheader("⚡ Live Summary Report & Multi-Phase Ingestion Center")
     total_parsed_now = len(st.session_state["parsed_payloads"])
@@ -742,7 +837,6 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Always Render DataFrame Table
     if edit_summary_mode and total_parsed_now > 0:
         final_summary_df = st.data_editor(df_final_summary_display, use_container_width=True, num_rows="dynamic", height=280, key="summary_active_live_editor")
     else:
@@ -787,14 +881,27 @@ else:
                 if len(existing_rows) == 0:
                     safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
                 
+                plot_repeat_map = {}
+                if len(existing_rows) > 1:
+                    for r in existing_rows[1:]:
+                        r_plot = str(r[4]).strip().lower() if len(r) > 4 else ""
+                        if r_plot:
+                            plot_repeat_map[r_plot] = plot_repeat_map.get(r_plot, 0) + 1
+                
                 rows_to_append = []
                 for row in rows_list:
                     plot_val = str(row.get("Plot No", "")).strip()
+                    repeat_count = plot_repeat_map.get(plot_val.lower(), 0)
+                    notes_txt = "Direct Ingestion"
+                    if repeat_count > 0:
+                        notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
+                    
+                    plot_repeat_map[plot_val.lower()] = repeat_count + 1
                     row_data = [
                         str(now_str), str(row.get("Category", "Selling")), str(phase), str(block),
                         str(plot_val), str(row.get("Size", "")), str(row.get("Plot Features", "Standard Layout")),
                         str(row.get("Demand / Price", "")), "Dealer", "", str(row.get("Contact No", "")),
-                        str(st.session_state['office_name']), "Available", "Direct Ingestion",
+                        str(st.session_state['office_name']), "Available", str(notes_txt),
                         f"[AI Ingest] {str(row.get('Source Text', ''))}"
                     ]
                     rows_to_append.append(row_data)
@@ -822,40 +929,128 @@ else:
 
     st.markdown("---")
 
-    # Ingestion Box
+    # ==========================================================================
+    # 4. UNIFIED ALL-IN-ONE INGESTION PROMPT ENCLOSURE (WITH [+] ATTACH SOURCES)
+    # ==========================================================================
     st.subheader("🧠 Multi-Source Data Ingestion Engine")
     default_box_value = st.session_state.get("extracted_file_text", "")
 
     st.markdown('<div class="unified-prompt-card">', unsafe_allow_html=True)
+    
     raw_text = st.text_area(
         "📋 Live Real Estate Ingestion Stream:",
         value=default_box_value,
         height=240,
-        placeholder="Paste WhatsApp messages here...",
+        placeholder="Paste thousands of WhatsApp chat messages, newspaper ads, portal feeds, or use [+] Attach Sources below...",
         label_visibility="collapsed"
     )
 
-    if not st.session_state["extraction_active"]:
-        if st.button("🚀 ➔ Start AI Extraction", use_container_width=True, key="btn_run_stream_inner"):
-            final_input_text = clean_whatsapp_chat_text(raw_text.strip())
-            if final_input_text:
-                all_lines = [l.strip() for l in final_input_text.splitlines() if l.strip()]
-                LINES_PER_CHUNK = 25
-                chunks = ["\n".join(all_lines[i:i+LINES_PER_CHUNK]) for i in range(0, len(all_lines), LINES_PER_CHUNK)]
-                
-                st.session_state["all_chunks"] = chunks
-                st.session_state["current_chunk_idx"] = 0
-                st.session_state["parsed_payloads"] = []
-                st.session_state["extraction_active"] = True
-                st.session_state["extraction_paused"] = False
-                st.session_state["extraction_default_phase"] = selected_phase
-                st.rerun()
-            else:
-                st.warning("Please provide listing text in the box.")
+    # Action Row: [+] Attach Sources on Left, [🚀 ➔ Start AI Extraction] on Right
+    col_in_attach, col_in_btn = st.columns([3.6, 1.4])
+    
+    with col_in_attach:
+        with st.expander("➕ **Attach Sources (Files, Drive, OCR, Zameen, Newspapers)**", expanded=False):
+            tab_upload, tab_gdrive, tab_camera, tab_direct, tab_zameen, tab_news = st.tabs([
+                "📎 Files", "☁️ G-Drive", "📸 Camera OCR", "📋 Direct", "🌐 Zameen", "📰 Newspapers"
+            ])
+            
+            with tab_upload:
+                uploaded_file = st.file_uploader(
+                    "Upload TXT, Excel, JSON, PDF, or Image:",
+                    type=["txt", "xlsx", "xls", "json", "csv", "pdf", "png", "jpg", "jpeg", "webp"],
+                    key="inner_file_uploader"
+                )
+                if uploaded_file is not None:
+                    with st.spinner(f"Reading `{uploaded_file.name}`..."):
+                        try:
+                            extracted_content = extract_text_from_any_file_or_image(uploaded_file, is_camera=False)
+                            if extracted_content:
+                                st.session_state["extracted_file_text"] = extracted_content
+                                st.success(f"✅ Loaded `{uploaded_file.name}` into box!")
+                        except Exception as e:
+                            st.error(f"Error reading file: {e}")
+
+            with tab_gdrive:
+                gdrive_url_in = st.text_input("Paste Google Drive Link:", placeholder="https://drive.google.com/...", key="inner_gdrive_in")
+                if st.button("☁️ Push G-Drive File Data", use_container_width=True, key="btn_push_gdrive_inner"):
+                    if gdrive_url_in.strip():
+                        with st.spinner("Fetching and cleaning timestamps..."):
+                            gdrive_content = fetch_content_from_gdrive_url(gdrive_url_in.strip())
+                            if gdrive_content and not gdrive_content.startswith("[Error"):
+                                st.session_state["extracted_file_text"] = gdrive_content
+                                st.success("✅ Google Drive data loaded into box!")
+                            else:
+                                st.error(gdrive_content)
+
+            with tab_camera:
+                st.caption("📷 Take photo of Property Document or Newspaper Classified Page:")
+                camera_photo = st.camera_input("Snap picture:", key="inner_cam_in")
+                if camera_photo is not None:
+                    with st.spinner("🧠 Scanning document / newspaper via Google Vision OCR..."):
+                        camera_text = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
+                        if camera_text:
+                            st.session_state["extracted_file_text"] = camera_text
+                            st.success("✅ Camera OCR loaded into box!")
+
+            with tab_direct:
+                pasted_txt = st.text_area("Paste Raw WhatsApp Broadcasts or Text:", height=80, placeholder="Paste text...", key="inner_paste_in")
+                if st.button("📥 Push Pasted Text", use_container_width=True, key="btn_push_direct_inner"):
+                    if pasted_txt.strip():
+                        st.session_state["extracted_file_text"] = pasted_txt.strip()
+                        st.success("✅ Direct text loaded into box!")
+
+            with tab_zameen:
+                portal_url = st.text_input("Paste Zameen / Portal Listing URL:", placeholder="https://www.zameen.com/...", key="inner_portal_in")
+                if st.button("🌐 Scrape & Ingest Portal Link", use_container_width=True, key="btn_push_portal_inner"):
+                    if portal_url.strip():
+                        with st.spinner("Connecting and extracting portal property feed..."):
+                            portal_raw = fetch_text_from_portal_url(portal_url.strip())
+                            st.session_state["extracted_file_text"] = portal_raw
+                            st.success("✅ Portal content fetched into box!")
+                    else:
+                        st.warning("Please provide a valid property portal URL.")
+
+            with tab_news:
+                st.markdown("""
+                    <b>📰 Quick Access to National Newspaper Portals:</b><br>
+                    <a href="https://classified.jang.com.pk" target="_blank" class="news-badge">📰 Daily Jang Classifieds ↗</a>
+                    <a href="https://e.jang.com.pk/lahore" target="_blank" class="news-badge">📰 Jang Lahore ePaper ↗</a>
+                    <a href="https://classifieds.dawn.com" target="_blank" class="news-badge">📰 Daily Dawn Classifieds ↗</a>
+                    <a href="https://express.pk/epaper" target="_blank" class="news-badge">📰 Daily Express Lahore ↗</a>
+                    <a href="https://e.thenews.com.pk" target="_blank" class="news-badge">📰 The News Classifieds ↗</a>
+                    <a href="https://epaper.nawaiwaqt.com.pk" target="_blank" class="news-badge">📰 Daily Nawa-i-Waqt ↗</a>
+                    <a href="https://e.dunya.com.pk" target="_blank" class="news-badge">📰 Daily Dunya ePaper ↗</a>
+                """, unsafe_allow_html=True)
+                st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
+                news_txt = st.text_area("Paste Newspaper Classified Ads Text (Jang, Dawn, Express etc.):", height=90, placeholder="مثلاً: ڈی ایچ اے فیز 9 پرزم 1 کنال پلاٹ برائے فروخت...", key="inner_news_in")
+                if st.button("📰 Ingest Classified Ads", use_container_width=True, key="btn_push_news_inner"):
+                    if news_txt.strip():
+                        st.session_state["extracted_file_text"] = f"[Newspaper Classified Source]\n" + news_txt.strip()
+                        st.success("✅ Newspaper classified ads loaded into box!")
+
+    with col_in_btn:
+        if not st.session_state["extraction_active"]:
+            st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
+            if st.button("🚀 ➔ Start AI Extraction", use_container_width=True, key="btn_run_stream_inner"):
+                final_input_text = clean_whatsapp_chat_text(raw_text.strip())
+                if final_input_text:
+                    all_lines = [l.strip() for l in final_input_text.splitlines() if l.strip()]
+                    LINES_PER_CHUNK = 25
+                    chunks = ["\n".join(all_lines[i:i+LINES_PER_CHUNK]) for i in range(0, len(all_lines), LINES_PER_CHUNK)]
+                    
+                    st.session_state["all_chunks"] = chunks
+                    st.session_state["current_chunk_idx"] = 0
+                    st.session_state["parsed_payloads"] = []
+                    st.session_state["extraction_active"] = True
+                    st.session_state["extraction_paused"] = False
+                    st.session_state["extraction_default_phase"] = selected_phase
+                    st.rerun()
+                else:
+                    st.warning("Please provide listing text, take a camera photo, or attach a file.")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Active Live Streaming Engine
+    # Active Live Streaming Loop (Pause / Resume / Cancel)
     if st.session_state["extraction_active"]:
         chunks = st.session_state["all_chunks"]
         curr_idx = st.session_state["current_chunk_idx"]
@@ -901,7 +1096,6 @@ else:
                 if st.session_state["current_chunk_idx"] >= total_chunks:
                     st.session_state["extraction_active"] = False
                     st.session_state["extraction_paused"] = False
-                    st.success(f"🎉 100% Complete! Extracted {len(st.session_state['parsed_payloads'])} listings into summary workspace.")
                     st.rerun()
                 else:
                     st.rerun()
