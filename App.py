@@ -294,7 +294,6 @@ def safe_gspread_call(func, *args, **kwargs):
             return func(*args, **kwargs)
         except Exception as e:
             err_str = str(e).lower()
-            # If Google API Rate Limit 429 or Quota exceeded
             if "429" in err_str or "quota" in err_str or "apierror" in err_str or "rate limit" in err_str:
                 time.sleep(delay * 2.0)
             if attempt == retries - 1:
@@ -913,20 +912,27 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Safe Dataframe Display (50 Rows Max for Ultra Fast Render)
+    # ==========================================================================
+    # FULL SCROLLABLE LIVE SUMMARY TABLE (SCROLL ALL EXTRACTED ROWS)
+    # ==========================================================================
     if not df_final_summary_display.empty:
-        df_render_preview = df_final_summary_display.head(50)
-        if len(df_final_summary_display) > 50:
-            st.caption(f"ℹ️ Showing top 50 rows for speed. Sync pushes all {len(df_final_summary_display)} records.")
-        
         if edit_summary_mode:
-            final_summary_df = st.data_editor(df_render_preview, num_rows="dynamic", height=280, key="summary_active_live_editor")
+            final_summary_df = st.data_editor(
+                df_final_summary_display,
+                height=520,
+                num_rows="dynamic",
+                key="summary_active_live_editor"
+            )
         else:
             final_summary_df = df_final_summary_display
-            st.dataframe(df_render_preview, height=280)
+            st.dataframe(
+                df_final_summary_display,
+                height=520,
+                hide_index=False
+            )
     else:
         final_summary_df = df_final_summary_display
-        st.dataframe(final_summary_df, height=280)
+        st.dataframe(final_summary_df, height=300)
 
     final_sync_count_live = len(df_final_summary_display)
     col_pb1, col_pb2 = st.columns([2, 1])
