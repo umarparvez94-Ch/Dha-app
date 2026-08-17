@@ -912,27 +912,36 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # ==========================================================================
-    # FULL SCROLLABLE LIVE SUMMARY TABLE (SCROLL ALL EXTRACTED ROWS)
-    # ==========================================================================
+    # Dynamic Row View Selector (Allows viewing all records or limited rows)
+    col_view_opt, col_view_info = st.columns([2, 3])
+    with col_view_opt:
+        view_limit_option = st.selectbox(
+            "👁️ Visible Rows in Table Preview:",
+            options=["Top 50 (Fastest)", "Top 100", "Top 250", "Top 500", "All Extracted Plots"],
+            index=0,
+            key="visible_rows_select_box"
+        )
+
+    row_limit_map = {
+        "Top 50 (Fastest)": 50,
+        "Top 100": 100,
+        "Top 250": 250,
+        "Top 500": 500,
+        "All Extracted Plots": len(df_final_summary_display)
+    }
+    limit_num = row_limit_map[view_limit_option]
+
     if not df_final_summary_display.empty:
+        df_render_preview = df_final_summary_display.head(limit_num)
+        
         if edit_summary_mode:
-            final_summary_df = st.data_editor(
-                df_final_summary_display,
-                height=520,
-                num_rows="dynamic",
-                key="summary_active_live_editor"
-            )
+            final_summary_df = st.data_editor(df_render_preview, num_rows="dynamic", height=320, key="summary_active_live_editor")
         else:
             final_summary_df = df_final_summary_display
-            st.dataframe(
-                df_final_summary_display,
-                height=520,
-                hide_index=False
-            )
+            st.dataframe(df_render_preview, height=320)
     else:
         final_summary_df = df_final_summary_display
-        st.dataframe(final_summary_df, height=300)
+        st.dataframe(final_summary_df, height=320)
 
     final_sync_count_live = len(df_final_summary_display)
     col_pb1, col_pb2 = st.columns([2, 1])
