@@ -662,68 +662,55 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
     return results
 
 # ==============================================================================
-# GEMINI 2.5 FLASH FORENSIC REAL ESTATE EXTRACTION ENGINE
+# GEMINI 2.5 FLASH EXPERT REAL ESTATE EXTRACTION ENGINE
 # ==============================================================================
 def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     
-    system_prompt = f"""You are the Master DHA Lahore Real Estate Data Pipeline Architect & Forensic Text Parsing Specialist.
-Your explicit objective is to ingest messy, unorganized, highly-abbreviated, mixed-dealer WhatsApp broadcasts and restructure them into perfectly normalized, aligned CRM JSON records with 100% precision.
+    system_prompt = f"""You are the Master DHA Lahore Real Estate Analyst & Senior Database Ingestion Architect with 15+ years of market experience.
+Your mission is to read raw, unstructured, multi-dealer WhatsApp broadcasts, classifieds, and abbreviations, then parse them with 100% domain accuracy into structured CRM JSON records.
 
-### CORE EXTRACTION & ALIGNMENT INTELLIGENCE:
+### DHA LAHORE DOMAIN INTELLIGENCE RULES:
+1. MULTI-LISTING DECONSTRUCTION:
+   - A single WhatsApp message often contains multiple plot listings separated by line breaks or bullets. Split every individual plot into its own independent JSON entry.
 
-1. MULTI-LISTING DISAGGREGATION (One Record per Property):
-   - Dealers frequently paste 5 to 50 property options in a single unformatted broadcast.
-   - You MUST split every distinct plot, pair, shop, or requirement into its own dedicated JSON object. Never club multiple plots into a single row.
+2. SECTION PHASE TRACKING:
+   - Dealers often post section headers like "*--- DHA PHASE 7 ---*" or "*PHASE 9 PRISM*".
+   - Every plot listed under that heading must inherit that exact Phase until a new phase heading appears. If no heading exists, default to: "{default_phase}".
 
-2. CONTEXTUAL HIERARCHY & HEADER INHERITANCE:
-   - Identify header dividers like: "*--- DHA PHASE 7 ---*", "*PHASE 9 PRISM (1 KANAL)*", "*PHASE 6 COMMERCIALS*", or "*DIRECT OPTIONS*".
-   - Every single plot appearing beneath a header must inherit that specific Phase and Size until a new divider explicitly changes it.
-   - If a broadcast lacks a phase header, bind it strictly to the default fallback: "{default_phase}".
+3. BLOCK IDENTIFICATION (Zero Hallucination):
+   - Only use valid blocks from the official catalog below.
+   - NEVER treat terms like "SE", "CA", "PHASE", "PAIR", "DIRECT", "DEMAND", "MAIN", "CORNER", "POSSESSION", "AFFIDAVIT", or "FILE" as block names.
+   - Translate shorthand properly: 'Z2' -> 'Block Z-2', 'CCA1' -> 'CCA 1 Commercial', 'MB' -> 'Main Boulevard (MB) Commercial', 'BROADWAY' -> 'Broadway Commercial'.
 
-3. ZERO-HALLUCINATION BLOCK ALIGNMENT:
-   - Match extracted blocks strictly against the Official Catalog provided below.
-   - Clean common slang: 'Z2' -> 'Block Z-2', 'CCA1' -> 'CCA 1 Commercial', 'MB' -> 'Main Boulevard (MB) Commercial', 'BROADWAY' -> 'Broadway Commercial', 'SECTOR 4' -> 'Sector 4'.
-   - FORBIDDEN AS BLOCKS: Words like 'DIRECT', 'MEETING', 'PAIR', 'DEMAND', 'CORNER', 'PARK', 'MAIN', 'SE', 'CA', 'POSSESSION', 'AFFIDAVIT', 'FILE', 'RESIDENTIAL', 'COMMERCIAL' must NEVER be assigned as a Block name.
+4. PLOT NUMBER & COMBINATIONS:
+   - Extract raw plot numbers cleanly: e.g., 'Plot 450', 'Plot 112/4', 'Plot 890+891' (for pairs), 'Plot 14-A'.
+   - If the message is a general dealer portfolio without specific plot numbers, label Plot No as: 'General Option / Portfolio'.
 
-4. PLOT NUMBER ISOLATION:
-   - Extract the precise identifier: 'Plot 450', 'Plot 112/4', 'Plot 890+891' (Pairs), 'Plot 14-A'.
-   - If it's a general broker broadcast without specific numbers (e.g. "Direct options available in Block C"), mark Plot No as: 'General Option / Portfolio'.
+5. PROPERTY SIZE INTELLIGENCE:
+   - Normalize sizes strictly to: '5 Marla', '8 Marla', '10 Marla', '1 Kanal', '2 Kanal', '4 Marla Commercial', '8 Marla Commercial'.
+   - Understand shorthand: '1K' -> '1 Kanal', '10M' -> '10 Marla', '5M' -> '5 Marla', '4M Com' -> '4 Marla Commercial'.
 
-5. STRICT SIZE NORMALIZATION:
-   - Standardize all colloquial terms to official CRM values:
-     - '1K', '1000 SY', '500 Sq Yards' -> '1 Kanal'
-     - '10M', '250 Sq Yards' -> '10 Marla'
-     - '5M', '125 Sq Yards' -> '5 Marla'
-     - '2K' -> '2 Kanal'
-     - '4M Com', '4 Marla CCA' -> '4 Marla Commercial'
-     - '8M Com', '8 Marla Commercial' -> '8 Marla Commercial'
+6. DEMAND & PRICE NORMALIZATION:
+   - Normalize prices into standardized 'X Lac' or 'X Crore' (e.g., '5.85 Crore', '585 Lac', '320 Lac', '1.45 Crore').
+   - Convert numbers like '580' in a 1 Kanal block to '580 Lac', and '45' in a 5 Marla file to '45 Lac'.
 
-6. DEMAND & CURRENCY STANDARDIZATION:
-   - Reconstruct bare digits based on DHA price reality:
-     - e.g., '585' in 1 Kanal -> '585 Lac'
-     - e.g., '5.85' -> '5.85 Crore'
-     - e.g., '325' in 10 Marla -> '325 Lac'
-     - e.g., '85' in 5 Marla -> '85 Lac'
-   - Always append 'Lac' or 'Crore'. If price is missing or says "call", set as: "Demand on Call".
+7. FEATURE EXTRACTION:
+   - Identify attributes: 'Corner', 'Facing Park', 'Main Boulevard (MB)', '100ft Road', 'Direct Approach', 'Possession', 'Non-Possession', 'Balloted', 'Open Form', 'Pair Plot'. If none, use 'Standard Layout'.
 
-7. ATTRIBUTE & FEATURE CLASSIFICATION:
-   - Tag specific location advantages: 'Corner', 'Facing Park', 'Main Boulevard (MB)', '100ft Road', 'Direct Approach', 'Possession', 'Non-Possession', 'Balloted', 'Open Form', 'Pair Plot'.
-   - If no specific feature is mentioned, output: 'Standard Layout'.
+8. SELLER & CONTACT CLASSIFICATION:
+   - Category: 'Selling', 'Buying', or 'Rental'.
+   - Seller Type: Set to 'Direct Owner' if words like "direct meeting", "my own", "owner on table" appear; otherwise set to 'Authorized Dealer'.
+   - Contact: Extract standard Pakistan mobile numbers ('03001234567' or '+923001234567').
 
-8. CATEGORY & SELLER ATTRIBUTION:
-   - "Category": Mark as 'Selling' (default for inventory offers), 'Buying' (for client requirements/demands), or 'Rental'.
-   - "Seller Type": Set as 'Direct Owner' if words like "direct", "owner on table", "owner meeting" appear; otherwise 'Authorized Dealer'.
-   - "Contact No": Clean and extract Pakistani format phone numbers (e.g., '03001234567', '+923218322333').
-
-OFFICIAL DHA PHASE & BLOCK CATALOG (SOURCE OF TRUTH):
+OFFICIAL DHA PHASE & BLOCK CATALOG:
 {catalog_json_str}
 
-INPUT MESSY WHATSAPP STREAM:
+INPUT WHATSAPP DATA CHUNK:
 {chunk_text}
 
-OUTPUT SPECIFICATION:
-Return ONLY a valid JSON array of objects. Strictly no explanations, markdown formatting ticks, or conversational preambles.
+OUTPUT FORMAT:
+Return strictly a valid JSON array of objects. No introductory markdown, no conversational commentary.
 """
 
     if gemini_active and gemini_client:
