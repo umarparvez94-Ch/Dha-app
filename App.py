@@ -5,19 +5,20 @@ import json
 import io
 import os
 import time
+import math
 import urllib.request
 import pandas as pd
 from datetime import datetime
 from PIL import Image
 from google.oauth2 import service_account
 
-# Optional imports handled safely
 try:
     import pypdf
     HAS_PYPDF = True
 except ImportError:
     HAS_PYPDF = False
 
+# Google GenAI SDK
 try:
     from google import genai
     from google.genai import types
@@ -282,17 +283,24 @@ def get_gspread_client():
     except Exception:
         return None
 
+# ==============================================================================
+# QUOTA-PROOF SAFE GOOGLE SHEETS CALLER (AUTO RETRY & BACKOFF)
+# ==============================================================================
 def safe_gspread_call(func, *args, **kwargs):
-    retries = 6
-    delay = 1.5
+    retries = 10
+    delay = 2.5
     for attempt in range(retries):
         try:
             return func(*args, **kwargs)
         except Exception as e:
+            err_str = str(e).lower()
+            # If Google API Rate Limit 429 or Quota exceeded
+            if "429" in err_str or "quota" in err_str or "apierror" in err_str or "rate limit" in err_str:
+                time.sleep(delay * 2.0)
             if attempt == retries - 1:
                 raise e
             time.sleep(delay)
-            delay *= 1.8
+            delay *= 1.5
 
 def get_phase_workbook(gc, phase_name):
     target_url = DHA_PHASE_SHEET_URLS.get(phase_name, DHA_PHASE_SHEET_URLS["DHA Phase 1"])
@@ -305,7 +313,7 @@ def get_or_create_clean_tab_exact(workbook, tab_title):
         for w in ws_list:
             if w.title.strip().lower() == clean_title.lower():
                 return w
-        ws = safe_gspread_call(workbook.add_worksheet, title=clean_title, rows=500, cols=16)
+        ws = safe_gspread_call(workbook.add_worksheet, title=clean_title, rows=1000, cols=16)
         safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
         return ws
     except Exception:
@@ -905,7 +913,7 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Safe Dataframe Display (50 Rows Max for Safe Speed)
+    # Safe Dataframe Display (50 Rows Max for Ultra Fast Render)
     if not df_final_summary_display.empty:
         df_render_preview = df_final_summary_display.head(50)
         if len(df_final_summary_display) > 50:
@@ -953,45 +961,26 @@ else:
                     
                     wb = workbook_cache[phase]
                     ws = get_or_create_clean_tab_exact(wb, block)
-                    try:
-                        existing_rows = safe_gspread_call(ws.get_all_values)
-                    except Exception:
-                        existing_rows = []
-                    
-                    if len(existing_rows) == 0:
-                        safe_gspread_call(ws.append_row, CRM_SHEET_HEADERS)
-                    
-                    plot_repeat_map = {}
-                    if len(existing_rows) > 1:
-                        for r in existing_rows[1:]:
-                            r_plot = str(r[4]).strip().lower() if len(r) > 4 else ""
-                            if r_plot:
-                                plot_repeat_map[r_plot] = plot_repeat_map.get(r_plot, 0) + 1
                     
                     rows_to_append = []
                     for row in rows_list:
                         plot_val = str(row.get("Plot No", "")).strip()
-                        repeat_count = plot_repeat_map.get(plot_val.lower(), 0)
-                        notes_txt = "Direct Ingestion"
-                        if repeat_count > 0:
-                            notes_txt = f"🔁 Repeated {repeat_count + 1} times this month"
-                        
-                        plot_repeat_map[plot_val.lower()] = repeat_count + 1
                         row_data = [
                             str(now_str), str(row.get("Category", "Selling")), str(phase), str(block),
                             str(plot_val), str(row.get("Size", "")), str(row.get("Plot Features", "Standard Layout")),
                             str(row.get("Demand / Price", "")), "Dealer", "", str(row.get("Contact No", "")),
-                            str(st.session_state['office_name']), "Available", str(notes_txt),
+                            str(st.session_state['office_name']), "Available", "Direct Ingestion",
                             f"[AI Ingest] {str(row.get('Source Text', ''))}"
                         ]
                         rows_to_append.append(row_data)
                     
-                    CHUNK_SIZE = 50
-                    for i in range(0, len(rows_to_append), CHUNK_SIZE):
-                        chunk_slice = rows_to_append[i:i + CHUNK_SIZE]
+                    # 500-Row Bulk Slice for Maximum Speed & Zero Quota Crash
+                    BULK_SLICE_SIZE = 500
+                    for i in range(0, len(rows_to_append), BULK_SLICE_SIZE):
+                        chunk_slice = rows_to_append[i:i + BULK_SLICE_SIZE]
                         safe_gspread_call(ws.append_rows, chunk_slice, value_input_option="USER_ENTERED")
                         saved_count += len(chunk_slice)
-                        time.sleep(0.4)
+                        time.sleep(0.8)  # API Rate protection buffer
                     
                     progress_bar_sync.progress((idx + 1) / total_groups)
                 
