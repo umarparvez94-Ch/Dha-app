@@ -294,6 +294,7 @@ def safe_gspread_call(func, *args, **kwargs):
             return func(*args, **kwargs)
         except Exception as e:
             err_str = str(e).lower()
+            # If Google API Rate Limit 429 or Quota exceeded
             if "429" in err_str or "quota" in err_str or "apierror" in err_str or "rate limit" in err_str:
                 time.sleep(delay * 2.0)
             if attempt == retries - 1:
@@ -912,36 +913,20 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Dynamic Row View Selector (Allows viewing all records or limited rows)
-    col_view_opt, col_view_info = st.columns([2, 3])
-    with col_view_opt:
-        view_limit_option = st.selectbox(
-            "👁️ Visible Rows in Table Preview:",
-            options=["Top 50 (Fastest)", "Top 100", "Top 250", "Top 500", "All Extracted Plots"],
-            index=0,
-            key="visible_rows_select_box"
-        )
-
-    row_limit_map = {
-        "Top 50 (Fastest)": 50,
-        "Top 100": 100,
-        "Top 250": 250,
-        "Top 500": 500,
-        "All Extracted Plots": len(df_final_summary_display)
-    }
-    limit_num = row_limit_map[view_limit_option]
-
+    # Safe Dataframe Display (50 Rows Max for Ultra Fast Render)
     if not df_final_summary_display.empty:
-        df_render_preview = df_final_summary_display.head(limit_num)
+        df_render_preview = df_final_summary_display.head(50)
+        if len(df_final_summary_display) > 50:
+            st.caption(f"ℹ️ Showing top 50 rows for speed. Sync pushes all {len(df_final_summary_display)} records.")
         
         if edit_summary_mode:
-            final_summary_df = st.data_editor(df_render_preview, num_rows="dynamic", height=320, key="summary_active_live_editor")
+            final_summary_df = st.data_editor(df_render_preview, num_rows="dynamic", height=280, key="summary_active_live_editor")
         else:
             final_summary_df = df_final_summary_display
-            st.dataframe(df_render_preview, height=320)
+            st.dataframe(df_render_preview, height=280)
     else:
         final_summary_df = df_final_summary_display
-        st.dataframe(final_summary_df, height=320)
+        st.dataframe(final_summary_df, height=280)
 
     final_sync_count_live = len(df_final_summary_display)
     col_pb1, col_pb2 = st.columns([2, 1])
