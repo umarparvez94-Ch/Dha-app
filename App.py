@@ -95,33 +95,10 @@ st.markdown("""
     .stat-pill { background: #F1F5F9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #334155; display: inline-block; margin-right: 8px; margin-bottom: 6px; }
     .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 16px 20px; margin: 15px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.08); }
     .backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }
-    
-    .unified-prompt-card {
-        background: #FFFFFF;
-        border: 2px solid #CBD5E1;
-        border-radius: 16px;
-        padding: 16px 18px 14px 18px;
-        margin-bottom: 16px;
-        box-shadow: 0 4px 16px rgba(0, 17, 58, 0.04);
-    }
-    .unified-prompt-card:focus-within {
-        border-color: #00113A;
-    }
-    .news-badge {
-        display: inline-block;
-        padding: 4px 10px;
-        margin: 3px 2px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 600;
-        text-decoration: none;
-        color: #00113A;
-        background: #E2E8F0;
-        border: 1px solid #CBD5E1;
-    }
-    .news-badge:hover {
-        background: #D6E2FF;
-    }
+    .unified-prompt-card { background: #FFFFFF; border: 2px solid #CBD5E1; border-radius: 16px; padding: 16px 18px 14px 18px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0, 17, 58, 0.04); }
+    .unified-prompt-card:focus-within { border-color: #00113A; }
+    .news-badge { display: inline-block; padding: 4px 10px; margin: 3px 2px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #00113A; background: #E2E8F0; border: 1px solid #CBD5E1; }
+    .news-badge:hover { background: #D6E2FF; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -502,7 +479,7 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
     return file_bytes.decode('utf-8', errors='ignore')
 
 # ==============================================================================
-# ROBUST MULTI-SECTION PARSER (ELIMINATES 'BLOCK SE' & HEADER HALLUCINATIONS)
+# ROBUST BACKUP REGEX PARSER (FALLBACK)
 # ==============================================================================
 def clean_line_from_artifacts(l):
     return re.sub(r'[*_~`]', ' ', l).strip()
@@ -598,7 +575,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     "Phase": current_section_phase,
                     "Block": blk_cca,
                     "Plot No": f"Plot {plt_num}",
-                    "Size": current_section_size if current_section_size else "4 Marla",
+                    "Size": current_section_size if current_section_size else "4 Marla Commercial",
                     "Plot Features": "Commercial / CCA",
                     "Demand / Price": prc_str,
                     "Seller Type": "Dealer",
@@ -684,52 +661,63 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
 
     return results
 
+# ==============================================================================
+# GEMINI 2.5 FLASH EXPERT REAL ESTATE EXTRACTION ENGINE
+# ==============================================================================
 def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     
-    prompt = f"""You are the Master DHA Lahore Real Estate CRM extraction engine using advanced Gemini 2.5 reasoning.
-Carefully analyze this batch of ~100 WhatsApp broadcasts separated by '===MESSAGE_START==='.
+    system_prompt = f"""You are the Master DHA Lahore Real Estate Analyst & Senior Database Ingestion Architect with 15+ years of market experience.
+Your mission is to read raw, unstructured, multi-dealer WhatsApp broadcasts, classifieds, and abbreviations, then parse them with 100% domain accuracy into structured CRM JSON records.
 
-CRITICAL RULES:
-1. "Phase": Track section headers inside broadcasts (*Phase 6*, *Phase 7*, *Phase 8*, *Phase 9 Prism*). Assign EACH plot to its respective section phase.
-2. "Block": Must match official catalog (e.g. 'Block G', 'Block X', 'Block Y', 'Block S', 'Block A', 'Block M', 'Block N', 'Block K', 'Block Q', 'Block T', 'Block Z', 'Block Z-2', 'CCA 1 Commercial'). NEVER extract 'Block SE', 'Block CA', 'Block PHA' or header words as blocks!
-3. "Plot No": Extract plot number correctly (e.g. 'Plot 292', 'Plot 500/9', 'Plot 1122/3', 'Plot 4092', 'Plot 864+865', 'Plot 18', 'Plot 274', 'Plot 844/51', 'Plot 450', 'Plot 393', 'Plot 1308').
-4. "Size": '5 Marla', '10 Marla', '1 Kanal', '2 Kanal', '4 Marla', '8 Marla'.
-5. "Demand / Price": '565 Lac', '310 Lac', '325 Lac', '200 Lac', '575 Lac', '930 Lac', '1025 Lac' etc.
-6. "Contact No": Extract dealer phone number.
-7. "Raw Listing & Source Material": MUST CONTAIN THE FULL ORIGINAL BROADCAST MESSAGE.
+### DHA LAHORE DOMAIN INTELLIGENCE RULES:
+1. MULTI-LISTING DECONSTRUCTION:
+   - A single WhatsApp message often contains multiple plot listings separated by line breaks or bullets. Split every individual plot into its own independent JSON entry.
 
-OFFICIAL DHA BLOCKS CATALOG:
+2. SECTION PHASE TRACKING:
+   - Dealers often post section headers like "*--- DHA PHASE 7 ---*" or "*PHASE 9 PRISM*".
+   - Every plot listed under that heading must inherit that exact Phase until a new phase heading appears. If no heading exists, default to: "{default_phase}".
+
+3. BLOCK IDENTIFICATION (Zero Hallucination):
+   - Only use valid blocks from the official catalog below.
+   - NEVER treat terms like "SE", "CA", "PHASE", "PAIR", "DIRECT", "DEMAND", "MAIN", "CORNER", "POSSESSION", "AFFIDAVIT", or "FILE" as block names.
+   - Translate shorthand properly: 'Z2' -> 'Block Z-2', 'CCA1' -> 'CCA 1 Commercial', 'MB' -> 'Main Boulevard (MB) Commercial', 'BROADWAY' -> 'Broadway Commercial'.
+
+4. PLOT NUMBER & COMBINATIONS:
+   - Extract raw plot numbers cleanly: e.g., 'Plot 450', 'Plot 112/4', 'Plot 890+891' (for pairs), 'Plot 14-A'.
+   - If the message is a general dealer portfolio without specific plot numbers, label Plot No as: 'General Option / Portfolio'.
+
+5. PROPERTY SIZE INTELLIGENCE:
+   - Normalize sizes strictly to: '5 Marla', '8 Marla', '10 Marla', '1 Kanal', '2 Kanal', '4 Marla Commercial', '8 Marla Commercial'.
+   - Understand shorthand: '1K' -> '1 Kanal', '10M' -> '10 Marla', '5M' -> '5 Marla', '4M Com' -> '4 Marla Commercial'.
+
+6. DEMAND & PRICE NORMALIZATION:
+   - Normalize prices into standardized 'X Lac' or 'X Crore' (e.g., '5.85 Crore', '585 Lac', '320 Lac', '1.45 Crore').
+   - Convert numbers like '580' in a 1 Kanal block to '580 Lac', and '45' in a 5 Marla file to '45 Lac'.
+
+7. FEATURE EXTRACTION:
+   - Identify attributes: 'Corner', 'Facing Park', 'Main Boulevard (MB)', '100ft Road', 'Direct Approach', 'Possession', 'Non-Possession', 'Balloted', 'Open Form', 'Pair Plot'. If none, use 'Standard Layout'.
+
+8. SELLER & CONTACT CLASSIFICATION:
+   - Category: 'Selling', 'Buying', or 'Rental'.
+   - Seller Type: Set to 'Direct Owner' if words like "direct meeting", "my own", "owner on table" appear; otherwise set to 'Authorized Dealer'.
+   - Contact: Extract standard Pakistan mobile numbers ('03001234567' or '+923001234567').
+
+OFFICIAL DHA PHASE & BLOCK CATALOG:
 {catalog_json_str}
 
-Input Text:
+INPUT WHATSAPP DATA CHUNK:
 {chunk_text}
 
-Return ONLY valid JSON Array:
-[
-  {{
-    "Category": "Selling",
-    "Phase": "DHA Phase 6",
-    "Block": "Block G",
-    "Plot No": "Plot 292",
-    "Size": "1 Kanal",
-    "Plot Features": "Standard Layout",
-    "Demand / Price": "565 Lac",
-    "Seller Type": "Dealer",
-    "Seller / Dealer Name": "LIAQAT Ali",
-    "Contact No": "03218322333",
-    "Office / Agency": "Six Sigma Properties",
-    "Deal Status": "Available",
-    "Last Conversation / Notes": "Direct Ingestion",
-    "Raw Listing & Source Material": "Full broadcast message text..."
-  }}
-]"""
+OUTPUT FORMAT:
+Return strictly a valid JSON array of objects. No introductory markdown, no conversational commentary.
+"""
 
     if gemini_active and gemini_client:
         try:
             response = gemini_client.models.generate_content(
                 model='gemini-2.5-flash',
-                contents=prompt,
+                contents=system_prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     temperature=0.0
@@ -742,12 +730,10 @@ Return ONLY valid JSON Array:
                     blk = str(item.get("Block", "")).strip()
                     plt = str(item.get("Plot No", "")).strip()
                     sz = str(item.get("Size", "")).strip()
+                    ph = item.get("Phase", default_phase)
                     if plt and plt.lower() != "general option / portfolio":
                         item["Size"] = resolve_size_text_first_or_map(
-                            item.get("Phase", default_phase),
-                            blk,
-                            plt,
-                            sz
+                            ph, blk, plt, sz
                         )
                 return parsed_json
         except Exception:
@@ -777,8 +763,8 @@ if not st.session_state["authenticated"]:
                 <div class="stitch-avatar">
                     <span class="material-symbols-outlined" style="font-size:30px;">apartment</span>
                 </div>
-                <div class="stitch-title">Welcome to DHA</div>
-                <div class="stitch-subtitle">Clinical & Property CRM Data Systems</div>
+                <div style="font-family:'Manrope',sans-serif; font-size:22px; font-weight:700; color:#00113A;">Welcome to DHA</div>
+                <div style="color:#757682; font-size:13px; margin-top:4px;">Clinical & Property CRM Data Systems</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -921,20 +907,29 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    if edit_summary_mode and total_parsed_now > 0:
-        final_summary_df = st.data_editor(df_final_summary_display, use_container_width=True, num_rows="dynamic", height=280, key="summary_active_live_editor")
+    # Safe Dataframe Display (Limited View to Prevent MessageSizeError)
+    if not df_final_summary_display.empty:
+        df_render_preview = df_final_summary_display.head(50)
+        if len(df_final_summary_display) > 50:
+            st.caption(f"ℹ️ Showing top 50 rows for ultra-fast browser speed. The sync button pushes all {len(df_final_summary_display)} records.")
+        
+        if edit_summary_mode:
+            final_summary_df = st.data_editor(df_render_preview, use_container_width=True, num_rows="dynamic", height=280, key="summary_active_live_editor")
+        else:
+            final_summary_df = df_final_summary_display
+            st.dataframe(df_render_preview, use_container_width=True, height=280)
     else:
         final_summary_df = df_final_summary_display
         st.dataframe(final_summary_df, use_container_width=True, height=280)
 
-    final_sync_count_live = len(final_summary_df)
+    final_sync_count_live = len(df_final_summary_display)
     col_pb1, col_pb2 = st.columns([2, 1])
     with col_pb1:
         if st.button(f"🚀 Push ({final_sync_count_live} Filtered Plots) to Sheet Tabs", use_container_width=True, disabled=(final_sync_count_live == 0)):
             now_dt = datetime.now()
             now_str = now_dt.strftime("%Y-%m-%d %H:%M")
             grouped_data = {}
-            for _, row in final_summary_df.iterrows():
+            for _, row in df_final_summary_display.iterrows():
                 target_phase = str(row.get("Target Phase", "DHA Phase 1")).strip()
                 target_block = str(row.get("Target Tab", "Block A")).strip()
                 key = (target_phase, target_block)
