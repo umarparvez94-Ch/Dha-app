@@ -284,9 +284,6 @@ def get_gspread_client():
     except Exception:
         return None
 
-# ==============================================================================
-# QUOTA-PROOF SAFE GOOGLE SHEETS CALLER (AUTO RETRY & BACKOFF)
-# ==============================================================================
 def safe_gspread_call(func, *args, **kwargs):
     retries = 10
     delay = 2.5
@@ -519,56 +516,6 @@ def show_pdf_catalog_dialog(df_cat):
 # ==============================================================================
 # SOURCE FETCHERS & 100-MESSAGE CHUNKER
 # ==============================================================================
-def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
-    msg_split_pattern = r'(?=\n?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2})'
-    raw_messages = re.split(msg_split_pattern, raw_text)
-    
-    clean_messages = []
-    for msg in raw_messages:
-        m_str = msg.strip()
-        if not m_str:
-            continue
-        if "Messages and calls are end-to-end encrypted" in m_str or "<Media omitted>" in m_str or "security code changed" in m_str:
-            continue
-        clean_messages.append(m_str)
-    
-    if not clean_messages:
-        clean_messages = [l.strip() for l in raw_text.splitlines() if l.strip()]
-
-    chunks = []
-    for i in range(0, len(clean_messages), messages_per_chunk):
-        chunk_batch = clean_messages[i:i + messages_per_chunk]
-        chunks.append("\n\n===MESSAGE_START===\n" + "\n\n===MESSAGE_START===\n".join(chunk_batch))
-        
-    return chunks
-
-def fetch_content_from_gdrive_url(drive_url):
-    file_id_match = re.search(r'[-\w]{25,}', drive_url)
-    if not file_id_match:
-        return "[Invalid Google Drive URL format]"
-    file_id = file_id_match.group(0)
-    direct_download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    try:
-        req = urllib.request.Request(direct_download_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
-            file_bytes = response.read()
-            return file_bytes.decode('utf-8', errors='ignore')
-    except Exception as e:
-        return f"[Error fetching from Google Drive: {e}]"
-
-def fetch_text_from_portal_url(url_in):
-    if not url_in.startswith("http"):
-        url_in = "https://" + url_in
-    try:
-        req = urllib.request.Request(url_in, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-        with urllib.request.urlopen(req, timeout=12) as response:
-            html = response.read().decode('utf-8', errors='ignore')
-            text_only = re.sub(r'<[^>]+>', ' ', html)
-            text_clean = re.sub(r'\s+', ' ', text_only).strip()
-            return f"[Source: {url_in}]\n" + text_clean[:30000]
-    except Exception as e:
-        return f"[Error connecting to Portal URL: {e}]"
-
 def extract_text_from_any_file_or_image(file_obj, is_camera=False):
     if file_obj is None:
         return ""
@@ -622,6 +569,56 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
             return "[pypdf not installed]"
 
     return file_bytes.decode('utf-8', errors='ignore')
+
+def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
+    msg_split_pattern = r'(?=\n?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2})'
+    raw_messages = re.split(msg_split_pattern, raw_text)
+    
+    clean_messages = []
+    for msg in raw_messages:
+        m_str = msg.strip()
+        if not m_str:
+            continue
+        if "Messages and calls are end-to-end encrypted" in m_str or "<Media omitted>" in m_str or "security code changed" in m_str:
+            continue
+        clean_messages.append(m_str)
+    
+    if not clean_messages:
+        clean_messages = [l.strip() for l in raw_text.splitlines() if l.strip()]
+
+    chunks = []
+    for i in range(0, len(clean_messages), messages_per_chunk):
+        chunk_batch = clean_messages[i:i + messages_per_chunk]
+        chunks.append("\n\n===MESSAGE_START===\n" + "\n\n===MESSAGE_START===\n".join(chunk_batch))
+        
+    return chunks
+
+def fetch_content_from_gdrive_url(drive_url):
+    file_id_match = re.search(r'[-\w]{25,}', drive_url)
+    if not file_id_match:
+        return "[Invalid Google Drive URL format]"
+    file_id = file_id_match.group(0)
+    direct_download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    try:
+        req = urllib.request.Request(direct_download_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            file_bytes = response.read()
+            return file_bytes.decode('utf-8', errors='ignore')
+    except Exception as e:
+        return f"[Error fetching from Google Drive: {e}]"
+
+def fetch_text_from_portal_url(url_in):
+    if not url_in.startswith("http"):
+        url_in = "https://" + url_in
+    try:
+        req = urllib.request.Request(url_in, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        with urllib.request.urlopen(req, timeout=12) as response:
+            html = response.read().decode('utf-8', errors='ignore')
+            text_only = re.sub(r'<[^>]+>', ' ', html)
+            text_clean = re.sub(r'\s+', ' ', text_only).strip()
+            return f"[Source: {url_in}]\n" + text_clean[:30000]
+    except Exception as e:
+        return f"[Error connecting to Portal URL: {e}]"
 
 # ==============================================================================
 # ROBUST BACKUP REGEX PARSER (FALLBACK)
