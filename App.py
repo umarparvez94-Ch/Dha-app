@@ -29,7 +29,7 @@ except ImportError:
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="DHA Enterprise CRM & Live AI Engine",
+    page_title="DHA Property Search Engine",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -64,7 +64,6 @@ if "extraction_default_phase" not in st.session_state:
 # Setup Google Gemini AI Client Safely
 gemini_client = None
 gemini_active = False
-
 try:
     api_key_val = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
     if HAS_GENAI and api_key_val:
@@ -73,33 +72,85 @@ try:
 except Exception:
     gemini_active = False
 
-# 2. CSS Styling
+# 2. Modern Responsive UI/UX Styling (Stitch Aligned)
 st.markdown("""
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
     <style>
+    /* Reset & Base Canvas */
     #MainMenu, header, footer { visibility: hidden !important; height: 0 !important; }
     .stAppDeployButton { display: none !important; }
-    .block-container { padding-top: 1.2rem !important; padding-bottom: 2rem !important; max-width: 100% !important; }
-    .stApp { background-color: #F8FAFB !important; font-family: 'Inter', sans-serif !important; color: #1A1B20 !important; }
-    .stitch-navbar { background: #FAFAFF; border-bottom: 1px solid #C5C6D2; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; border-radius: 12px; margin-bottom: 20px; box-shadow: 0px 2px 6px rgba(0, 17, 58, 0.02); }
-    .stitch-logo-text { font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 20px; color: #00113A; display: flex; align-items: center; gap: 8px; }
-    .header-banner { background: linear-gradient(135deg, #00113A 0%, #102A6B 100%); padding: 20px 24px; border-radius: 14px; color: white; margin-bottom: 20px; box-shadow: 0 8px 20px -5px rgba(0, 17, 58, 0.2); }
-    .header-title { font-family: 'Manrope', sans-serif; font-size: 24px; font-weight: 800; margin: 0; color: #FFFFFF; }
-    .header-subtitle { color: #B3C5FF; font-size: 13px; margin-top: 4px; }
-    .office-badge { background-color: #006B5E; color: #9FF2E1; padding: 5px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; float: right; }
-    .stitch-login-box { background: #FFFFFF; border: 1px solid rgba(197, 198, 210, 0.6); border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04); padding: 32px 28px; margin-bottom: 16px; text-align: center; }
+    .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 100% !important; }
+    .stApp { background-color: #F7F9FB !important; font-family: 'Inter', sans-serif !important; color: #191C1E !important; }
+
+    /* Modern Header Banner */
+    .header-banner { 
+        background: linear-gradient(135deg, #00113A 0%, #102A6B 100%); 
+        padding: 16px 20px; 
+        border-radius: 12px; 
+        color: white; 
+        margin-bottom: 16px; 
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 4px 14px rgba(0, 17, 58, 0.1); 
+    }
+    .header-title { font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 800; margin: 0; color: #FFFFFF; }
+    .header-subtitle { color: #B3C5FF; font-size: 12px; margin-top: 2px; }
+    .office-badge { background-color: #006B5E; color: #9FF2E1; padding: 4px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; }
+
+    /* Login Screen Card */
+    .stitch-login-box { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04); padding: 32px 28px; margin-bottom: 16px; text-align: center; }
     .stitch-avatar { width: 60px; height: 60px; border-radius: 50%; background-color: #D6E2FF; border: 1px solid #B3C5FF; display: inline-flex; align-items: center; justify-content: center; color: #00113A; margin-bottom: 12px; }
-    .summary-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
-    .stat-pill { background: #F1F5F9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #334155; display: inline-block; margin-right: 8px; margin-bottom: 6px; }
-    .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 16px 20px; margin: 15px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.08); }
+
+    /* Touch-Scrollable Block Switcher Ribbon */
+    div[role="radiogroup"] {
+        display: flex !important;
+        flex-direction: row !important;
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+        padding-bottom: 8px !important;
+        gap: 8px !important;
+        scrollbar-width: thin;
+    }
+    div[role="radiogroup"] label {
+        background: #FFFFFF !important;
+        border: 1px solid #C5C6D0 !important;
+        border-radius: 20px !important;
+        padding: 4px 14px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        color: #191C1E !important;
+        cursor: pointer;
+    }
+
+    /* KPI Summary Pills */
+    .summary-card { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+    .stat-pill { background: #ECEEF0; border-radius: 20px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #191C1E; display: inline-block; margin-right: 6px; margin-bottom: 6px; }
+    .stat-pill b { color: #00113A; font-family: 'JetBrains Mono', monospace; }
+
+    /* Control Panels & Enclosures */
+    .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 14px 18px; margin: 12px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.06); }
+    .unified-prompt-card { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0, 17, 58, 0.03); }
     .backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }
-    .unified-prompt-card { background: #FFFFFF; border: 2px solid #CBD5E1; border-radius: 16px; padding: 16px 18px 14px 18px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0, 17, 58, 0.04); }
-    .unified-prompt-card:focus-within { border-color: #00113A; }
     .news-badge { display: inline-block; padding: 4px 10px; margin: 3px 2px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #00113A; background: #E2E8F0; border: 1px solid #CBD5E1; }
-    .news-badge:hover { background: #D6E2FF; }
+
+    /* Buttons */
+    .stButton > button {
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        min-height: 40px !important;
+    }
+
+    /* Mobile Adaptations */
+    @media (max-width: 768px) {
+        .header-banner { flex-direction: column; align-items: flex-start; }
+        .stButton > button { width: 100% !important; }
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -201,7 +252,7 @@ DHA_PHASE_BLOCK_CATALOG = {
         "commercial": ["Y Block Commercial", "Z Block Commercial", "W Block Commercial", "Sector Shops"]
     },
     "DHA Phase 4": {
-        "residential": ["Block AA", "Block BB", "Block CC", "Block DD", "Block EE", "Block FF", "Block GG", "Block JJ", "Block KK"],
+        "residential": ["Block AA", "Block BB", "Block CC", "Block DD", "Block EE", "Block GG", "Block JJ", "Block KK"],
         "commercial": ["CCA 1 Commercial", "CCA 2 Commercial", "Block DD Commercial", "Sector Shops"]
     },
     "DHA Phase 5": {
@@ -249,7 +300,6 @@ DHA_PHASE_BLOCK_CATALOG = {
         "commercial": ["Civic Centre EME", "Block D Commercial", "Block H Commercial", "Sector Shops"]
     }
 }
-
 def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
     cleaned_size = str(extracted_size).strip() if extracted_size else ""
     if cleaned_size and cleaned_size.lower() not in ["n/a", "unknown", "none", ""]:
@@ -330,9 +380,7 @@ def get_specific_tab_url(workbook, base_url, tab_title):
         pass
     return base_url
 
-# ==============================================================================
-# MODALS & SYSTEM DIALOGS
-# ==============================================================================
+# Modals
 @st.dialog("🔗 Backend Google Sheets Connection Details", width="large")
 def show_backend_connection_dialog(selected_phase, selected_block, target_url):
     st.markdown(f"#### 🏢 Google Sheets Connection Architecture: [{selected_phase}]")
@@ -352,7 +400,6 @@ def show_dealer_ledger_dialog(payloads):
     if not payloads:
         st.info("No dealer records loaded in memory yet.")
         return
-
     dealer_data = []
     for item in payloads:
         contact = str(item.get("Contact No", "")).strip()
@@ -368,14 +415,12 @@ def show_dealer_ledger_dialog(payloads):
             "Demand": demand,
             "Raw Log": raw_msg
         })
-
     df_dealers = pd.DataFrame(dealer_data)
     if not df_dealers.empty:
         summary_group = df_dealers.groupby("Dealer / Phone").agg(
             Total_Listings=("Plot Option", "count"),
             Active_Demands=("Demand", lambda x: ", ".join([str(v) for v in x if v][:3]))
         ).reset_index().sort_values(by="Total_Listings", ascending=False)
-
         st.markdown(f"**Total Active Dealers in Memory:** `{len(summary_group)}`")
         st.dataframe(summary_group, height=260, use_container_width=True)
         st.markdown("##### 🔍 Detailed Listing Records per Dealer:")
@@ -446,7 +491,6 @@ def show_whatsapp_share_dialog(df_share):
         sz = row.get('Size', '')
         dem = row.get('Demand / Price', 'Call for Price')
         feat = row.get('Plot Features', '')
-        
         line = f"📍 {p_str} | {plt} ({sz})\n   💰 Demand: *{dem}* | Feature: {feat}"
         broadcast_lines.append(line)
         
@@ -454,7 +498,6 @@ def show_whatsapp_share_dialog(df_share):
     broadcast_lines.append("📞 For Deals & Inquiries: Direct Message or Call.")
     
     final_text = "\n\n".join(broadcast_lines)
-    
     st.text_area("📋 Copy Broadcast Text Directly:", value=final_text, height=260)
     encoded_text = urllib.parse.quote(final_text)
     wa_url = f"https://api.whatsapp.com/send?text={encoded_text}"
@@ -489,7 +532,6 @@ def show_pdf_catalog_dialog(df_cat):
             </thead>
             <tbody>
     """
-    
     for idx, (_, row) in enumerate(df_cat.iterrows(), 1):
         html_preview += f"""
             <tr style="border-bottom:1px solid #E2E8F0;">
@@ -503,19 +545,11 @@ def show_pdf_catalog_dialog(df_cat):
                 <td style="padding:8px;">{row.get('Category', 'Selling')}</td>
             </tr>
         """
-        
-    html_preview += """
-            </tbody>
-        </table>
-    </div>
-    """
-    
+    html_preview += "</tbody></table></div>"
     st.markdown(html_preview, unsafe_allow_html=True)
-    st.caption("ℹ️ Use Browser Print (Ctrl + P / Cmd + P) to Save as PDF with exact formatting.")
+    st.caption("ℹ️ Use Browser Print (Ctrl + P / Cmd + P) to Save as PDF.")
 
-# ==============================================================================
-# SOURCE FETCHERS & 100-MESSAGE CHUNKER
-# ==============================================================================
+# File Parsers
 def extract_text_from_any_file_or_image(file_obj, is_camera=False):
     if file_obj is None:
         return ""
@@ -537,7 +571,6 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
                 return f"[Image OCR extraction error: {e}]"
         else:
             return "[Image loaded. Add GEMINI_API_KEY to secrets to extract live OCR]"
-
     fname = file_obj.name.lower() if hasattr(file_obj, 'name') else "file.txt"
     if fname.endswith(".xlsx") or fname.endswith(".xls"):
         try:
@@ -567,13 +600,11 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
                 return f"[Error reading PDF: {e}]"
         else:
             return "[pypdf not installed]"
-
     return file_bytes.decode('utf-8', errors='ignore')
 
 def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
     msg_split_pattern = r'(?=\n?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2})'
     raw_messages = re.split(msg_split_pattern, raw_text)
-    
     clean_messages = []
     for msg in raw_messages:
         m_str = msg.strip()
@@ -585,12 +616,10 @@ def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
     
     if not clean_messages:
         clean_messages = [l.strip() for l in raw_text.splitlines() if l.strip()]
-
     chunks = []
     for i in range(0, len(clean_messages), messages_per_chunk):
         chunk_batch = clean_messages[i:i + messages_per_chunk]
         chunks.append("\n\n===MESSAGE_START===\n" + "\n\n===MESSAGE_START===\n".join(chunk_batch))
-        
     return chunks
 
 def fetch_content_from_gdrive_url(drive_url):
@@ -602,8 +631,7 @@ def fetch_content_from_gdrive_url(drive_url):
     try:
         req = urllib.request.Request(direct_download_url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
-            file_bytes = response.read()
-            return file_bytes.decode('utf-8', errors='ignore')
+            return response.read().decode('utf-8', errors='ignore')
     except Exception as e:
         return f"[Error fetching from Google Drive: {e}]"
 
@@ -615,16 +643,12 @@ def fetch_text_from_portal_url(url_in):
         with urllib.request.urlopen(req, timeout=12) as response:
             html = response.read().decode('utf-8', errors='ignore')
             text_only = re.sub(r'<[^>]+>', ' ', html)
-            text_clean = re.sub(r'\s+', ' ', text_only).strip()
-            return f"[Source: {url_in}]\n" + text_clean[:30000]
+            return f"[Source: {url_in}]\n" + re.sub(r'\s+', ' ', text_only).strip()[:30000]
     except Exception as e:
         return f"[Error connecting to Portal URL: {e}]"
 
-# ==============================================================================
-# ROBUST BACKUP REGEX PARSER (FALLBACK)
-# ==============================================================================
 def clean_line_from_artifacts(l):
-    return re.sub(r'[*_~`]', ' ', l).strip()
+    return re.sub(r'[\*\_~`]', ' ', l).strip()
 
 def detect_phase_from_header(line_up):
     if "PHASE 12" in line_up or "EME" in line_up:
@@ -658,32 +682,26 @@ def detect_phase_from_header(line_up):
 def smart_accurate_rule_parser(chunk_text, default_phase):
     messages = chunk_text.split("===MESSAGE_START===")
     results = []
-
     FORBIDDEN_BLOCK_WORDS = {
         "PHASE", "PH", "SECTOR", "DHA", "CCA", "COMMERCIAL", "PAIR", "DEMAND", "ASKING",
         "OFFER", "FINAL", "DIRECT", "MEETING", "COMPLETE", "FILE", "PAPER", "CORNER", "PARK",
         "ROAD", "FACING", "POSSESSION", "RS", "LAC", "LACS", "CRORE", "CR", "KANAL", "MARLA",
         "MAIN", "NEAR", "BOULEVARD", "ZONE", "SE", "CA", "TH", "ST", "ND", "RD"
     }
-
     for msg in messages:
         m_clean = msg.strip()
         if not m_clean:
             continue
-        
         phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', m_clean)
         main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else ""
-        
         active_phase = detect_phase_from_header(m_clean.upper()) or default_phase
         lines = [clean_line_from_artifacts(l) for l in m_clean.splitlines() if clean_line_from_artifacts(l)]
         
         current_section_phase = active_phase
         current_section_size = ""
         matched_in_message = False
-
         for line in lines:
             l_up = line.upper()
-            
             ph_found = detect_phase_from_header(l_up)
             if ph_found:
                 current_section_phase = ph_found
@@ -733,25 +751,23 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 continue
 
             p_match = re.search(r'(?:^|[\s*])([A-Z]{1,2}[0-9]?)\s*[\.\-_/:\s]+\s*([0-9]{1,5}(?:[+/][0-9]{1,5})?)\s*(?:@|RS|DEMAND|ASKING|[:\s-])?\s*([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
-            
             if p_match:
                 raw_b = p_match.group(1).strip()
                 if raw_b in FORBIDDEN_BLOCK_WORDS or len(raw_b) > 3:
                     continue
-                
                 matched_in_message = True
                 raw_p = p_match.group(2).strip()
                 raw_prc = p_match.group(3)
                 raw_unit = p_match.group(4) or "Lac"
                 prc_str = f"{raw_prc} {raw_unit}".strip() if raw_prc else ""
-
+                
                 if raw_b.startswith("Z") and len(raw_b) == 2 and raw_b[1].isdigit():
                     blk_str = f"Block Z-{raw_b[1]}"
                 elif raw_b.startswith("BLOCK"):
                     blk_str = raw_b
                 else:
                     blk_str = f"Block {raw_b}"
-
+                
                 sz_str = ""
                 if "5 MARLA" in l_up or "5M" in l_up:
                     sz_str = "5 Marla"
@@ -765,9 +781,8 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     sz_str = current_section_size
                 else:
                     sz_str = resolve_size_text_first_or_map(current_section_phase, blk_str, f"Plot {raw_p}", "")
-
+                    
                 feat = "Corner" if "CORNER" in l_up else ("Park Facing" if "PARK" in l_up else ("Possession" if "POSSESSION" in l_up else "Standard Layout"))
-
                 results.append({
                     "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "Date": datetime.now().strftime("%Y-%m-%d"),
@@ -786,7 +801,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     "Last Conversation / Notes": "Direct Ingestion",
                     "Raw Listing & Source Material": line.strip()
                 })
-
+                
         if not matched_in_message and main_phone:
             results.append({
                 "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -806,12 +821,8 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 "Last Conversation / Notes": "Direct Ingestion",
                 "Raw Listing & Source Material": m_clean
             })
-
     return results
 
-# ==============================================================================
-# GEMINI 2.5 FLASH FORENSIC REAL ESTATE EXTRACTION ENGINE (V8.1 SOURCE GRANULARITY)
-# ==============================================================================
 def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     today_date = datetime.now().strftime("%Y-%m-%d")
@@ -837,18 +848,11 @@ Your explicit objective is to ingest messy, unorganized, highly-abbreviated, mix
 14. "Last Conversation / Notes": 'Direct Ingestion'
 15. "Raw Listing & Source Material": The EXACT ISOLATED origin snippet for this listing (See Source Granularity Rule below).
 
-### V8.1 SOURCE DATA GRANULARITY & FORENSIC AUDIT RULE (COLUMN 11 / RAW LISTING):
+### SOURCE DATA GRANULARITY & FORENSIC AUDIT RULE (COLUMN 11 / RAW LISTING):
 - "Raw Listing & Source Material": You MUST provide ONLY the exact, isolated single message snippet that generated this specific listing.
 - If the input is an exported WhatsApp chat file, extract and attach ONLY the single message block containing the plot details. Do NOT attach the entire 100-message chunk or surrounding irrelevant chatter.
 - If the input is direct text or multi-message pastes, isolate ONLY the relevant lines containing the specific plot, phase, block, demand, and phone number.
 - Under NO circumstances should one listing's source contain data from another unrelated listing in the chunk.
-
-### CORE EXTRACTION & ALIGNMENT INTELLIGENCE:
-1. MULTI-LISTING DISAGGREGATION: Split every distinct plot into its own JSON object.
-2. CONTEXTUAL HIERARCHY: Every plot inherits Phase and Size until a new divider explicitly changes it. If none, default Phase to: "{default_phase}".
-3. ZERO-HALLUCINATION BLOCK ALIGNMENT: Match strictly against Official Catalog. Clean slang: 'Z2' -> 'Block Z-2', 'CCA1' -> 'CCA 1 Commercial', 'MB' -> 'Main Boulevard (MB) Commercial', 'BROADWAY' -> 'Broadway Commercial'.
-4. STRICT SIZE NORMALIZATION: '5 Marla', '8 Marla', '10 Marla', '1 Kanal', '2 Kanal', '4 Marla Commercial', '8 Marla Commercial'.
-5. DATE TRACKING: Include "Date" as "{today_date}" for same-day deduplication logic.
 
 OFFICIAL DHA PHASE & BLOCK CATALOG:
 {catalog_json_str}
@@ -859,7 +863,6 @@ INPUT MESSY WHATSAPP STREAM:
 OUTPUT SPECIFICATION:
 Return ONLY a valid JSON array of objects strictly conforming to the 15 canonical keys above. Strictly no explanations, markdown ticks (```json), or commentary.
 """
-
     if gemini_active and gemini_client:
         try:
             response = gemini_client.models.generate_content(
@@ -883,30 +886,25 @@ Return ONLY a valid JSON array of objects strictly conforming to the 15 canonica
                     sz = str(item.get("Size", "")).strip()
                     ph = item.get("Phase", default_phase)
                     if plt and plt.lower() != "general option / portfolio":
-                        item["Size"] = resolve_size_text_first_or_map(
-                            ph, blk, plt, sz
-                        )
+                        item["Size"] = resolve_size_text_first_or_map(ph, blk, plt, sz)
                 return parsed_json
         except Exception:
             pass
-
     return smart_accurate_rule_parser(chunk_text, default_phase)
-
-# 8. Login Screen
+# Login Screen
 if not st.session_state["authenticated"]:
     st.markdown("""
-        <div class="stitch-navbar">
-            <div class="stitch-logo-text">
-                <span class="material-symbols-outlined" style="color:#00113A; font-size:26px;">dataset</span>
-                <span>DHA Property Data Systems</span>
+        <div style="background:#FFFFFF; border-bottom:1px solid #C5C6D0; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; border-radius:12px; margin-bottom:20px;">
+            <div style="font-family:'Manrope',sans-serif; font-weight:700; font-size:18px; color:#00113A; display:flex; align-items:center; gap:8px;">
+                <span class="material-symbols-outlined" style="color:#00113A; font-size:24px;">dataset</span>
+                <span>DHA Property Search Engine</span>
             </div>
-            <div style="color: #757682; font-size: 13px; font-weight: 500;">
+            <div style="color:#757682; font-size:13px; font-weight:500;">
                 <span class="material-symbols-outlined" style="vertical-align:middle; font-size:18px; color:#006B5E;">lock</span>
                 Secure Access
             </div>
         </div>
     """, unsafe_allow_html=True)
-
     col_l1, col_center, col_l2 = st.columns([1, 1.3, 1])
     with col_center:
         st.markdown("""
@@ -915,10 +913,9 @@ if not st.session_state["authenticated"]:
                     <span class="material-symbols-outlined" style="font-size:30px;">apartment</span>
                 </div>
                 <div style="font-family:'Manrope',sans-serif; font-size:22px; font-weight:700; color:#00113A;">Welcome to DHA</div>
-                <div style="color:#757682; font-size:13px; margin-top:4px;">Clinical & Property CRM Data Systems</div>
+                <div style="color:#757682; font-size:13px; margin-top:4px;">Property Search Engine & CRM</div>
             </div>
         """, unsafe_allow_html=True)
-
         with st.form("stitch_login_form"):
             email_in = st.text_input("WORK EMAIL ADDRESS", placeholder="name@wali-associates.pk")
             pass_in = st.text_input("PASSWORD", type="password", placeholder="••••••••")
@@ -927,30 +924,30 @@ if not st.session_state["authenticated"]:
                 st.session_state["authenticated"] = True
                 st.session_state["user_email"] = email_in if email_in.strip() else "authorized.agent@dha.pk"
                 st.rerun()
-
         st.markdown("<div style='text-align:center; margin: 10px 0; color:#757682; font-size:12px;'>OR</div>", unsafe_allow_html=True)
         if st.button("🔑 CONTINUE WITH SINGLE SIGN-ON (SSO)"):
             st.session_state["authenticated"] = True
             st.session_state["user_email"] = "sso.agent@dha.pk"
             st.rerun()
 
-# 9. Main Clean Live Summary Dashboard
+# Main Application Dashboard
 else:
     gc_client = get_gspread_client()
-
-    # Header
+    
+    # 1. Header Banner
     col_h1, col_h2 = st.columns([2.6, 1.4])
     with col_h1:
         st.markdown(f"""
             <div class="header-banner">
+                <div>
+                    <h1 class="header-title">🏢 DHA Property Search Engine</h1>
+                    <div class="header-subtitle">Live Streaming AI Ingestion & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
+                </div>
                 <span class="office-badge">📍 {st.session_state['office_name']}</span>
-                <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
-                <div class="header-subtitle">Live Streaming AI Ingestion & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
             </div>
         """, unsafe_allow_html=True)
-
     with col_h2:
-        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
         col_hb1, col_hb2 = st.columns(2)
         with col_hb1:
             if st.button("👥 Dealer Ledger", use_container_width=True):
@@ -959,7 +956,7 @@ else:
             if st.button("📈 Analytics", use_container_width=True):
                 show_price_analytics_dialog(st.session_state.get("parsed_payloads", []))
 
-    # Top Selectors
+    # 2. Selectors & Block Ribbon
     col_city, col_phase = st.columns([1.2, 2.5])
     with col_city:
         selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
@@ -970,7 +967,7 @@ else:
     sheet_base_link = DHA_PHASE_SHEET_URLS.get(selected_phase, "")
     p_info = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
     all_phase_blocks = p_info.get("residential", []) + p_info.get("commercial", [])
-
+    
     st.markdown(f"##### 🧱 Choose Block Sheet Tab for **[{selected_phase}]**:")
     selected_active_block = st.radio("Direct Block Switcher:", options=all_phase_blocks, horizontal=True, key="block_feature_tab_bar")
 
@@ -992,12 +989,10 @@ else:
 
     st.markdown("---")
 
-    # ==========================================================================
-    # ⚡ LIVE STREAMING SUMMARY AND EXTRACTED TABLE (V8.1 REALIGNMENT)
-    # ==========================================================================
+    # 3. Live Streaming Summary and Extracted Table (V8.2 Realignment)
     st.subheader("⚡ Live Streaming Summary and Extracted Table")
+    
     total_parsed_now = len(st.session_state["parsed_payloads"])
-
     if total_parsed_now > 0:
         base_data = []
         for item in st.session_state["parsed_payloads"]:
@@ -1025,7 +1020,7 @@ else:
     with col_sc1:
         edit_summary_mode = st.toggle("✏️ Edit Mode (ON / OFF)", value=False, key="toggle_summary_edit_mode")
         highlight_incomplete = st.toggle("⚠️ Incomplete Flags", value=False, key="toggle_incomplete_flags")
-
+        
     all_dha_phases_summary = ["All Phases (Everything)"] + list(DHA_PHASE_BLOCK_CATALOG.keys())
     with col_sc2:
         selected_summary_phase = st.selectbox("📍 Filter / Target Phase:", options=all_dha_phases_summary, index=0, key="summary_target_phase_select")
@@ -1047,14 +1042,13 @@ else:
     else:
         df_final_summary_display = df_filtered_summary_phase
 
-    # 🔍 Global Search Bar
+    # Global Search
     search_query = st.text_input("🔍 Global Search Across Listings (Plot No, Phone, Demand, Features):", placeholder="Type anything to search...", key="global_search_input")
     if search_query.strip() and not df_final_summary_display.empty:
         q = search_query.strip().lower()
         mask = df_final_summary_display.apply(lambda row: row.astype(str).str.lower().str.contains(q).any(), axis=1)
         df_final_summary_display = df_final_summary_display[mask]
 
-    # Incomplete Data Flagging
     if highlight_incomplete and not df_final_summary_display.empty:
         inc_mask = (df_final_summary_display["Demand / Price"] == "") | (df_final_summary_display["Contact No"] == "")
         df_final_summary_display = df_final_summary_display[inc_mask]
@@ -1062,6 +1056,7 @@ else:
     with col_sc4:
         st.metric(label="📊 Plots In View", value=f"{len(df_final_summary_display)}", delta=f"{total_parsed_now} Total Extracted")
 
+    # Modern KPI Summary Strip
     num_selected_live = len(df_final_summary_display)
     unique_tabs_count_live = df_final_summary_display[["Target Phase", "Target Tab"]].drop_duplicates().shape[0] if num_selected_live > 0 else 0
     with_demand_count_live = df_final_summary_display[df_final_summary_display["Demand / Price"] != ""].shape[0] if num_selected_live > 0 else 0
@@ -1073,11 +1068,11 @@ else:
             <span class="stat-pill">📁 <b>Target Tabs:</b> {unique_tabs_count_live} Tabs</span>
             <span class="stat-pill">💰 <b>Prices Identified:</b> {with_demand_count_live}</span>
             <span class="stat-pill">📞 <b>Contacts Identified:</b> {with_contact_count_live}</span>
-            <span class="stat-pill">⚡ <b>Live Extracted:</b> {total_parsed_now} Listings</span>
+            <span class="stat-pill" style="background:#E0F2FE; color:#0369A1;">⚡ <b>Live Extracted:</b> {total_parsed_now} Listings</span>
         </div>
     """, unsafe_allow_html=True)
 
-    # Action Bar 1: Edit & Clean Duplicates & Mark as Sold
+    # Action Bar 1
     col_act1, col_act2, col_act3 = st.columns([1.5, 1.5, 1.5])
     with col_act1:
         if st.button("🧹 Remove Duplicates (Same Date)", disabled=df_final_summary_display.empty):
@@ -1101,9 +1096,8 @@ else:
                 })
                 st.session_state["parsed_payloads"] = df_dedup.to_dict(orient="records")
                 removed = initial_len - len(st.session_state["parsed_payloads"])
-                st.success(f"✅ Removed and merged {removed} duplicate listings on identical dates!")
+                st.success(f"✅ Removed {removed} duplicates on identical dates!")
                 st.rerun()
-
     with col_act2:
         if st.button("🏷️ Mark Visible Plots as Sold", disabled=df_final_summary_display.empty):
             plots_to_mark = set(df_final_summary_display["Plot No"].tolist())
@@ -1113,9 +1107,7 @@ else:
             st.success(f"🏷️ Marked {len(plots_to_mark)} plots as SOLD in memory!")
             st.rerun()
 
-    # ==========================================================================
-    # FULL INFINITE SCROLL SUMMARY TABLE DISPLAY (HEIGHT=520, NO 50-ROW LIMIT)
-    # ==========================================================================
+    # Data Table Container (Height: 520px)
     if not df_final_summary_display.empty:
         if edit_summary_mode:
             final_summary_df = st.data_editor(
@@ -1127,20 +1119,14 @@ else:
             )
         else:
             final_summary_df = df_final_summary_display
-            st.dataframe(
-                df_final_summary_display,
-                height=520,
-                use_container_width=True
-            )
+            st.dataframe(df_final_summary_display, height=520, use_container_width=True)
     else:
-        final_summary_df = df_final_summary_display
-        st.dataframe(final_summary_df, height=300, use_container_width=True)
+        st.dataframe(df_final_summary_display, height=300, use_container_width=True)
 
     final_sync_count_live = len(df_final_summary_display)
-    
-    # Action Bar 2: Push, Export CSV, Export Excel, WhatsApp Share, PDF & Clear
+
+    # Action Bar 2: Push & Export
     col_pb1, col_pb_csv, col_pb_xlsx, col_pb_wa, col_pb_pdf, col_pb2 = st.columns([1.5, 0.9, 0.9, 1.1, 1.1, 0.9])
-    
     with col_pb1:
         if st.button(f"🚀 Push ({final_sync_count_live}) to Sheets", disabled=(final_sync_count_live == 0)):
             if not gc_client:
@@ -1198,7 +1184,7 @@ else:
                 progress_bar_sync.empty()
                 st.success(f"🎉 **Push Complete!** Successfully saved ALL **{saved_count} listings** directly to Google Sheets!")
                 st.balloons()
-
+                
     with col_pb_csv:
         if not df_final_summary_display.empty:
             csv_export_bytes = df_final_summary_display.to_csv(index=False).encode('utf-8-sig')
@@ -1218,7 +1204,6 @@ else:
             with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                 df_final_summary_display.to_excel(writer, sheet_name="DHA Listings", index=False)
             excel_bytes = excel_buffer.getvalue()
-            
             st.download_button(
                 label=f"📊 ({final_sync_count_live}) Excel",
                 data=excel_bytes,
@@ -1246,22 +1231,18 @@ else:
 
     st.markdown("---")
 
-    # ==========================================================================
-    # 4. UNIFIED INGESTION PROMPT ENCLOSURE
-    # ==========================================================================
+    # 4. Multi-Source Ingestion Engine (Drawer & Stream)
     st.subheader("🧠 Multi-Source Data Ingestion Engine")
     default_box_value = st.session_state.get("extracted_file_text", "")
-
     st.markdown('<div class="unified-prompt-card">', unsafe_allow_html=True)
     
     raw_text = st.text_area(
         "📋 Live Real Estate Ingestion Stream:",
         value=default_box_value,
-        height=240,
+        height=220,
         placeholder="Paste WhatsApp broadcasts, newspaper ads, portal feeds, or use [+] Attach Sources below...",
         label_visibility="collapsed"
     )
-
     col_in_attach, col_in_clear, col_in_btn = st.columns([3.0, 1.0, 1.0])
     
     with col_in_attach:
@@ -1269,7 +1250,6 @@ else:
             tab_upload, tab_gdrive, tab_camera, tab_direct, tab_zameen, tab_news = st.tabs([
                 "📎 Files", "☁️ G-Drive", "📸 Camera OCR", "📋 Direct", "🌐 Zameen", "📰 Newspapers"
             ])
-            
             with tab_upload:
                 uploaded_file = st.file_uploader(
                     "Upload TXT, Excel, JSON, PDF, or Image:",
@@ -1357,7 +1337,6 @@ else:
                         st.success("✅ Newspaper classified ads loaded into box!")
                         st.rerun()
 
-    # 🗑️ Clear Box Button
     with col_in_clear:
         if not st.session_state["extraction_active"]:
             st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
@@ -1385,7 +1364,7 @@ else:
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Active Live Streaming Loop (Pause / Resume / Cancel)
+    # Active Live Streaming Loop (100-Message Chunker)
     if st.session_state["extraction_active"]:
         chunks = st.session_state["all_chunks"]
         curr_idx = st.session_state["current_chunk_idx"]
@@ -1393,12 +1372,11 @@ else:
         
         st.markdown(f"""
             <div class="control-panel-box">
-                <div style="font-size: 16px; font-weight: 700; color: #00113A; margin-bottom: 8px;">
+                <div style="font-size: 15px; font-weight: 700; color: #00113A; margin-bottom: 8px;">
                     ⚡ Live AI Streaming: Processing Chunk {curr_idx + 1} of {total_chunks} (100 msgs/chunk) • Streamed: {total_parsed_now} Listings into Summary
                 </div>
             </div>
         """, unsafe_allow_html=True)
-
         col_p1, col_p2, col_p3 = st.columns([1, 1, 1.2])
         with col_p1:
             if not st.session_state["extraction_paused"]:
@@ -1434,3 +1412,4 @@ else:
                     st.rerun()
                 else:
                     st.rerun()
+
