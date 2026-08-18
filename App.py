@@ -6,7 +6,6 @@ import io
 import os
 import time
 import math
-import zipfile
 import urllib.request
 import urllib.parse
 import pandas as pd
@@ -518,86 +517,8 @@ def show_pdf_catalog_dialog(df_cat):
     st.caption("ℹ️ Use Browser Print (Ctrl + P / Cmd + P) to Save as PDF with exact formatting.")
 
 # ==============================================================================
-# SOURCE FETCHERS & MOBILE-OPTIMIZED INGESTION (V8.2 UPGRADE)
+# SOURCE FETCHERS & 100-MESSAGE CHUNKER
 # ==============================================================================
-def decode_bytes_safely(raw_bytes):
-    for enc in ["utf-8-sig", "utf-8", "utf-16", "latin-1", "cp1252"]:
-        try:
-            return raw_bytes.decode(enc)
-        except Exception:
-            continue
-    return raw_bytes.decode("utf-8", errors="ignore")
-
-def extract_text_from_any_file_or_image(file_obj, is_camera=False):
-    if file_obj is None:
-        return ""
-    file_bytes = file_obj.getvalue()
-    fname = (file_obj.name if hasattr(file_obj, 'name') else "file.txt").lower()
-    
-    # 1. Native WhatsApp ZIP Unpacker
-    if fname.endswith(".zip"):
-        try:
-            with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
-                txt_candidates = [n for n in z.namelist() if n.lower().endswith(".txt")]
-                if txt_candidates:
-                    target_file = "_chat.txt" if "_chat.txt" in txt_candidates else txt_candidates[0]
-                    with z.open(target_file) as f_in_zip:
-                        return decode_bytes_safely(f_in_zip.read())
-                else:
-                    return "[ZIP file unpacked, but no .txt chat file was found inside]"
-        except Exception as e:
-            return f"[Error unzipping WhatsApp file: {e}]"
-
-    # 2. Camera or Direct Image Scanning
-    if is_camera or any(fname.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"]):
-        if gemini_active and gemini_client:
-            try:
-                img = Image.open(io.BytesIO(file_bytes))
-                res = gemini_client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=[
-                        "Extract all DHA Lahore property listings, newspaper classified ads, phases, blocks, plot numbers, sizes, and demand prices from this image:",
-                        img
-                    ]
-                )
-                return res.text.strip()
-            except Exception as e:
-                return f"[Image OCR extraction error: {e}]"
-        else:
-            return "[Image loaded. Add GEMINI_API_KEY to secrets to extract live OCR]"
-
-    # 3. Excel, CSV, JSON, PDF & Text
-    if fname.endswith(".xlsx") or fname.endswith(".xls"):
-        try:
-            excel_df = pd.read_excel(io.BytesIO(file_bytes))
-            return excel_df.to_string(index=False)
-        except Exception as e:
-            return f"[Error reading Excel file: {e}]"
-    elif fname.endswith(".csv"):
-        try:
-            csv_df = pd.read_csv(io.BytesIO(file_bytes))
-            return csv_df.to_string(index=False)
-        except Exception as e:
-            return f"[Error reading CSV file: {e}]"
-    elif fname.endswith(".json"):
-        try:
-            json_data = json.loads(decode_bytes_safely(file_bytes))
-            return json.dumps(json_data, indent=2)
-        except Exception as e:
-            return f"[Error reading JSON file: {e}]"
-    elif fname.endswith(".pdf"):
-        if HAS_PYPDF:
-            try:
-                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-                pdf_text = [p.extract_text() for p in reader.pages if p.extract_text()]
-                return "\n".join(pdf_text)
-            except Exception as e:
-                return f"[Error reading PDF: {e}]"
-        else:
-            return "[pypdf not installed]"
-
-    return decode_bytes_safely(file_bytes)
-
 def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
     msg_split_pattern = r'(?=\n?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2})'
     raw_messages = re.split(msg_split_pattern, raw_text)
@@ -631,7 +552,7 @@ def fetch_content_from_gdrive_url(drive_url):
         req = urllib.request.Request(direct_download_url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
             file_bytes = response.read()
-            return decode_bytes_safely(file_bytes)
+            return file_bytes.decode('utf-8', errors='ignore')
     except Exception as e:
         return f"[Error fetching from Google Drive: {e}]"
 
@@ -647,6 +568,60 @@ def fetch_text_from_portal_url(url_in):
             return f"[Source: {url_in}]\n" + text_clean[:30000]
     except Exception as e:
         return f"[Error connecting to Portal URL: {e}]"
+
+def extract_text_from_any_file_or_image(file_obj, is_camera=False):
+    if file_obj is None:
+        return ""
+    file_bytes = file_obj.getvalue()
+    
+    if is_camera or (hasattr(file_obj, 'name') and any(file_obj.name.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"])):
+        if gemini_active and gemini_client:
+            try:
+                img = Image.open(io.BytesIO(file_bytes))
+                res = gemini_client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=[
+                        "Extract all DHA Lahore property listings, newspaper classified ads, phases, blocks, plot numbers, sizes, and demand prices from this image:",
+                        img
+                    ]
+                )
+                return res.text.strip()
+            except Exception as e:
+                return f"[Image OCR extraction error: {e}]"
+        else:
+            return "[Image loaded. Add GEMINI_API_KEY to secrets to extract live OCR]"
+
+    fname = file_obj.name.lower() if hasattr(file_obj, 'name') else "file.txt"
+    if fname.endswith(".xlsx") or fname.endswith(".xls"):
+        try:
+            excel_df = pd.read_excel(io.BytesIO(file_bytes))
+            return excel_df.to_string(index=False)
+        except Exception as e:
+            return f"[Error reading Excel file: {e}]"
+    elif fname.endswith(".csv"):
+        try:
+            csv_df = pd.read_csv(io.BytesIO(file_bytes))
+            return csv_df.to_string(index=False)
+        except Exception as e:
+            return f"[Error reading CSV file: {e}]"
+    elif fname.endswith(".json"):
+        try:
+            json_data = json.loads(file_bytes.decode('utf-8', errors='ignore'))
+            return json.dumps(json_data, indent=2)
+        except Exception as e:
+            return f"[Error reading JSON file: {e}]"
+    elif fname.endswith(".pdf"):
+        if HAS_PYPDF:
+            try:
+                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+                pdf_text = [p.extract_text() for p in reader.pages if p.extract_text()]
+                return "\n".join(pdf_text)
+            except Exception as e:
+                return f"[Error reading PDF: {e}]"
+        else:
+            return "[pypdf not installed]"
+
+    return file_bytes.decode('utf-8', errors='ignore')
 
 # ==============================================================================
 # ROBUST BACKUP REGEX PARSER (FALLBACK)
@@ -838,7 +813,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
     return results
 
 # ==============================================================================
-# GEMINI 2.5 FLASH FORENSIC REAL ESTATE EXTRACTION ENGINE (V8.2 SOURCE GRANULARITY)
+# GEMINI 2.5 FLASH FORENSIC REAL ESTATE EXTRACTION ENGINE (V8.1 SOURCE GRANULARITY)
 # ==============================================================================
 def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
@@ -865,7 +840,7 @@ Your explicit objective is to ingest messy, unorganized, highly-abbreviated, mix
 14. "Last Conversation / Notes": 'Direct Ingestion'
 15. "Raw Listing & Source Material": The EXACT ISOLATED origin snippet for this listing (See Source Granularity Rule below).
 
-### V8.2 SOURCE DATA GRANULARITY & FORENSIC AUDIT RULE (COLUMN 11 / RAW LISTING):
+### V8.1 SOURCE DATA GRANULARITY & FORENSIC AUDIT RULE (COLUMN 11 / RAW LISTING):
 - "Raw Listing & Source Material": You MUST provide ONLY the exact, isolated single message snippet that generated this specific listing.
 - If the input is an exported WhatsApp chat file, extract and attach ONLY the single message block containing the plot details. Do NOT attach the entire 100-message chunk or surrounding irrelevant chatter.
 - If the input is direct text or multi-message pastes, isolate ONLY the relevant lines containing the specific plot, phase, block, demand, and phone number.
@@ -923,4 +898,542 @@ Return ONLY a valid JSON array of objects strictly conforming to the 15 canonica
 # 8. Login Screen
 if not st.session_state["authenticated"]:
     st.markdown("""
-        <div class="stitch-
+        <div class="stitch-navbar">
+            <div class="stitch-logo-text">
+                <span class="material-symbols-outlined" style="color:#00113A; font-size:26px;">dataset</span>
+                <span>DHA Property Data Systems</span>
+            </div>
+            <div style="color: #757682; font-size: 13px; font-weight: 500;">
+                <span class="material-symbols-outlined" style="vertical-align:middle; font-size:18px; color:#006B5E;">lock</span>
+                Secure Access
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col_l1, col_center, col_l2 = st.columns([1, 1.3, 1])
+    with col_center:
+        st.markdown("""
+            <div class="stitch-login-box">
+                <div class="stitch-avatar">
+                    <span class="material-symbols-outlined" style="font-size:30px;">apartment</span>
+                </div>
+                <div style="font-family:'Manrope',sans-serif; font-size:22px; font-weight:700; color:#00113A;">Welcome to DHA</div>
+                <div style="color:#757682; font-size:13px; margin-top:4px;">Clinical & Property CRM Data Systems</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("stitch_login_form"):
+            email_in = st.text_input("WORK EMAIL ADDRESS", placeholder="name@wali-associates.pk")
+            pass_in = st.text_input("PASSWORD", type="password", placeholder="••••••••")
+            submit_login = st.form_submit_button("SIGN IN →")
+            if submit_login:
+                st.session_state["authenticated"] = True
+                st.session_state["user_email"] = email_in if email_in.strip() else "authorized.agent@dha.pk"
+                st.rerun()
+
+        st.markdown("<div style='text-align:center; margin: 10px 0; color:#757682; font-size:12px;'>OR</div>", unsafe_allow_html=True)
+        if st.button("🔑 CONTINUE WITH SINGLE SIGN-ON (SSO)"):
+            st.session_state["authenticated"] = True
+            st.session_state["user_email"] = "sso.agent@dha.pk"
+            st.rerun()
+
+# 9. Main Clean Live Summary Dashboard
+else:
+    gc_client = get_gspread_client()
+
+    # Header
+    col_h1, col_h2 = st.columns([2.6, 1.4])
+    with col_h1:
+        st.markdown(f"""
+            <div class="header-banner">
+                <span class="office-badge">📍 {st.session_state['office_name']}</span>
+                <h1 class="header-title">🏢 DHA Smart Property Engine & CRM</h1>
+                <div class="header-subtitle">Live Streaming AI Ingestion & Multi-Phase Pipeline (Active: {st.session_state['user_email']})</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col_h2:
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        col_hb1, col_hb2 = st.columns(2)
+        with col_hb1:
+            if st.button("👥 Dealer Ledger", use_container_width=True):
+                show_dealer_ledger_dialog(st.session_state.get("parsed_payloads", []))
+        with col_hb2:
+            if st.button("📈 Analytics", use_container_width=True):
+                show_price_analytics_dialog(st.session_state.get("parsed_payloads", []))
+
+    # Top Selectors
+    col_city, col_phase = st.columns([1.2, 2.5])
+    with col_city:
+        selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
+    with col_phase:
+        phase_options = list(DHA_PHASE_BLOCK_CATALOG.keys())
+        selected_phase = st.selectbox("📍 Select DHA Phase (Active Workbook View)", phase_options, index=11)
+
+    sheet_base_link = DHA_PHASE_SHEET_URLS.get(selected_phase, "")
+    p_info = DHA_PHASE_BLOCK_CATALOG.get(selected_phase, {})
+    all_phase_blocks = p_info.get("residential", []) + p_info.get("commercial", [])
+
+    st.markdown(f"##### 🧱 Choose Block Sheet Tab for **[{selected_phase}]**:")
+    selected_active_block = st.radio("Direct Block Switcher:", options=all_phase_blocks, horizontal=True, key="block_feature_tab_bar")
+
+    if gc_client:
+        try:
+            active_wb = get_phase_workbook(gc_client, selected_phase)
+            exact_block_tab_url = get_specific_tab_url(active_wb, sheet_base_link, selected_active_block)
+        except Exception:
+            exact_block_tab_url = sheet_base_link
+    else:
+        exact_block_tab_url = sheet_base_link
+
+    col_btn_info, col_btn_sheet = st.columns([1.5, 2.5])
+    with col_btn_info:
+        if st.button("ℹ️ Connection Details & Architecture"):
+            show_backend_connection_dialog(selected_phase, selected_active_block, exact_block_tab_url)
+    with col_btn_sheet:
+        st.link_button(f"📑 Open [{selected_active_block}] Tab in Google Sheets ↗", url=exact_block_tab_url)
+
+    st.markdown("---")
+
+    # ==========================================================================
+    # ⚡ LIVE STREAMING SUMMARY AND EXTRACTED TABLE (V8.1 REALIGNMENT)
+    # ==========================================================================
+    st.subheader("⚡ Live Streaming Summary and Extracted Table")
+    total_parsed_now = len(st.session_state["parsed_payloads"])
+
+    if total_parsed_now > 0:
+        base_data = []
+        for item in st.session_state["parsed_payloads"]:
+            base_data.append({
+                "Date": str(item.get("Date", datetime.now().strftime("%Y-%m-%d"))),
+                "Target Phase": str(item.get("Phase", "DHA Phase 1")),
+                "Target Tab": str(item.get("Block", "Block A")),
+                "Plot No": str(item.get("Plot No", "")),
+                "Size": str(item.get("Size", "")),
+                "Demand / Price": str(item.get("Demand / Price", "")),
+                "Contact No": str(item.get("Contact No", "")),
+                "Category": str(item.get("Category", "Selling")),
+                "Plot Features": str(item.get("Plot Features", "Standard Layout")),
+                "Deal Status": str(item.get("Deal Status", "Available")),
+                "Source Data": str(item.get("Raw Listing & Source Material", ""))
+            })
+        df_all_live = pd.DataFrame(base_data)
+    else:
+        df_all_live = pd.DataFrame(columns=[
+            "Date", "Target Phase", "Target Tab", "Plot No", "Size", "Demand / Price",
+            "Contact No", "Category", "Plot Features", "Deal Status", "Source Data"
+        ])
+
+    col_sc1, col_sc2, col_sc3, col_sc4 = st.columns([1.2, 1.4, 1.4, 1.2])
+    with col_sc1:
+        edit_summary_mode = st.toggle("✏️ Edit Mode (ON / OFF)", value=False, key="toggle_summary_edit_mode")
+        highlight_incomplete = st.toggle("⚠️ Incomplete Flags", value=False, key="toggle_incomplete_flags")
+
+    all_dha_phases_summary = ["All Phases (Everything)"] + list(DHA_PHASE_BLOCK_CATALOG.keys())
+    with col_sc2:
+        selected_summary_phase = st.selectbox("📍 Filter / Target Phase:", options=all_dha_phases_summary, index=0, key="summary_target_phase_select")
+
+    if selected_summary_phase == "All Phases (Everything)":
+        available_summary_tabs = ["All Block Tabs / CCAs"] + (sorted(list(df_all_live["Target Tab"].unique())) if total_parsed_now > 0 else [])
+        df_filtered_summary_phase = df_all_live
+    else:
+        p_data = DHA_PHASE_BLOCK_CATALOG.get(selected_summary_phase, {})
+        full_catalog_blocks = p_data.get("residential", []) + p_data.get("commercial", [])
+        available_summary_tabs = ["All Block Tabs / CCAs"] + full_catalog_blocks
+        df_filtered_summary_phase = df_all_live[df_all_live["Target Phase"] == selected_summary_phase] if total_parsed_now > 0 else df_all_live
+
+    with col_sc3:
+        selected_summary_block = st.selectbox("🧱 Filter / Target Block:", options=available_summary_tabs, index=0, key="summary_target_block_select")
+
+    if selected_summary_block != "All Block Tabs / CCAs" and total_parsed_now > 0:
+        df_final_summary_display = df_filtered_summary_phase[df_filtered_summary_phase["Target Tab"] == selected_summary_block]
+    else:
+        df_final_summary_display = df_filtered_summary_phase
+
+    # 🔍 Global Search Bar
+    search_query = st.text_input("🔍 Global Search Across Listings (Plot No, Phone, Demand, Features):", placeholder="Type anything to search...", key="global_search_input")
+    if search_query.strip() and not df_final_summary_display.empty:
+        q = search_query.strip().lower()
+        mask = df_final_summary_display.apply(lambda row: row.astype(str).str.lower().str.contains(q).any(), axis=1)
+        df_final_summary_display = df_final_summary_display[mask]
+
+    # Incomplete Data Flagging
+    if highlight_incomplete and not df_final_summary_display.empty:
+        inc_mask = (df_final_summary_display["Demand / Price"] == "") | (df_final_summary_display["Contact No"] == "")
+        df_final_summary_display = df_final_summary_display[inc_mask]
+
+    with col_sc4:
+        st.metric(label="📊 Plots In View", value=f"{len(df_final_summary_display)}", delta=f"{total_parsed_now} Total Extracted")
+
+    num_selected_live = len(df_final_summary_display)
+    unique_tabs_count_live = df_final_summary_display[["Target Phase", "Target Tab"]].drop_duplicates().shape[0] if num_selected_live > 0 else 0
+    with_demand_count_live = df_final_summary_display[df_final_summary_display["Demand / Price"] != ""].shape[0] if num_selected_live > 0 else 0
+    with_contact_count_live = df_final_summary_display[df_final_summary_display["Contact No"] != ""].shape[0] if num_selected_live > 0 else 0
+
+    st.markdown(f"""
+        <div class="summary-card">
+            <span class="stat-pill">📊 <b>Selected View:</b> {num_selected_live} Plots</span>
+            <span class="stat-pill">📁 <b>Target Tabs:</b> {unique_tabs_count_live} Tabs</span>
+            <span class="stat-pill">💰 <b>Prices Identified:</b> {with_demand_count_live}</span>
+            <span class="stat-pill">📞 <b>Contacts Identified:</b> {with_contact_count_live}</span>
+            <span class="stat-pill">⚡ <b>Live Extracted:</b> {total_parsed_now} Listings</span>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Action Bar 1: Edit & Clean Duplicates & Mark as Sold
+    col_act1, col_act2, col_act3 = st.columns([1.5, 1.5, 1.5])
+    with col_act1:
+        if st.button("🧹 Remove Duplicates (Same Date)", disabled=df_final_summary_display.empty):
+            initial_len = len(st.session_state["parsed_payloads"])
+            df_temp = pd.DataFrame(st.session_state["parsed_payloads"])
+            if not df_temp.empty:
+                if "Date" not in df_temp.columns:
+                    df_temp["Date"] = datetime.now().strftime("%Y-%m-%d")
+                
+                df_dedup = df_temp.groupby(["Date", "Phase", "Block", "Plot No"], as_index=False).agg({
+                    "Size": "first",
+                    "Plot Features": lambda x: ", ".join(set([str(v) for v in x if str(v).strip()])),
+                    "Demand / Price": "last",
+                    "Seller Type": "first",
+                    "Seller / Dealer Name": "first",
+                    "Contact No": lambda x: " / ".join(set([str(v) for v in x if str(v).strip()])),
+                    "Office / Agency": "first",
+                    "Deal Status": "first",
+                    "Last Conversation / Notes": "first",
+                    "Raw Listing & Source Material": lambda x: " | ".join(set([str(v) for v in x if str(v).strip()]))
+                })
+                st.session_state["parsed_payloads"] = df_dedup.to_dict(orient="records")
+                removed = initial_len - len(st.session_state["parsed_payloads"])
+                st.success(f"✅ Removed and merged {removed} duplicate listings on identical dates!")
+                st.rerun()
+
+    with col_act2:
+        if st.button("🏷️ Mark Visible Plots as Sold", disabled=df_final_summary_display.empty):
+            plots_to_mark = set(df_final_summary_display["Plot No"].tolist())
+            for item in st.session_state["parsed_payloads"]:
+                if item.get("Plot No") in plots_to_mark:
+                    item["Deal Status"] = "Sold"
+            st.success(f"🏷️ Marked {len(plots_to_mark)} plots as SOLD in memory!")
+            st.rerun()
+
+    # ==========================================================================
+    # FULL INFINITE SCROLL SUMMARY TABLE DISPLAY (HEIGHT=520, NO 50-ROW LIMIT)
+    # ==========================================================================
+    if not df_final_summary_display.empty:
+        if edit_summary_mode:
+            final_summary_df = st.data_editor(
+                df_final_summary_display,
+                num_rows="dynamic",
+                height=520,
+                use_container_width=True,
+                key="summary_active_infinite_editor"
+            )
+        else:
+            final_summary_df = df_final_summary_display
+            st.dataframe(
+                df_final_summary_display,
+                height=520,
+                use_container_width=True
+            )
+    else:
+        final_summary_df = df_final_summary_display
+        st.dataframe(final_summary_df, height=300, use_container_width=True)
+
+    final_sync_count_live = len(df_final_summary_display)
+    
+    # Action Bar 2: Push, Export CSV, Export Excel, WhatsApp Share, PDF & Clear
+    col_pb1, col_pb_csv, col_pb_xlsx, col_pb_wa, col_pb_pdf, col_pb2 = st.columns([1.5, 0.9, 0.9, 1.1, 1.1, 0.9])
+    
+    with col_pb1:
+        if st.button(f"🚀 Push ({final_sync_count_live}) to Sheets", disabled=(final_sync_count_live == 0)):
+            if not gc_client:
+                st.error("Google Cloud credentials not found in secrets. Please configure GCP_SERVICE_ACCOUNT_JSON.")
+            else:
+                now_dt = datetime.now()
+                now_str = now_dt.strftime("%Y-%m-%d %H:%M")
+                grouped_data = {}
+                for _, row in df_final_summary_display.iterrows():
+                    target_phase = str(row.get("Target Phase", "DHA Phase 1")).strip()
+                    target_block = str(row.get("Target Tab", "Block A")).strip()
+                    key = (target_phase, target_block)
+                    if key not in grouped_data:
+                        grouped_data[key] = []
+                    grouped_data[key].append(row)
+                
+                saved_count = 0
+                workbook_cache = {}
+                total_groups = len(grouped_data)
+                progress_bar_sync = st.progress(0)
+                status_placeholder_sync = st.empty()
+                
+                for idx, ((phase, block), rows_list) in enumerate(grouped_data.items()):
+                    pct = int(((idx + 1) / total_groups) * 100)
+                    status_placeholder_sync.markdown(f"⏳ **Syncing:** `[{phase} ➔ {block}]` — ({idx+1}/{total_groups} tabs) • **{pct}% Complete**")
+                    if phase not in workbook_cache:
+                        wb = get_phase_workbook(gc_client, phase)
+                        workbook_cache[phase] = wb
+                    
+                    wb = workbook_cache[phase]
+                    ws = get_or_create_clean_tab_exact(wb, block)
+                    
+                    rows_to_append = []
+                    for row in rows_list:
+                        plot_val = str(row.get("Plot No", "")).strip()
+                        row_data = [
+                            str(row.get("Date", now_str)), str(row.get("Category", "Selling")), str(phase), str(block),
+                            str(plot_val), str(row.get("Size", "")), str(row.get("Plot Features", "Standard Layout")),
+                            str(row.get("Demand / Price", "")), "Authorized Dealer", "", str(row.get("Contact No", "")),
+                            str(st.session_state['office_name']), str(row.get("Deal Status", "Available")), "Direct Ingestion",
+                            f"[AI Ingest] {str(row.get('Source Data', ''))}"
+                        ]
+                        rows_to_append.append(row_data)
+                    
+                    BULK_SLICE_SIZE = 500
+                    for i in range(0, len(rows_to_append), BULK_SLICE_SIZE):
+                        chunk_slice = rows_to_append[i:i + BULK_SLICE_SIZE]
+                        safe_gspread_call(ws.append_rows, chunk_slice, value_input_option="USER_ENTERED")
+                        saved_count += len(chunk_slice)
+                        time.sleep(0.8)
+                    
+                    progress_bar_sync.progress((idx + 1) / total_groups)
+                
+                status_placeholder_sync.empty()
+                progress_bar_sync.empty()
+                st.success(f"🎉 **Push Complete!** Successfully saved ALL **{saved_count} listings** directly to Google Sheets!")
+                st.balloons()
+
+    with col_pb_csv:
+        if not df_final_summary_display.empty:
+            csv_export_bytes = df_final_summary_display.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label=f"📥 ({final_sync_count_live}) CSV",
+                data=csv_export_bytes,
+                file_name=f"DHA_CRM_Export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        else:
+            st.button("📥 CSV", disabled=True, use_container_width=True)
+
+    with col_pb_xlsx:
+        if not df_final_summary_display.empty:
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                df_final_summary_display.to_excel(writer, sheet_name="DHA Listings", index=False)
+            excel_bytes = excel_buffer.getvalue()
+            
+            st.download_button(
+                label=f"📊 ({final_sync_count_live}) Excel",
+                data=excel_bytes,
+                file_name=f"DHA_CRM_Workbook_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        else:
+            st.button("📊 Excel", disabled=True, use_container_width=True)
+
+    with col_pb_wa:
+        if st.button("📱 WhatsApp Share", disabled=df_final_summary_display.empty, use_container_width=True):
+            show_whatsapp_share_dialog(df_final_summary_display)
+
+    with col_pb_pdf:
+        if st.button("📄 PDF Catalog", disabled=df_final_summary_display.empty, use_container_width=True):
+            show_pdf_catalog_dialog(df_final_summary_display)
+
+    with col_pb2:
+        if st.button("🗑️ Clear Extracted", use_container_width=True):
+            st.session_state["parsed_payloads"] = []
+            st.session_state["extraction_active"] = False
+            st.session_state["extraction_paused"] = False
+            st.rerun()
+
+    st.markdown("---")
+
+    # ==========================================================================
+    # 4. UNIFIED INGESTION PROMPT ENCLOSURE
+    # ==========================================================================
+    st.subheader("🧠 Multi-Source Data Ingestion Engine")
+    default_box_value = st.session_state.get("extracted_file_text", "")
+
+    st.markdown('<div class="unified-prompt-card">', unsafe_allow_html=True)
+    
+    raw_text = st.text_area(
+        "📋 Live Real Estate Ingestion Stream:",
+        value=default_box_value,
+        height=240,
+        placeholder="Paste WhatsApp broadcasts, newspaper ads, portal feeds, or use [+] Attach Sources below...",
+        label_visibility="collapsed"
+    )
+
+    col_in_attach, col_in_clear, col_in_btn = st.columns([3.0, 1.0, 1.0])
+    
+    with col_in_attach:
+        with st.expander("➕ **Attach Sources (Files, Drive, OCR, Zameen, Newspapers)**", expanded=False):
+            tab_upload, tab_gdrive, tab_camera, tab_direct, tab_zameen, tab_news = st.tabs([
+                "📎 Files", "☁️ G-Drive", "📸 Camera OCR", "📋 Direct", "🌐 Zameen", "📰 Newspapers"
+            ])
+            
+            with tab_upload:
+                uploaded_file = st.file_uploader(
+                    "Upload TXT, Excel, JSON, PDF, or Image:",
+                    type=["txt", "xlsx", "xls", "json", "csv", "pdf", "png", "jpg", "jpeg", "webp"],
+                    key="inner_file_uploader"
+                )
+                if uploaded_file is not None:
+                    with st.spinner(f"Reading `{uploaded_file.name}`..."):
+                        try:
+                            extracted_content = extract_text_from_any_file_or_image(uploaded_file, is_camera=False)
+                            if extracted_content:
+                                st.session_state["uploaded_temp_text"] = extracted_content
+                                st.success(f"✅ File `{uploaded_file.name}` ready! Click '📥 Push to Box' below.")
+                        except Exception as e:
+                            st.error(f"Error reading file: {e}")
+                
+                if st.session_state.get("uploaded_temp_text", ""):
+                    if st.button("📥 Push to Box", key="btn_push_file_to_box"):
+                        st.session_state["extracted_file_text"] = st.session_state["uploaded_temp_text"]
+                        st.session_state["uploaded_temp_text"] = ""
+                        st.success("✅ Pushed file text into stream box!")
+                        st.rerun()
+
+            with tab_gdrive:
+                gdrive_url_in = st.text_input("Paste Google Drive Link:", placeholder="[https://drive.google.com/](https://drive.google.com/)...", key="inner_gdrive_in")
+                if st.button("📥 Push to Box (G-Drive)", key="btn_push_gdrive_inner"):
+                    if gdrive_url_in.strip():
+                        with st.spinner("Fetching Google Drive file..."):
+                            gdrive_content = fetch_content_from_gdrive_url(gdrive_url_in.strip())
+                            if gdrive_content and not gdrive_content.startswith("[Error"):
+                                st.session_state["extracted_file_text"] = gdrive_content
+                                st.success("✅ Google Drive data loaded into box!")
+                                st.rerun()
+                            else:
+                                st.error(gdrive_content)
+
+            with tab_camera:
+                st.caption("📷 Take photo of Property Document or Newspaper Classified Page:")
+                camera_photo = st.camera_input("Snap picture:", key="inner_cam_in")
+                if camera_photo is not None:
+                    with st.spinner("🧠 Scanning document via Google Vision OCR..."):
+                        camera_text = extract_text_from_any_file_or_image(camera_photo, is_camera=True)
+                        if camera_text:
+                            if st.button("📥 Push to Box (Camera OCR)", key="btn_push_cam_inner"):
+                                st.session_state["extracted_file_text"] = camera_text
+                                st.success("✅ Camera OCR loaded into box!")
+                                st.rerun()
+
+            with tab_direct:
+                pasted_txt = st.text_area("Paste Raw WhatsApp Broadcasts or Text:", height=80, placeholder="Paste text...", key="inner_paste_in")
+                if st.button("📥 Push to Box (Direct Text)", key="btn_push_direct_inner"):
+                    if pasted_txt.strip():
+                        st.session_state["extracted_file_text"] = pasted_txt.strip()
+                        st.success("✅ Direct text loaded into box!")
+                        st.rerun()
+
+            with tab_zameen:
+                portal_url = st.text_input("Paste Zameen / Portal Listing URL:", placeholder="[https://www.zameen.com/](https://www.zameen.com/)...", key="inner_portal_in")
+                if st.button("🌐 Scrape & Push to Box", key="btn_push_portal_inner"):
+                    if portal_url.strip():
+                        with st.spinner("Connecting and extracting portal property feed..."):
+                            portal_raw = fetch_text_from_portal_url(portal_url.strip())
+                            st.session_state["extracted_file_text"] = portal_raw
+                            st.success("✅ Portal content fetched into box!")
+                            st.rerun()
+                    else:
+                        st.warning("Please provide a valid property portal URL.")
+
+            with tab_news:
+                st.markdown("""
+                    <b>📰 Quick Access to National Newspaper Portals:</b><br>
+                    <a href="[https://classified.jang.com.pk](https://classified.jang.com.pk)" target="_blank" class="news-badge">📰 Daily Jang Classifieds ↗</a>
+                    <a href="[https://e.jang.com.pk/lahore](https://e.jang.com.pk/lahore)" target="_blank" class="news-badge">📰 Jang Lahore ePaper ↗</a>
+                    <a href="[https://classifieds.dawn.com](https://classifieds.dawn.com)" target="_blank" class="news-badge">📰 Daily Dawn Classifieds ↗</a>
+                    <a href="[https://express.pk/epaper](https://express.pk/epaper)" target="_blank" class="news-badge">📰 Daily Express Lahore ↗</a>
+                    <a href="[https://e.thenews.com.pk](https://e.thenews.com.pk)" target="_blank" class="news-badge">📰 The News Classifieds ↗</a>
+                    <a href="[https://epaper.nawaiwaqt.com.pk](https://epaper.nawaiwaqt.com.pk)" target="_blank" class="news-badge">📰 Daily Nawa-i-Waqt ↗</a>
+                    <a href="[https://e.dunya.com.pk](https://e.dunya.com.pk)" target="_blank" class="news-badge">📰 Daily Dunya ePaper ↗</a>
+                """, unsafe_allow_html=True)
+                st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
+                news_txt = st.text_area("Paste Newspaper Classified Ads Text (Jang, Dawn, Express etc.):", height=90, placeholder="مثلاً: ڈی ایچ اے فیز 9 پرزم 1 کنال پلاٹ برائے فروخت...", key="inner_news_in")
+                if st.button("📥 Push to Box (Newspaper Ads)", key="btn_push_news_inner"):
+                    if news_txt.strip():
+                        st.session_state["extracted_file_text"] = f"[Newspaper Classified Source]\n" + news_txt.strip()
+                        st.success("✅ Newspaper classified ads loaded into box!")
+                        st.rerun()
+
+    # 🗑️ Clear Box Button
+    with col_in_clear:
+        if not st.session_state["extraction_active"]:
+            st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
+            if st.button("🗑️ Clear Box", key="btn_clear_ingestion_stream_box", use_container_width=True):
+                st.session_state["extracted_file_text"] = ""
+                st.session_state["uploaded_temp_text"] = ""
+                st.rerun()
+
+    with col_in_btn:
+        if not st.session_state["extraction_active"]:
+            st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
+            if st.button("🚀 Extract", key="btn_run_stream_inner", use_container_width=True):
+                final_input_text = raw_text.strip()
+                if final_input_text:
+                    chunks = split_raw_into_message_chunks(final_input_text, messages_per_chunk=100)
+                    st.session_state["all_chunks"] = chunks
+                    st.session_state["current_chunk_idx"] = 0
+                    st.session_state["parsed_payloads"] = []
+                    st.session_state["extraction_active"] = True
+                    st.session_state["extraction_paused"] = False
+                    st.session_state["extraction_default_phase"] = selected_phase
+                    st.rerun()
+                else:
+                    st.warning("Please provide listing text, take a camera photo, or attach a file.")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Active Live Streaming Loop (Pause / Resume / Cancel)
+    if st.session_state["extraction_active"]:
+        chunks = st.session_state["all_chunks"]
+        curr_idx = st.session_state["current_chunk_idx"]
+        total_chunks = len(chunks)
+        
+        st.markdown(f"""
+            <div class="control-panel-box">
+                <div style="font-size: 16px; font-weight: 700; color: #00113A; margin-bottom: 8px;">
+                    ⚡ Live AI Streaming: Processing Chunk {curr_idx + 1} of {total_chunks} (100 msgs/chunk) • Streamed: {total_parsed_now} Listings into Summary
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        col_p1, col_p2, col_p3 = st.columns([1, 1, 1.2])
+        with col_p1:
+            if not st.session_state["extraction_paused"]:
+                if st.button("⏸️ Pause Extraction", use_container_width=True):
+                    st.session_state["extraction_paused"] = True
+                    st.rerun()
+            else:
+                if st.button("▶️ Resume Extraction", use_container_width=True):
+                    st.session_state["extraction_paused"] = False
+                    st.rerun()
+        with col_p2:
+            if st.button("⏹️ Stop & Keep Extracted Data", use_container_width=True):
+                st.session_state["extraction_active"] = False
+                st.session_state["extraction_paused"] = False
+                st.rerun()
+        with col_p3:
+            if st.button("❌ Cancel / Reset", use_container_width=True):
+                st.session_state["extraction_active"] = False
+                st.session_state["extraction_paused"] = False
+                st.session_state["parsed_payloads"] = []
+                st.rerun()
+
+        if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
+            with st.spinner(f"🧠 Processing Chunk {curr_idx + 1} of {total_chunks} (100 msgs)..."):
+                chunk_to_process = chunks[curr_idx]
+                new_listings = process_single_chunk_via_gemini(chunk_to_process, st.session_state["extraction_default_phase"])
+                st.session_state["parsed_payloads"].extend(new_listings)
+                st.session_state["current_chunk_idx"] += 1
+                
+                if st.session_state["current_chunk_idx"] >= total_chunks:
+                    st.session_state["extraction_active"] = False
+                    st.session_state["extraction_paused"] = False
+                    st.rerun()
+                else:
+                    st.rerun()
