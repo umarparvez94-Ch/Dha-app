@@ -716,6 +716,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 prc_str = f"{prc_val} {prc_unit}".strip() if prc_val else ""
                 
                 results.append({
+                    "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "Date": datetime.now().strftime("%Y-%m-%d"),
                     "Category": "Selling",
                     "Phase": current_section_phase,
@@ -724,7 +725,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     "Size": current_section_size if current_section_size else "4 Marla Commercial",
                     "Plot Features": "Commercial / CCA",
                     "Demand / Price": prc_str,
-                    "Seller Type": "Dealer",
+                    "Seller Type": "Authorized Dealer",
                     "Seller / Dealer Name": "",
                     "Contact No": main_phone,
                     "Office / Agency": st.session_state["office_name"],
@@ -771,6 +772,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 feat = "Corner" if "CORNER" in l_up else ("Park Facing" if "PARK" in l_up else ("Possession" if "POSSESSION" in l_up else "Standard Layout"))
 
                 results.append({
+                    "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "Date": datetime.now().strftime("%Y-%m-%d"),
                     "Category": "Selling",
                     "Phase": current_section_phase,
@@ -779,7 +781,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     "Size": sz_str,
                     "Plot Features": feat,
                     "Demand / Price": prc_str,
-                    "Seller Type": "Dealer",
+                    "Seller Type": "Authorized Dealer",
                     "Seller / Dealer Name": "",
                     "Contact No": main_phone,
                     "Office / Agency": st.session_state["office_name"],
@@ -790,15 +792,16 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
 
         if not matched_in_message and main_phone:
             results.append({
+                "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "Date": datetime.now().strftime("%Y-%m-%d"),
-                "Category": "Dealer Lead / General",
+                "Category": "Selling",
                 "Phase": active_phase,
                 "Block": "General Lead",
                 "Plot No": "General Option / Portfolio",
                 "Size": "",
                 "Plot Features": "Direct Broadcast / Portfolio",
                 "Demand / Price": "",
-                "Seller Type": "Dealer",
+                "Seller Type": "Authorized Dealer",
                 "Seller / Dealer Name": "",
                 "Contact No": main_phone,
                 "Office / Agency": st.session_state["office_name"],
@@ -810,25 +813,51 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
     return results
 
 # ==============================================================================
-# GEMINI 2.5 FLASH FORENSIC REAL ESTATE EXTRACTION ENGINE
+# GEMINI 2.5 FLASH FORENSIC REAL ESTATE EXTRACTION ENGINE (UNCUT MASTER PROMPT)
 # ==============================================================================
 def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     today_date = datetime.now().strftime("%Y-%m-%d")
+    now_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     
     system_prompt = f"""You are the Master DHA Lahore Real Estate Data Pipeline Architect & Forensic Text Parsing Specialist.
 Your explicit objective is to ingest messy, unorganized, highly-abbreviated, mixed-dealer WhatsApp broadcasts and restructure them into perfectly normalized, aligned CRM JSON records with 100% precision.
 
+### STRICT 15-COLUMN CANONICAL CRM SCHEMA (MANDATORY KEYS FOR EVERY JSON OBJECT):
+1. "Date / Timestamp": "{now_timestamp}"
+2. "Category": 'Selling', 'Buying', or 'Rental' (Default: 'Selling')
+3. "Phase": The exact DHA Phase name matched to catalog.
+4. "Block": The exact Canonical Block / CCA name.
+5. "Plot No": Extracted isolated plot identifier (e.g. 'Plot 450', 'Plot 112/4', 'Plot 890+891').
+6. "Size": Strict normalized property cutting size.
+7. "Plot Features": Extracted key features ('Corner', 'Facing Park', 'Main Boulevard (MB)', '100ft Road', 'Direct Approach', 'Possession', 'Non-Possession', 'Standard Layout').
+8. "Demand / Price": Normalized asking rate in 'X Lac' or 'X Crore' (e.g. '585 Lac', '5.85 Crore', '325 Lac'). If missing, leave empty string "".
+9. "Seller Type": 'Authorized Dealer' or 'Direct Owner' (Default: 'Authorized Dealer').
+10. "Seller / Dealer Name": Extracted dealer/owner name if mentioned, else empty string "".
+11. "Contact No": Clean Pakistani phone format ('03XXXXXXXXX' or '+923XXXXXXXXX').
+12. "Office / Agency": "{st.session_state['office_name']}"
+13. "Deal Status": 'Available'
+14. "Last Conversation / Notes": 'Direct Ingestion'
+15. "Raw Listing & Source Material": The exact unparsed message snippet for forensic audit.
+
 ### CORE EXTRACTION & ALIGNMENT INTELLIGENCE:
-1. MULTI-LISTING DISAGGREGATION: Split every distinct plot into its own JSON object.
-2. CONTEXTUAL HIERARCHY: Every plot inherits Phase and Size until a new header divider changes it.
-   - If no header exists, default to: "{default_phase}".
-3. ZERO-HALLUCINATION BLOCK ALIGNMENT: Match strictly against the Official Catalog provided below.
-4. PLOT NUMBER ISOLATION: Extract raw numbers cleanly (e.g. 'Plot 450', 'Plot 112/4').
-5. STRICT SIZE NORMALIZATION: '5 Marla', '8 Marla', '10 Marla', '1 Kanal', '2 Kanal', '4 Marla Commercial', '8 Marla Commercial'.
-6. DEMAND STANDARDIZATION: 'X Lac' or 'X Crore' (e.g. '585 Lac', '5.85 Crore').
-7. ATTRIBUTE CLASSIFICATION: 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Standard Layout'.
-8. CATEGORY & DATE: Set "Date" as "{today_date}". "Category" as 'Selling', 'Buying', or 'Rental'.
+1. MULTI-LISTING DISAGGREGATION (One Record per Property):
+   - Split every distinct plot, pair, commercial shop, or investor requirement into its own separate JSON object.
+
+2. CONTEXTUAL HIERARCHY & HEADER INHERITANCE:
+   - Every single plot appearing beneath a section header must inherit that specific Phase and Size until a new divider explicitly changes it.
+   - If no header exists in the text stream, default strictly to Phase: "{default_phase}".
+
+3. ZERO-HALLUCINATION BLOCK ALIGNMENT:
+   - Match extracted blocks strictly against the Official Catalog provided below.
+   - Clean common dealer slang: 'Z2' -> 'Block Z-2', 'CCA1' -> 'CCA 1 Commercial', 'MB' -> 'Main Boulevard (MB) Commercial', 'BROADWAY' -> 'Broadway Commercial', 'ZONE 1' -> 'Zone 1 Commercial'.
+   - FORBIDDEN AS BLOCKS: 'DIRECT', 'MEETING', 'PAIR', 'DEMAND', 'CORNER', 'PARK', 'MAIN', 'SE', 'CA', 'POSSESSION', 'AFFIDAVIT', 'FILE', 'AVAILABLE'.
+
+4. STRICT SIZE NORMALIZATION:
+   - Must be one of: '5 Marla', '8 Marla', '10 Marla', '1 Kanal', '2 Kanal', '4 Marla Commercial', '8 Marla Commercial'.
+
+5. DATE TRACKING:
+   - Also include a "Date" key with value "{today_date}" for same-day deduplication logic.
 
 OFFICIAL DHA PHASE & BLOCK CATALOG:
 {catalog_json_str}
@@ -837,7 +866,7 @@ INPUT MESSY WHATSAPP STREAM:
 {chunk_text}
 
 OUTPUT SPECIFICATION:
-Return ONLY a valid JSON array of objects. Strictly no explanations or markdown.
+Return ONLY a valid JSON array of objects strictly conforming to the 15 canonical keys above. Strictly no explanations, markdown ticks (```json), or commentary.
 """
 
     if gemini_active and gemini_client:
@@ -856,6 +885,8 @@ Return ONLY a valid JSON array of objects. Strictly no explanations or markdown.
                 for item in parsed_json:
                     if "Date" not in item or not item["Date"]:
                         item["Date"] = today_date
+                    if "Date / Timestamp" not in item or not item["Date / Timestamp"]:
+                        item["Date / Timestamp"] = now_timestamp
                     blk = str(item.get("Block", "")).strip()
                     plt = str(item.get("Plot No", "")).strip()
                     sz = str(item.get("Size", "")).strip()
@@ -1157,7 +1188,7 @@ else:
                         row_data = [
                             str(row.get("Date", now_str)), str(row.get("Category", "Selling")), str(phase), str(block),
                             str(plot_val), str(row.get("Size", "")), str(row.get("Plot Features", "Standard Layout")),
-                            str(row.get("Demand / Price", "")), "Dealer", "", str(row.get("Contact No", "")),
+                            str(row.get("Demand / Price", "")), "Authorized Dealer", "", str(row.get("Contact No", "")),
                             str(st.session_state['office_name']), str(row.get("Deal Status", "Available")), "Direct Ingestion",
                             f"[AI Ingest] {str(row.get('Source Text', ''))}"
                         ]
@@ -1272,7 +1303,7 @@ else:
                         st.rerun()
 
             with tab_gdrive:
-                gdrive_url_in = st.text_input("Paste Google Drive Link:", placeholder="https://drive.google.com/...", key="inner_gdrive_in")
+                gdrive_url_in = st.text_input("Paste Google Drive Link:", placeholder="[https://drive.google.com/](https://drive.google.com/)...", key="inner_gdrive_in")
                 if st.button("📥 Push to Box (G-Drive)", key="btn_push_gdrive_inner"):
                     if gdrive_url_in.strip():
                         with st.spinner("Fetching Google Drive file..."):
@@ -1305,7 +1336,7 @@ else:
                         st.rerun()
 
             with tab_zameen:
-                portal_url = st.text_input("Paste Zameen / Portal Listing URL:", placeholder="https://www.zameen.com/...", key="inner_portal_in")
+                portal_url = st.text_input("Paste Zameen / Portal Listing URL:", placeholder="[https://www.zameen.com/](https://www.zameen.com/)...", key="inner_portal_in")
                 if st.button("🌐 Scrape & Push to Box", key="btn_push_portal_inner"):
                     if portal_url.strip():
                         with st.spinner("Connecting and extracting portal property feed..."):
@@ -1319,13 +1350,13 @@ else:
             with tab_news:
                 st.markdown("""
                     <b>📰 Quick Access to National Newspaper Portals:</b><br>
-                    <a href="https://classified.jang.com.pk" target="_blank" class="news-badge">📰 Daily Jang Classifieds ↗</a>
-                    <a href="https://e.jang.com.pk/lahore" target="_blank" class="news-badge">📰 Jang Lahore ePaper ↗</a>
-                    <a href="https://classifieds.dawn.com" target="_blank" class="news-badge">📰 Daily Dawn Classifieds ↗</a>
-                    <a href="https://express.pk/epaper" target="_blank" class="news-badge">📰 Daily Express Lahore ↗</a>
-                    <a href="https://e.thenews.com.pk" target="_blank" class="news-badge">📰 The News Classifieds ↗</a>
-                    <a href="https://epaper.nawaiwaqt.com.pk" target="_blank" class="news-badge">📰 Daily Nawa-i-Waqt ↗</a>
-                    <a href="https://e.dunya.com.pk" target="_blank" class="news-badge">📰 Daily Dunya ePaper ↗</a>
+                    <a href="[https://classified.jang.com.pk](https://classified.jang.com.pk)" target="_blank" class="news-badge">📰 Daily Jang Classifieds ↗</a>
+                    <a href="[https://e.jang.com.pk/lahore](https://e.jang.com.pk/lahore)" target="_blank" class="news-badge">📰 Jang Lahore ePaper ↗</a>
+                    <a href="[https://classifieds.dawn.com](https://classifieds.dawn.com)" target="_blank" class="news-badge">📰 Daily Dawn Classifieds ↗</a>
+                    <a href="[https://express.pk/epaper](https://express.pk/epaper)" target="_blank" class="news-badge">📰 Daily Express Lahore ↗</a>
+                    <a href="[https://e.thenews.com.pk](https://e.thenews.com.pk)" target="_blank" class="news-badge">📰 The News Classifieds ↗</a>
+                    <a href="[https://epaper.nawaiwaqt.com.pk](https://epaper.nawaiwaqt.com.pk)" target="_blank" class="news-badge">📰 Daily Nawa-i-Waqt ↗</a>
+                    <a href="[https://e.dunya.com.pk](https://e.dunya.com.pk)" target="_blank" class="news-badge">📰 Daily Dunya ePaper ↗</a>
                 """, unsafe_allow_html=True)
                 st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
                 news_txt = st.text_area("Paste Newspaper Classified Ads Text (Jang, Dawn, Express etc.):", height=90, placeholder="مثلاً: ڈی ایچ اے فیز 9 پرزم 1 کنال پلاٹ برائے فروخت...", key="inner_news_in")
