@@ -72,86 +72,86 @@ try:
 except Exception:
     gemini_active = False
 
-# 2. Modern Responsive UI/UX Styling (Stitch Aligned)
+# 2. Modern Responsive UI/UX Styling (Wrapped Safely)
 st.markdown("""
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-    <style>
-    /* Reset & Base Canvas */
-    #MainMenu, header, footer { visibility: hidden !important; height: 0 !important; }
-    .stAppDeployButton { display: none !important; }
-    .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 100% !important; }
-    .stApp { background-color: #F7F9FB !important; font-family: 'Inter', sans-serif !important; color: #191C1E !important; }
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<style>
+/* Reset & Base Canvas */
+#MainMenu, header, footer { visibility: hidden !important; height: 0 !important; }
+.stAppDeployButton { display: none !important; }
+.block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 100% !important; }
+.stApp { background-color: #F7F9FB !important; font-family: 'Inter', sans-serif !important; color: #191C1E !important; }
 
-    /* Modern Header Banner */
-    .header-banner { 
-        background: linear-gradient(135deg, #00113A 0%, #102A6B 100%); 
-        padding: 16px 20px; 
-        border-radius: 12px; 
-        color: white; 
-        margin-bottom: 16px; 
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        align-items: center;
-        gap: 10px;
-        box-shadow: 0 4px 14px rgba(0, 17, 58, 0.1); 
-    }
-    .header-title { font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 800; margin: 0; color: #FFFFFF; }
-    .header-subtitle { color: #B3C5FF; font-size: 12px; margin-top: 2px; }
-    .office-badge { background-color: #006B5E; color: #9FF2E1; padding: 4px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; }
+/* Modern Header Banner */
+.header-banner { 
+    background: linear-gradient(135deg, #00113A 0%, #102A6B 100%); 
+    padding: 16px 20px; 
+    border-radius: 12px; 
+    color: white; 
+    margin-bottom: 16px; 
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 14px rgba(0, 17, 58, 0.1); 
+}
+.header-title { font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 800; margin: 0; color: #FFFFFF; }
+.header-subtitle { color: #B3C5FF; font-size: 12px; margin-top: 2px; }
+.office-badge { background-color: #006B5E; color: #9FF2E1; padding: 4px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; }
 
-    /* Login Screen Card */
-    .stitch-login-box { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04); padding: 32px 28px; margin-bottom: 16px; text-align: center; }
-    .stitch-avatar { width: 60px; height: 60px; border-radius: 50%; background-color: #D6E2FF; border: 1px solid #B3C5FF; display: inline-flex; align-items: center; justify-content: center; color: #00113A; margin-bottom: 12px; }
+/* Login Screen Card */
+.stitch-login-box { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04); padding: 32px 28px; margin-bottom: 16px; text-align: center; }
+.stitch-avatar { width: 60px; height: 60px; border-radius: 50%; background-color: #D6E2FF; border: 1px solid #B3C5FF; display: inline-flex; align-items: center; justify-content: center; color: #00113A; margin-bottom: 12px; }
 
-    /* Touch-Scrollable Block Switcher Ribbon */
-    div[role="radiogroup"] {
-        display: flex !important;
-        flex-direction: row !important;
-        overflow-x: auto !important;
-        white-space: nowrap !important;
-        padding-bottom: 8px !important;
-        gap: 8px !important;
-        scrollbar-width: thin;
-    }
-    div[role="radiogroup"] label {
-        background: #FFFFFF !important;
-        border: 1px solid #C5C6D0 !important;
-        border-radius: 20px !important;
-        padding: 4px 14px !important;
-        font-size: 12px !important;
-        font-weight: 600 !important;
-        color: #191C1E !important;
-        cursor: pointer;
-    }
+/* Touch-Scrollable Block Switcher Ribbon */
+div[role="radiogroup"] {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    padding-bottom: 8px !important;
+    gap: 8px !important;
+    scrollbar-width: thin;
+}
+div[role="radiogroup"] label {
+    background: #FFFFFF !important;
+    border: 1px solid #C5C6D0 !important;
+    border-radius: 20px !important;
+    padding: 4px 14px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #191C1E !important;
+    cursor: pointer;
+}
 
-    /* KPI Summary Pills */
-    .summary-card { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
-    .stat-pill { background: #ECEEF0; border-radius: 20px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #191C1E; display: inline-block; margin-right: 6px; margin-bottom: 6px; }
-    .stat-pill b { color: #00113A; font-family: 'JetBrains Mono', monospace; }
+/* KPI Summary Pills */
+.summary-card { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+.stat-pill { background: #ECEEF0; border-radius: 20px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #191C1E; display: inline-block; margin-right: 6px; margin-bottom: 6px; }
+.stat-pill b { color: #00113A; font-family: 'JetBrains Mono', monospace; }
 
-    /* Control Panels & Enclosures */
-    .control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 14px 18px; margin: 12px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.06); }
-    .unified-prompt-card { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0, 17, 58, 0.03); }
-    .backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }
-    .news-badge { display: inline-block; padding: 4px 10px; margin: 3px 2px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #00113A; background: #E2E8F0; border: 1px solid #CBD5E1; }
+/* Control Panels & Enclosures */
+.control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 14px 18px; margin: 12px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.06); }
+.unified-prompt-card { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0, 17, 58, 0.03); }
+.backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }
+.news-badge { display: inline-block; padding: 4px 10px; margin: 3px 2px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #00113A; background: #E2E8F0; border: 1px solid #CBD5E1; }
 
-    /* Buttons */
-    .stButton > button {
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        font-size: 13px !important;
-        min-height: 40px !important;
-    }
+/* Buttons */
+.stButton > button {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    min-height: 40px !important;
+}
 
-    /* Mobile Adaptations */
-    @media (max-width: 768px) {
-        .header-banner { flex-direction: column; align-items: flex-start; }
-        .stButton > button { width: 100% !important; }
-    }
-    </style>
+/* Mobile Adaptations */
+@media (max-width: 768px) {
+    .header-banner { flex-direction: column; align-items: flex-start; }
+    .stButton > button { width: 100% !important; }
+}
+</style>
 """, unsafe_allow_html=True)
 
 CRM_SHEET_HEADERS = [
