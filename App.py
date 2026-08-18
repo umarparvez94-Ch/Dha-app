@@ -7,6 +7,7 @@ import os
 import time
 import math
 import urllib.request
+import urllib.parse
 import pandas as pd
 from datetime import datetime
 from PIL import Image
@@ -294,7 +295,6 @@ def safe_gspread_call(func, *args, **kwargs):
             return func(*args, **kwargs)
         except Exception as e:
             err_str = str(e).lower()
-            # If Google API Rate Limit 429 or Quota exceeded
             if "429" in err_str or "quota" in err_str or "apierror" in err_str or "rate limit" in err_str:
                 time.sleep(delay * 2.0)
             if attempt == retries - 1:
@@ -333,6 +333,9 @@ def get_specific_tab_url(workbook, base_url, tab_title):
         pass
     return base_url
 
+# ==============================================================================
+# MODALS & SYSTEM DIALOGS
+# ==============================================================================
 @st.dialog("🔗 Backend Google Sheets Connection Details", width="large")
 def show_backend_connection_dialog(selected_phase, selected_block, target_url):
     st.markdown(f"#### 🏢 Google Sheets Connection Architecture: [{selected_phase}]")
@@ -341,7 +344,7 @@ def show_backend_connection_dialog(selected_phase, selected_block, target_url):
             <b>🔑 Service Account:</b> <code>dha-bot@dha-property-sync.iam.gserviceaccount.com</code><br>
             <b>🌐 Active Spreadsheet Target:</b> <a href="{target_url}" target="_blank">{selected_phase} Database</a><br>
             <b>🧱 Target Tab Attached:</b> <code>{selected_block}</code><br>
-            <b>⚡ Sync Protocols:</b> Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
+            <b>⚡ Sync Protocols:</b> 500-Row Chunked Append with Exponential Backoff (Quota 429 Protection)<br>
             <b>🛡️ Schema Compliance:</b> 15 Canonical CRM Column Headers strictly mapped.
         </div>
     """, unsafe_allow_html=True)
@@ -355,8 +358,8 @@ def show_dealer_ledger_dialog(payloads):
 
     dealer_data = []
     for item in payloads:
-        contact = item.get("Contact No", "").strip()
-        dealer_name = item.get("Seller / Dealer Name", "").strip()
+        contact = str(item.get("Contact No", "")).strip()
+        dealer_name = str(item.get("Seller / Dealer Name", "")).strip()
         plot = f"{item.get('Phase', '')} {item.get('Block', '')} - {item.get('Plot No', '')}"
         demand = item.get("Demand / Price", "")
         raw_msg = item.get("Raw Listing & Source Material", "")
@@ -377,9 +380,141 @@ def show_dealer_ledger_dialog(payloads):
         ).reset_index().sort_values(by="Total_Listings", ascending=False)
 
         st.markdown(f"**Total Active Dealers in Memory:** `{len(summary_group)}`")
-        st.dataframe(summary_group, height=280)
+        st.dataframe(summary_group, height=260, use_container_width=True)
         st.markdown("##### 🔍 Detailed Listing Records per Dealer:")
-        st.dataframe(df_dealers, height=240)
+        st.dataframe(df_dealers, height=220, use_container_width=True)
+
+@st.dialog("📈 Price Trend Analytics", width="large")
+def show_price_analytics_dialog(payloads):
+    st.markdown("### 📊 DHA Price Demand Trends & Block Analytics")
+    if not payloads:
+        st.info("No property records available for price analytics.")
+        return
+    
+    clean_records = []
+    for item in payloads:
+        price_str = str(item.get("Demand / Price", "")).upper().strip()
+        phase = str(item.get("Phase", "Unknown"))
+        block = str(item.get("Block", "Unknown"))
+        size = str(item.get("Size", "Unknown"))
+        
+        lac_val = 0.0
+        match_lac = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*(?:LAC|LACS)', price_str)
+        match_cr = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*(?:CRORE|CR)', price_str)
+        
+        if match_cr:
+            lac_val = float(match_cr.group(1)) * 100.0
+        elif match_lac:
+            lac_val = float(match_lac.group(1))
+            
+        if lac_val > 0:
+            clean_records.append({
+                "Phase": phase,
+                "Block": block,
+                "Size": size,
+                "Price (Lacs)": lac_val,
+                "Raw Demand": price_str
+            })
+            
+    if clean_records:
+        df_analytics = pd.DataFrame(clean_records)
+        summary_analytics = df_analytics.groupby(["Phase", "Block", "Size"]).agg(
+            Total_Options=("Price (Lacs)", "count"),
+            Avg_Price_Lacs=("Price (Lacs)", lambda x: round(x.mean(), 1)),
+            Min_Price_Lacs=("Price (Lacs)", "min"),
+            Max_Price_Lacs=("Price (Lacs)", "max")
+        ).reset_index().sort_values(by="Total_Options", ascending=False)
+        
+        st.markdown(f"**Calculated from `{len(clean_records)}` listings with explicit pricing:**")
+        st.dataframe(summary_analytics, height=350, use_container_width=True)
+    else:
+        st.warning("No listings with standard Lac/Crore price formats detected yet.")
+
+@st.dialog("📱 Client-Ready WhatsApp Broadcast Generator", width="large")
+def show_whatsapp_share_dialog(df_share):
+    st.markdown("### 📱 Formatted Client Broadcast")
+    if df_share.empty:
+        st.warning("No records selected for broadcast.")
+        return
+    
+    broadcast_lines = [
+        f"🏢 *{st.session_state['office_name']}* - Available Inventory Update",
+        f"📅 Date: {datetime.now().strftime('%d-%b-%Y')}",
+        "----------------------------------------"
+    ]
+    
+    for idx, (_, row) in enumerate(df_share.iterrows(), 1):
+        p_str = f"*{row.get('Target Phase', '')} - {row.get('Target Tab', '')}*"
+        plt = row.get('Plot No', '')
+        sz = row.get('Size', '')
+        dem = row.get('Demand / Price', 'Call for Price')
+        feat = row.get('Plot Features', '')
+        
+        line = f"📍 {p_str} | {plt} ({sz})\n   💰 Demand: *{dem}* | Feature: {feat}"
+        broadcast_lines.append(line)
+        
+    broadcast_lines.append("----------------------------------------")
+    broadcast_lines.append("📞 For Deals & Inquiries: Direct Message or Call.")
+    
+    final_text = "\n\n".join(broadcast_lines)
+    
+    st.text_area("📋 Copy Broadcast Text Directly:", value=final_text, height=260)
+    encoded_text = urllib.parse.quote(final_text)
+    wa_url = f"https://api.whatsapp.com/send?text={encoded_text}"
+    st.link_button("📲 Open in WhatsApp Web / App ↗", url=wa_url)
+
+@st.dialog("📄 Generate Printable PDF / HTML Catalog", width="large")
+def show_pdf_catalog_dialog(df_cat):
+    st.markdown("### 📄 Property Catalog Preview")
+    if df_cat.empty:
+        st.warning("No records selected for catalog.")
+        return
+        
+    now_str = datetime.now().strftime("%d %B, %Y - %H:%M")
+    html_preview = f"""
+    <div style="background:#FFFFFF; border:1px solid #CBD5E1; padding:24px; border-radius:8px; font-family:'Inter', sans-serif;">
+        <div style="border-bottom:2px solid #00113A; padding-bottom:12px; margin-bottom:16px;">
+            <h2 style="color:#00113A; margin:0;">🏢 {st.session_state['office_name']}</h2>
+            <div style="color:#64748B; font-size:13px;">Official Property Inventory & Deal Options • Generated on: {now_str}</div>
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+            <thead>
+                <tr style="background:#F1F5F9; border-bottom:1px solid #CBD5E1;">
+                    <th style="padding:8px;">#</th>
+                    <th style="padding:8px;">Phase</th>
+                    <th style="padding:8px;">Block</th>
+                    <th style="padding:8px;">Plot No</th>
+                    <th style="padding:8px;">Size</th>
+                    <th style="padding:8px;">Features</th>
+                    <th style="padding:8px;">Demand</th>
+                    <th style="padding:8px;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+    
+    for idx, (_, row) in enumerate(df_cat.iterrows(), 1):
+        html_preview += f"""
+            <tr style="border-bottom:1px solid #E2E8F0;">
+                <td style="padding:8px;">{idx}</td>
+                <td style="padding:8px; font-weight:600;">{row.get('Target Phase', '')}</td>
+                <td style="padding:8px;">{row.get('Target Tab', '')}</td>
+                <td style="padding:8px; font-weight:600; color:#00113A;">{row.get('Plot No', '')}</td>
+                <td style="padding:8px;">{row.get('Size', '')}</td>
+                <td style="padding:8px;">{row.get('Plot Features', '')}</td>
+                <td style="padding:8px; font-weight:600; color:#006B5E;">{row.get('Demand / Price', '')}</td>
+                <td style="padding:8px;">{row.get('Category', 'Selling')}</td>
+            </tr>
+        """
+        
+    html_preview += """
+            </tbody>
+        </table>
+    </div>
+    """
+    
+    st.markdown(html_preview, unsafe_allow_html=True)
+    st.caption("ℹ️ Use Browser Print (Ctrl + P / Cmd + P) to Save as PDF with exact formatting.")
 
 # ==============================================================================
 # SOURCE FETCHERS & 100-MESSAGE CHUNKER
@@ -581,6 +716,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 prc_str = f"{prc_val} {prc_unit}".strip() if prc_val else ""
                 
                 results.append({
+                    "Date": datetime.now().strftime("%Y-%m-%d"),
                     "Category": "Selling",
                     "Phase": current_section_phase,
                     "Block": blk_cca,
@@ -635,6 +771,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 feat = "Corner" if "CORNER" in l_up else ("Park Facing" if "PARK" in l_up else ("Possession" if "POSSESSION" in l_up else "Standard Layout"))
 
                 results.append({
+                    "Date": datetime.now().strftime("%Y-%m-%d"),
                     "Category": "Selling",
                     "Phase": current_section_phase,
                     "Block": blk_str,
@@ -653,6 +790,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
 
         if not matched_in_message and main_phone:
             results.append({
+                "Date": datetime.now().strftime("%Y-%m-%d"),
                 "Category": "Dealer Lead / General",
                 "Phase": active_phase,
                 "Block": "General Lead",
@@ -676,39 +814,21 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
 # ==============================================================================
 def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
+    today_date = datetime.now().strftime("%Y-%m-%d")
     
     system_prompt = f"""You are the Master DHA Lahore Real Estate Data Pipeline Architect & Forensic Text Parsing Specialist.
 Your explicit objective is to ingest messy, unorganized, highly-abbreviated, mixed-dealer WhatsApp broadcasts and restructure them into perfectly normalized, aligned CRM JSON records with 100% precision.
 
 ### CORE EXTRACTION & ALIGNMENT INTELLIGENCE:
-1. MULTI-LISTING DISAGGREGATION (One Record per Property):
-   - Split every distinct plot, pair, shop, or requirement into its own dedicated JSON object.
-
-2. CONTEXTUAL HIERARCHY & HEADER INHERITANCE:
-   - Every single plot appearing beneath a header must inherit that specific Phase and Size until a new divider explicitly changes it.
+1. MULTI-LISTING DISAGGREGATION: Split every distinct plot into its own JSON object.
+2. CONTEXTUAL HIERARCHY: Every plot inherits Phase and Size until a new header divider changes it.
    - If no header exists, default to: "{default_phase}".
-
-3. ZERO-HALLUCINATION BLOCK ALIGNMENT:
-   - Match extracted blocks strictly against the Official Catalog provided below.
-   - Clean common slang: 'Z2' -> 'Block Z-2', 'CCA1' -> 'CCA 1 Commercial', 'MB' -> 'Main Boulevard (MB) Commercial', 'BROADWAY' -> 'Broadway Commercial'.
-   - FORBIDDEN AS BLOCKS: 'DIRECT', 'MEETING', 'PAIR', 'DEMAND', 'CORNER', 'PARK', 'MAIN', 'SE', 'CA', 'POSSESSION', 'AFFIDAVIT', 'FILE'.
-
-4. PLOT NUMBER ISOLATION:
-   - Extract raw plot numbers cleanly: e.g., 'Plot 450', 'Plot 112/4', 'Plot 890+891'.
-
-5. STRICT SIZE NORMALIZATION:
-   - '5 Marla', '8 Marla', '10 Marla', '1 Kanal', '2 Kanal', '4 Marla Commercial', '8 Marla Commercial'.
-
-6. DEMAND & CURRENCY STANDARDIZATION:
-   - Normalize prices into 'X Lac' or 'X Crore' (e.g. '585 Lac', '5.85 Crore', '325 Lac').
-
-7. ATTRIBUTE & FEATURE CLASSIFICATION:
-   - 'Corner', 'Facing Park', 'Main Boulevard (MB)', '100ft Road', 'Direct Approach', 'Possession', 'Non-Possession', 'Standard Layout'.
-
-8. CATEGORY & SELLER ATTRIBUTION:
-   - "Category": 'Selling', 'Buying', or 'Rental'.
-   - "Seller Type": 'Direct Owner' or 'Authorized Dealer'.
-   - "Contact No": Clean Pakistani phone numbers.
+3. ZERO-HALLUCINATION BLOCK ALIGNMENT: Match strictly against the Official Catalog provided below.
+4. PLOT NUMBER ISOLATION: Extract raw numbers cleanly (e.g. 'Plot 450', 'Plot 112/4').
+5. STRICT SIZE NORMALIZATION: '5 Marla', '8 Marla', '10 Marla', '1 Kanal', '2 Kanal', '4 Marla Commercial', '8 Marla Commercial'.
+6. DEMAND STANDARDIZATION: 'X Lac' or 'X Crore' (e.g. '585 Lac', '5.85 Crore').
+7. ATTRIBUTE CLASSIFICATION: 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Standard Layout'.
+8. CATEGORY & DATE: Set "Date" as "{today_date}". "Category" as 'Selling', 'Buying', or 'Rental'.
 
 OFFICIAL DHA PHASE & BLOCK CATALOG:
 {catalog_json_str}
@@ -717,7 +837,7 @@ INPUT MESSY WHATSAPP STREAM:
 {chunk_text}
 
 OUTPUT SPECIFICATION:
-Return ONLY a valid JSON array of objects. Strictly no explanations, markdown formatting ticks, or commentary.
+Return ONLY a valid JSON array of objects. Strictly no explanations or markdown.
 """
 
     if gemini_active and gemini_client:
@@ -734,6 +854,8 @@ Return ONLY a valid JSON array of objects. Strictly no explanations, markdown fo
             parsed_json = json.loads(raw_json)
             if isinstance(parsed_json, list) and len(parsed_json) > 0:
                 for item in parsed_json:
+                    if "Date" not in item or not item["Date"]:
+                        item["Date"] = today_date
                     blk = str(item.get("Block", "")).strip()
                     plt = str(item.get("Plot No", "")).strip()
                     sz = str(item.get("Size", "")).strip()
@@ -795,7 +917,7 @@ else:
     gc_client = get_gspread_client()
 
     # Header
-    col_h1, col_h2 = st.columns([3, 1.2])
+    col_h1, col_h2 = st.columns([2.6, 1.4])
     with col_h1:
         st.markdown(f"""
             <div class="header-banner">
@@ -806,9 +928,14 @@ else:
         """, unsafe_allow_html=True)
 
     with col_h2:
-        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        if st.button("👥 Dealer Ledger & Directory"):
-            show_dealer_ledger_dialog(st.session_state.get("parsed_payloads", []))
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        col_hb1, col_hb2 = st.columns(2)
+        with col_hb1:
+            if st.button("👥 Dealer Ledger", use_container_width=True):
+                show_dealer_ledger_dialog(st.session_state.get("parsed_payloads", []))
+        with col_hb2:
+            if st.button("📈 Analytics", use_container_width=True):
+                show_price_analytics_dialog(st.session_state.get("parsed_payloads", []))
 
     # Top Selectors
     col_city, col_phase = st.columns([1.2, 2.5])
@@ -853,6 +980,7 @@ else:
         base_data = []
         for item in st.session_state["parsed_payloads"]:
             base_data.append({
+                "Date": str(item.get("Date", datetime.now().strftime("%Y-%m-%d"))),
                 "Target Phase": str(item.get("Phase", "DHA Phase 1")),
                 "Target Tab": str(item.get("Block", "Block A")),
                 "Plot No": str(item.get("Plot No", "")),
@@ -861,18 +989,20 @@ else:
                 "Contact No": str(item.get("Contact No", "")),
                 "Category": str(item.get("Category", "Selling")),
                 "Plot Features": str(item.get("Plot Features", "Standard Layout")),
+                "Deal Status": str(item.get("Deal Status", "Available")),
                 "Source Text": str(item.get("Raw Listing & Source Material", ""))
             })
         df_all_live = pd.DataFrame(base_data)
     else:
         df_all_live = pd.DataFrame(columns=[
-            "Target Phase", "Target Tab", "Plot No", "Size", "Demand / Price",
-            "Contact No", "Category", "Plot Features", "Source Text"
+            "Date", "Target Phase", "Target Tab", "Plot No", "Size", "Demand / Price",
+            "Contact No", "Category", "Plot Features", "Deal Status", "Source Text"
         ])
 
     col_sc1, col_sc2, col_sc3, col_sc4 = st.columns([1.2, 1.4, 1.4, 1.2])
     with col_sc1:
         edit_summary_mode = st.toggle("✏️ Edit Mode (ON / OFF)", value=False, key="toggle_summary_edit_mode")
+        highlight_incomplete = st.toggle("⚠️ Incomplete Flags", value=False, key="toggle_incomplete_flags")
 
     all_dha_phases_summary = ["All Phases (Everything)"] + list(DHA_PHASE_BLOCK_CATALOG.keys())
     with col_sc2:
@@ -895,6 +1025,18 @@ else:
     else:
         df_final_summary_display = df_filtered_summary_phase
 
+    # 🔍 Global Search Bar
+    search_query = st.text_input("🔍 Global Search Across Listings (Plot No, Phone, Demand, Features):", placeholder="Type anything to search...", key="global_search_input")
+    if search_query.strip() and not df_final_summary_display.empty:
+        q = search_query.strip().lower()
+        mask = df_final_summary_display.apply(lambda row: row.astype(str).str.lower().str.contains(q).any(), axis=1)
+        df_final_summary_display = df_final_summary_display[mask]
+
+    # Incomplete Data Flagging
+    if highlight_incomplete and not df_final_summary_display.empty:
+        inc_mask = (df_final_summary_display["Demand / Price"] == "") | (df_final_summary_display["Contact No"] == "")
+        df_final_summary_display = df_final_summary_display[inc_mask]
+
     with col_sc4:
         st.metric(label="📊 Plots In View", value=f"{len(df_final_summary_display)}", delta=f"{total_parsed_now} Total Extracted")
 
@@ -913,25 +1055,72 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Safe Dataframe Display (50 Rows Max for Ultra Fast Render)
+    # Action Bar 1: Edit & Clean Duplicates & Mark as Sold
+    col_act1, col_act2, col_act3 = st.columns([1.5, 1.5, 1.5])
+    with col_act1:
+        if st.button("🧹 Remove Duplicates (Same Date)", disabled=df_final_summary_display.empty):
+            initial_len = len(st.session_state["parsed_payloads"])
+            df_temp = pd.DataFrame(st.session_state["parsed_payloads"])
+            if not df_temp.empty:
+                if "Date" not in df_temp.columns:
+                    df_temp["Date"] = datetime.now().strftime("%Y-%m-%d")
+                
+                df_dedup = df_temp.groupby(["Date", "Phase", "Block", "Plot No"], as_index=False).agg({
+                    "Size": "first",
+                    "Plot Features": lambda x: ", ".join(set([str(v) for v in x if str(v).strip()])),
+                    "Demand / Price": "last",
+                    "Seller Type": "first",
+                    "Seller / Dealer Name": "first",
+                    "Contact No": lambda x: " / ".join(set([str(v) for v in x if str(v).strip()])),
+                    "Office / Agency": "first",
+                    "Deal Status": "first",
+                    "Last Conversation / Notes": "first",
+                    "Raw Listing & Source Material": lambda x: " | ".join(set([str(v) for v in x if str(v).strip()]))
+                })
+                st.session_state["parsed_payloads"] = df_dedup.to_dict(orient="records")
+                removed = initial_len - len(st.session_state["parsed_payloads"])
+                st.success(f"✅ Removed and merged {removed} duplicate listings on identical dates!")
+                st.rerun()
+
+    with col_act2:
+        if st.button("🏷️ Mark Visible Plots as Sold", disabled=df_final_summary_display.empty):
+            plots_to_mark = set(df_final_summary_display["Plot No"].tolist())
+            for item in st.session_state["parsed_payloads"]:
+                if item.get("Plot No") in plots_to_mark:
+                    item["Deal Status"] = "Sold"
+            st.success(f"🏷️ Marked {len(plots_to_mark)} plots as SOLD in memory!")
+            st.rerun()
+
+    # ==========================================================================
+    # FULL INFINITE SCROLL SUMMARY TABLE DISPLAY (NO 50-ROW LIMIT)
+    # ==========================================================================
     if not df_final_summary_display.empty:
-        df_render_preview = df_final_summary_display.head(50)
-        if len(df_final_summary_display) > 50:
-            st.caption(f"ℹ️ Showing top 50 rows for speed. Sync pushes all {len(df_final_summary_display)} records.")
-        
         if edit_summary_mode:
-            final_summary_df = st.data_editor(df_render_preview, num_rows="dynamic", height=280, key="summary_active_live_editor")
+            final_summary_df = st.data_editor(
+                df_final_summary_display,
+                num_rows="dynamic",
+                height=520,
+                use_container_width=True,
+                key="summary_active_infinite_editor"
+            )
         else:
             final_summary_df = df_final_summary_display
-            st.dataframe(df_render_preview, height=280)
+            st.dataframe(
+                df_final_summary_display,
+                height=520,
+                use_container_width=True
+            )
     else:
         final_summary_df = df_final_summary_display
-        st.dataframe(final_summary_df, height=280)
+        st.dataframe(final_summary_df, height=300, use_container_width=True)
 
     final_sync_count_live = len(df_final_summary_display)
-    col_pb1, col_pb2 = st.columns([2, 1])
+    
+    # Action Bar 2: Push, Export CSV, Export Excel, WhatsApp Share, PDF & Clear
+    col_pb1, col_pb_csv, col_pb_xlsx, col_pb_wa, col_pb_pdf, col_pb2 = st.columns([1.5, 0.9, 0.9, 1.1, 1.1, 0.9])
+    
     with col_pb1:
-        if st.button(f"🚀 Push ({final_sync_count_live} Filtered Plots) to Sheet Tabs", disabled=(final_sync_count_live == 0)):
+        if st.button(f"🚀 Push ({final_sync_count_live}) to Sheets", disabled=(final_sync_count_live == 0)):
             if not gc_client:
                 st.error("Google Cloud credentials not found in secrets. Please configure GCP_SERVICE_ACCOUNT_JSON.")
             else:
@@ -966,21 +1155,20 @@ else:
                     for row in rows_list:
                         plot_val = str(row.get("Plot No", "")).strip()
                         row_data = [
-                            str(now_str), str(row.get("Category", "Selling")), str(phase), str(block),
+                            str(row.get("Date", now_str)), str(row.get("Category", "Selling")), str(phase), str(block),
                             str(plot_val), str(row.get("Size", "")), str(row.get("Plot Features", "Standard Layout")),
                             str(row.get("Demand / Price", "")), "Dealer", "", str(row.get("Contact No", "")),
-                            str(st.session_state['office_name']), "Available", "Direct Ingestion",
+                            str(st.session_state['office_name']), str(row.get("Deal Status", "Available")), "Direct Ingestion",
                             f"[AI Ingest] {str(row.get('Source Text', ''))}"
                         ]
                         rows_to_append.append(row_data)
                     
-                    # 500-Row Bulk Slice for Maximum Speed & Zero Quota Crash
                     BULK_SLICE_SIZE = 500
                     for i in range(0, len(rows_to_append), BULK_SLICE_SIZE):
                         chunk_slice = rows_to_append[i:i + BULK_SLICE_SIZE]
                         safe_gspread_call(ws.append_rows, chunk_slice, value_input_option="USER_ENTERED")
                         saved_count += len(chunk_slice)
-                        time.sleep(0.8)  # API Rate protection buffer
+                        time.sleep(0.8)
                     
                     progress_bar_sync.progress((idx + 1) / total_groups)
                 
@@ -989,8 +1177,46 @@ else:
                 st.success(f"🎉 **Push Complete!** Successfully saved ALL **{saved_count} listings** directly to Google Sheets!")
                 st.balloons()
 
+    with col_pb_csv:
+        if not df_final_summary_display.empty:
+            csv_export_bytes = df_final_summary_display.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label=f"📥 ({final_sync_count_live}) CSV",
+                data=csv_export_bytes,
+                file_name=f"DHA_CRM_Export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        else:
+            st.button("📥 CSV", disabled=True, use_container_width=True)
+
+    with col_pb_xlsx:
+        if not df_final_summary_display.empty:
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                df_final_summary_display.to_excel(writer, sheet_name="DHA Listings", index=False)
+            excel_bytes = excel_buffer.getvalue()
+            
+            st.download_button(
+                label=f"📊 ({final_sync_count_live}) Excel",
+                data=excel_bytes,
+                file_name=f"DHA_CRM_Workbook_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        else:
+            st.button("📊 Excel", disabled=True, use_container_width=True)
+
+    with col_pb_wa:
+        if st.button("📱 WhatsApp Share", disabled=df_final_summary_display.empty, use_container_width=True):
+            show_whatsapp_share_dialog(df_final_summary_display)
+
+    with col_pb_pdf:
+        if st.button("📄 PDF Catalog", disabled=df_final_summary_display.empty, use_container_width=True):
+            show_pdf_catalog_dialog(df_final_summary_display)
+
     with col_pb2:
-        if st.button("🗑️ Clear Extracted Summary Data"):
+        if st.button("🗑️ Clear Extracted", use_container_width=True):
             st.session_state["parsed_payloads"] = []
             st.session_state["extraction_active"] = False
             st.session_state["extraction_paused"] = False
@@ -1014,7 +1240,7 @@ else:
         label_visibility="collapsed"
     )
 
-    col_in_attach, col_in_btn = st.columns([3.6, 1.4])
+    col_in_attach, col_in_clear, col_in_btn = st.columns([3.0, 1.0, 1.0])
     
     with col_in_attach:
         with st.expander("➕ **Attach Sources (Files, Drive, OCR, Zameen, Newspapers)**", expanded=False):
@@ -1109,10 +1335,19 @@ else:
                         st.success("✅ Newspaper classified ads loaded into box!")
                         st.rerun()
 
+    # 🗑️ Clear Box Button
+    with col_in_clear:
+        if not st.session_state["extraction_active"]:
+            st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
+            if st.button("🗑️ Clear Box", key="btn_clear_ingestion_stream_box", use_container_width=True):
+                st.session_state["extracted_file_text"] = ""
+                st.session_state["uploaded_temp_text"] = ""
+                st.rerun()
+
     with col_in_btn:
         if not st.session_state["extraction_active"]:
             st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
-            if st.button("🚀 Extract", key="btn_run_stream_inner"):
+            if st.button("🚀 Extract", key="btn_run_stream_inner", use_container_width=True):
                 final_input_text = raw_text.strip()
                 if final_input_text:
                     chunks = split_raw_into_message_chunks(final_input_text, messages_per_chunk=100)
@@ -1145,20 +1380,20 @@ else:
         col_p1, col_p2, col_p3 = st.columns([1, 1, 1.2])
         with col_p1:
             if not st.session_state["extraction_paused"]:
-                if st.button("⏸️ Pause Extraction"):
+                if st.button("⏸️ Pause Extraction", use_container_width=True):
                     st.session_state["extraction_paused"] = True
                     st.rerun()
             else:
-                if st.button("▶️ Resume Extraction"):
+                if st.button("▶️ Resume Extraction", use_container_width=True):
                     st.session_state["extraction_paused"] = False
                     st.rerun()
         with col_p2:
-            if st.button("⏹️ Stop & Keep Extracted Data"):
+            if st.button("⏹️ Stop & Keep Extracted Data", use_container_width=True):
                 st.session_state["extraction_active"] = False
                 st.session_state["extraction_paused"] = False
                 st.rerun()
         with col_p3:
-            if st.button("❌ Cancel / Reset"):
+            if st.button("❌ Cancel / Reset", use_container_width=True):
                 st.session_state["extraction_active"] = False
                 st.session_state["extraction_paused"] = False
                 st.session_state["parsed_payloads"] = []
