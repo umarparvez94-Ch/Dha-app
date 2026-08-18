@@ -731,7 +731,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     "Office / Agency": st.session_state["office_name"],
                     "Deal Status": "Available",
                     "Last Conversation / Notes": "Direct Ingestion",
-                    "Raw Listing & Source Material": m_clean
+                    "Raw Listing & Source Material": line.strip()
                 })
                 continue
 
@@ -787,7 +787,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     "Office / Agency": st.session_state["office_name"],
                     "Deal Status": "Available",
                     "Last Conversation / Notes": "Direct Ingestion",
-                    "Raw Listing & Source Material": m_clean
+                    "Raw Listing & Source Material": line.strip()
                 })
 
         if not matched_in_message and main_phone:
@@ -813,7 +813,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
     return results
 
 # ==============================================================================
-# GEMINI 2.5 FLASH FORENSIC REAL ESTATE EXTRACTION ENGINE (UNCUT MASTER PROMPT)
+# GEMINI 2.5 FLASH FORENSIC REAL ESTATE EXTRACTION ENGINE (V8.1 SOURCE GRANULARITY)
 # ==============================================================================
 def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
@@ -838,26 +838,20 @@ Your explicit objective is to ingest messy, unorganized, highly-abbreviated, mix
 12. "Office / Agency": "{st.session_state['office_name']}"
 13. "Deal Status": 'Available'
 14. "Last Conversation / Notes": 'Direct Ingestion'
-15. "Raw Listing & Source Material": The exact unparsed message snippet for forensic audit.
+15. "Raw Listing & Source Material": The EXACT ISOLATED origin snippet for this listing (See Source Granularity Rule below).
+
+### V8.1 SOURCE DATA GRANULARITY & FORENSIC AUDIT RULE (COLUMN 11 / RAW LISTING):
+- "Raw Listing & Source Material": You MUST provide ONLY the exact, isolated single message snippet that generated this specific listing.
+- If the input is an exported WhatsApp chat file, extract and attach ONLY the single message block containing the plot details. Do NOT attach the entire 100-message chunk or surrounding irrelevant chatter.
+- If the input is direct text or multi-message pastes, isolate ONLY the relevant lines containing the specific plot, phase, block, demand, and phone number.
+- Under NO circumstances should one listing's source contain data from another unrelated listing in the chunk.
 
 ### CORE EXTRACTION & ALIGNMENT INTELLIGENCE:
-1. MULTI-LISTING DISAGGREGATION (One Record per Property):
-   - Split every distinct plot, pair, commercial shop, or investor requirement into its own separate JSON object.
-
-2. CONTEXTUAL HIERARCHY & HEADER INHERITANCE:
-   - Every single plot appearing beneath a section header must inherit that specific Phase and Size until a new divider explicitly changes it.
-   - If no header exists in the text stream, default strictly to Phase: "{default_phase}".
-
-3. ZERO-HALLUCINATION BLOCK ALIGNMENT:
-   - Match extracted blocks strictly against the Official Catalog provided below.
-   - Clean common dealer slang: 'Z2' -> 'Block Z-2', 'CCA1' -> 'CCA 1 Commercial', 'MB' -> 'Main Boulevard (MB) Commercial', 'BROADWAY' -> 'Broadway Commercial', 'ZONE 1' -> 'Zone 1 Commercial'.
-   - FORBIDDEN AS BLOCKS: 'DIRECT', 'MEETING', 'PAIR', 'DEMAND', 'CORNER', 'PARK', 'MAIN', 'SE', 'CA', 'POSSESSION', 'AFFIDAVIT', 'FILE', 'AVAILABLE'.
-
-4. STRICT SIZE NORMALIZATION:
-   - Must be one of: '5 Marla', '8 Marla', '10 Marla', '1 Kanal', '2 Kanal', '4 Marla Commercial', '8 Marla Commercial'.
-
-5. DATE TRACKING:
-   - Also include a "Date" key with value "{today_date}" for same-day deduplication logic.
+1. MULTI-LISTING DISAGGREGATION: Split every distinct plot into its own JSON object.
+2. CONTEXTUAL HIERARCHY: Every plot inherits Phase and Size until a new divider explicitly changes it. If none, default Phase to: "{default_phase}".
+3. ZERO-HALLUCINATION BLOCK ALIGNMENT: Match strictly against Official Catalog. Clean slang: 'Z2' -> 'Block Z-2', 'CCA1' -> 'CCA 1 Commercial', 'MB' -> 'Main Boulevard (MB) Commercial', 'BROADWAY' -> 'Broadway Commercial'.
+4. STRICT SIZE NORMALIZATION: '5 Marla', '8 Marla', '10 Marla', '1 Kanal', '2 Kanal', '4 Marla Commercial', '8 Marla Commercial'.
+5. DATE TRACKING: Include "Date" as "{today_date}" for same-day deduplication logic.
 
 OFFICIAL DHA PHASE & BLOCK CATALOG:
 {catalog_json_str}
@@ -1002,9 +996,9 @@ else:
     st.markdown("---")
 
     # ==========================================================================
-    # ALWAYS-LIVE REAL-TIME SUMMARY DASHBOARD TABLE
+    # ⚡ LIVE STREAMING SUMMARY AND EXTRACTED TABLE (V8.1 REALIGNMENT)
     # ==========================================================================
-    st.subheader("⚡ Live Summary Report & Multi-Phase Ingestion Center")
+    st.subheader("⚡ Live Streaming Summary and Extracted Table")
     total_parsed_now = len(st.session_state["parsed_payloads"])
 
     if total_parsed_now > 0:
@@ -1021,13 +1015,13 @@ else:
                 "Category": str(item.get("Category", "Selling")),
                 "Plot Features": str(item.get("Plot Features", "Standard Layout")),
                 "Deal Status": str(item.get("Deal Status", "Available")),
-                "Source Text": str(item.get("Raw Listing & Source Material", ""))
+                "Source Data": str(item.get("Raw Listing & Source Material", ""))
             })
         df_all_live = pd.DataFrame(base_data)
     else:
         df_all_live = pd.DataFrame(columns=[
             "Date", "Target Phase", "Target Tab", "Plot No", "Size", "Demand / Price",
-            "Contact No", "Category", "Plot Features", "Deal Status", "Source Text"
+            "Contact No", "Category", "Plot Features", "Deal Status", "Source Data"
         ])
 
     col_sc1, col_sc2, col_sc3, col_sc4 = st.columns([1.2, 1.4, 1.4, 1.2])
@@ -1123,7 +1117,7 @@ else:
             st.rerun()
 
     # ==========================================================================
-    # FULL INFINITE SCROLL SUMMARY TABLE DISPLAY (NO 50-ROW LIMIT)
+    # FULL INFINITE SCROLL SUMMARY TABLE DISPLAY (HEIGHT=520, NO 50-ROW LIMIT)
     # ==========================================================================
     if not df_final_summary_display.empty:
         if edit_summary_mode:
@@ -1190,7 +1184,7 @@ else:
                             str(plot_val), str(row.get("Size", "")), str(row.get("Plot Features", "Standard Layout")),
                             str(row.get("Demand / Price", "")), "Authorized Dealer", "", str(row.get("Contact No", "")),
                             str(st.session_state['office_name']), str(row.get("Deal Status", "Available")), "Direct Ingestion",
-                            f"[AI Ingest] {str(row.get('Source Text', ''))}"
+                            f"[AI Ingest] {str(row.get('Source Data', ''))}"
                         ]
                         rows_to_append.append(row_data)
                     
