@@ -72,7 +72,7 @@ try:
 except Exception:
     gemini_active = False
 
-# 2. Modern Responsive UI/UX Styling (Version 8.4 Safe Injection)
+# 2. Modern Responsive UI/UX Styling
 st.markdown("""<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"><style>#MainMenu, header, footer { visibility: hidden !important; height: 0 !important; }.stAppDeployButton { display: none !important; }.block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 100% !important; }.stApp { background-color: #F7F9FB !important; font-family: 'Inter', sans-serif !important; color: #191C1E !important; }.header-banner { background: linear-gradient(135deg, #00113A 0%, #102A6B 100%); padding: 16px 20px; border-radius: 12px; color: white; margin-bottom: 14px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; box-shadow: 0 4px 14px rgba(0, 17, 58, 0.1); }.header-title { font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 800; margin: 0; color: #FFFFFF; }.header-subtitle { color: #B3C5FF; font-size: 12px; margin-top: 2px; }.office-badge { background-color: #006B5E; color: #9FF2E1; padding: 4px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; }.stitch-login-box { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04); padding: 32px 28px; margin-bottom: 16px; text-align: center; }.stitch-avatar { width: 60px; height: 60px; border-radius: 50%; background-color: #D6E2FF; border: 1px solid #B3C5FF; display: inline-flex; align-items: center; justify-content: center; color: #00113A; margin-bottom: 12px; }div[role="radiogroup"] { display: flex !important; flex-direction: row !important; overflow-x: auto !important; white-space: nowrap !important; padding-bottom: 8px !important; gap: 8px !important; scrollbar-width: thin; }div[role="radiogroup"] label { background: #FFFFFF !important; border: 1px solid #C5C6D0 !important; border-radius: 20px !important; padding: 4px 14px !important; font-size: 12px !important; font-weight: 600 !important; color: #191C1E !important; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important; }.summary-card { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); display: flex; flex-wrap: wrap; gap: 8px; }.stat-pill { background: #ECEEF0; border-radius: 20px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #191C1E; display: inline-block; }.stat-pill b { color: #00113A; font-family: 'JetBrains Mono', monospace; }.stitch-card-container { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 12px; padding: 14px; box-shadow: 0 2px 8px rgba(0, 17, 58, 0.03); margin-bottom: 12px; }.control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 14px 18px; margin: 12px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.06); }.backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }.news-badge { display: inline-block; padding: 4px 10px; margin: 3px 2px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #00113A; background: #E2E8F0; border: 1px solid #CBD5E1; }.stButton > button { border-radius: 8px !important; font-weight: 600 !important; font-size: 13px !important; min-height: 38px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #00113A !important; transition: all 0.15s ease-in-out !important; }div[data-baseweb="select"] > div, div[data-baseweb="input"] > div, textarea { background-color: #FFFFFF !important; border: 1px solid #CBD5E1 !important; border-radius: 8px !important; color: #191C1E !important; font-size: 13px !important; }@media (max-width: 768px) { .header-banner { flex-direction: column; align-items: flex-start; } .stButton > button { width: 100% !important; } }</style>""", unsafe_allow_html=True)
 
 # 15 Canonical CRM Schema Columns
@@ -102,254 +102,44 @@ DHA_PHASE_SHEET_URLS = {
     "DHA Phase 12 (EME Sector)": "https://docs.google.com/spreadsheets/d/1Ai07OSySM4pcPV9yRr--fsMpKNPXtD2uwJx285_mPho/edit"
 }
 
-# Full Complete Official DHA Cutting Map Rules (All Phases & Blocks)
+# Full Complete Official DHA Cutting Map Rules
 DHA_CUTTING_MAP_RULES = {
-    "DHA Phase 1": {
-        "Block A": [(1, 800, "1 Kanal")],
-        "Block B": [(1, 900, "1 Kanal")],
-        "Block C": [(1, 850, "1 Kanal")],
-        "Block D": [(1, 750, "1 Kanal")],
-        "Block E": [(1, 600, "1 Kanal")],
-        "Block J": [(1, 700, "1 Kanal")],
-        "Block K": [(1, 650, "1 Kanal")],
-        "Block L": [(1, 800, "10 Marla")],
-        "Block M": [(1, 950, "10 Marla")],
-        "Block N": [(1, 1100, "5 Marla")],
-        "Block P": [(1, 1200, "5 Marla")]
-    },
-    "DHA Phase 2": {
-        "Block Q": [(1, 600, "1 Kanal")],
-        "Block R": [(1, 700, "1 Kanal")],
-        "Block S": [(1, 800, "1 Kanal")],
-        "Block T": [(1, 900, "10 Marla")],
-        "Block U": [(1, 1000, "10 Marla")],
-        "Block V": [(1, 1200, "5 Marla")]
-    },
-    "DHA Phase 3": {
-        "Block W": [(1, 500, "2 Kanal"), (501, 1100, "1 Kanal")],
-        "Block X": [(1, 400, "2 Kanal"), (401, 1000, "1 Kanal")],
-        "Block Y": [(1, 300, "2 Kanal"), (301, 900, "1 Kanal")],
-        "Block Z": [(1, 800, "1 Kanal")],
-        "Block XX": [(1, 950, "1 Kanal")]
-    },
-    "DHA Phase 4": {
-        "Block AA": [(1, 700, "1 Kanal")],
-        "Block BB": [(1, 800, "1 Kanal")],
-        "Block CC": [(1, 900, "1 Kanal")],
-        "Block DD": [(1, 650, "1 Kanal")],
-        "Block EE": [(1, 850, "10 Marla")],
-        "Block GG": [(1, 950, "10 Marla")],
-        "Block JJ": [(1, 1100, "10 Marla")],
-        "Block KK": [(1, 1200, "5 Marla")]
-    },
-    "DHA Phase 5": {
-        "Block A": [(1, 120, "2 Kanal"), (121, 500, "1 Kanal")],
-        "Block B": [(1, 80, "2 Kanal"), (81, 600, "1 Kanal")],
-        "Block C": [(1, 50, "2 Kanal"), (51, 450, "1 Kanal")],
-        "Block D": [(1, 600, "1 Kanal")],
-        "Block E": [(1, 550, "1 Kanal")],
-        "Block F": [(1, 500, "1 Kanal")],
-        "Block G": [(1, 350, "1 Kanal"), (351, 700, "10 Marla")],
-        "Block H": [(1, 400, "10 Marla"), (401, 800, "5 Marla")],
-        "Block J": [(1, 500, "10 Marla"), (501, 950, "5 Marla")],
-        "Block K": [(1, 600, "10 Marla")],
-        "Block L": [(1, 750, "10 Marla"), (751, 1200, "5 Marla")],
-        "Block M": [(1, 800, "5 Marla")]
-    },
-    "DHA Phase 6": {
-        "Block A": [(1, 150, "2 Kanal"), (151, 800, "1 Kanal")],
-        "Block B": [(1, 100, "2 Kanal"), (101, 700, "1 Kanal")],
-        "Block C": [(1, 650, "1 Kanal")],
-        "Block D": [(1, 700, "1 Kanal")],
-        "Block E": [(1, 550, "1 Kanal")],
-        "Block F": [(1, 600, "1 Kanal")],
-        "Block G": [(1, 650, "1 Kanal")],
-        "Block H": [(1, 700, "1 Kanal")],
-        "Block J": [(1, 600, "10 Marla")],
-        "Block K": [(1, 650, "10 Marla")],
-        "Block L": [(1, 800, "10 Marla"), (801, 1200, "5 Marla")],
-        "Block M": [(1, 850, "10 Marla")],
-        "Block N": [(1, 900, "10 Marla")]
-    },
-    "DHA Phase 7": {
-        "Block P": [(1, 1100, "1 Kanal")],
-        "Block Q": [(1, 900, "1 Kanal")],
-        "Block R": [(1, 1050, "1 Kanal")],
-        "Block S": [(1, 950, "1 Kanal")],
-        "Block T": [(1, 1200, "1 Kanal")],
-        "Block U": [(1, 1400, "1 Kanal")],
-        "Block V": [(1, 1000, "1 Kanal")],
-        "Block W": [(1, 1400, "10 Marla")],
-        "Block X": [(1, 1300, "10 Marla")],
-        "Block Y": [(1, 900, "5 Marla")],
-        "Block Z": [(1, 1100, "5 Marla")],
-        "Block Z-1": [(1, 800, "5 Marla")],
-        "Block Z-2": [(1, 750, "5 Marla")]
-    },
-    "DHA Phase 8 (Proper)": {
-        "Block A": [(1, 100, "2 Kanal"), (101, 550, "1 Kanal")],
-        "Block B": [(1, 80, "2 Kanal"), (81, 500, "1 Kanal")],
-        "Block C": [(1, 70, "2 Kanal"), (71, 480, "1 Kanal")],
-        "Block D": [(1, 600, "1 Kanal")],
-        "Block E": [(1, 550, "1 Kanal")],
-        "Block F": [(1, 500, "1 Kanal")],
-        "Block G": [(1, 520, "1 Kanal")],
-        "Block H": [(1, 480, "1 Kanal")],
-        "Block J": [(1, 510, "1 Kanal")],
-        "Block K": [(1, 560, "1 Kanal")],
-        "Block L": [(1, 620, "1 Kanal")],
-        "Block M": [(1, 580, "1 Kanal")],
-        "Block N": [(1, 610, "1 Kanal")],
-        "Block P": [(1, 640, "1 Kanal")],
-        "Block Q": [(1, 590, "1 Kanal")],
-        "Block R": [(1, 630, "1 Kanal")],
-        "Block S": [(1, 750, "10 Marla")],
-        "Block T": [(1, 800, "10 Marla"), (801, 1300, "5 Marla")],
-        "Block U": [(1, 900, "5 Marla")],
-        "Block V": [(1, 850, "5 Marla")],
-        "Block W": [(1, 700, "8 Marla")],
-        "Block X": [(1, 750, "8 Marla")],
-        "Block Y": [(1, 800, "8 Marla")]
-    },
-    "DHA Phase 8 (Ivy Green / Sector Z)": {
-        "Block Z-1": [(1, 700, "5 Marla")],
-        "Block Z-2": [(1, 800, "5 Marla")],
-        "Block Z-3": [(1, 900, "5 Marla")],
-        "Block Z-4": [(1, 750, "5 Marla")],
-        "Block Z-5": [(1, 650, "5 Marla")],
-        "Block Z-6": [(1, 600, "5 Marla")]
-    },
-    "DHA Phase 8 (Park View)": {
-        "Block A": [(1, 500, "2 Kanal"), (501, 1200, "1 Kanal")],
-        "Block B": [(1, 400, "2 Kanal"), (401, 1100, "1 Kanal")],
-        "Block C": [(1, 1000, "1 Kanal")],
-        "Block D": [(1, 950, "1 Kanal")],
-        "Block E": [(1, 900, "1 Kanal")],
-        "Block F": [(1, 850, "1 Kanal")],
-        "Block G": [(1, 800, "1 Kanal")],
-        "Block H": [(1, 750, "1 Kanal")],
-        "Block J": [(1, 1200, "10 Marla")],
-        "Block K": [(1, 1100, "10 Marla")]
-    },
-    "DHA Phase 8 (Air Avenue / Sector AA)": {
-        "Block L": [(1, 800, "1 Kanal")],
-        "Block M": [(1, 850, "1 Kanal")],
-        "Block N": [(1, 900, "1 Kanal")],
-        "Block P": [(1, 1100, "10 Marla")],
-        "Block Q": [(1, 1200, "10 Marla")],
-        "Block R": [(1, 1400, "5 Marla")]
-    },
-    "DHA Phase 9 Prism": {
-        "Block A": [(1, 600, "1 Kanal")],
-        "Block B": [(1, 550, "1 Kanal")],
-        "Block C": [(1, 700, "1 Kanal")],
-        "Block D": [(1, 650, "1 Kanal")],
-        "Block E": [(1, 500, "1 Kanal")],
-        "Block F": [(1, 700, "1 Kanal")],
-        "Block G": [(1, 600, "1 Kanal")],
-        "Block H": [(1, 650, "1 Kanal")],
-        "Block J": [(1, 1200, "10 Marla")],
-        "Block K": [(1, 1100, "10 Marla")],
-        "Block L": [(1, 1300, "10 Marla")],
-        "Block M": [(1, 1250, "10 Marla")],
-        "Block N": [(1, 1150, "10 Marla")],
-        "Block P": [(1, 1400, "5 Marla")],
-        "Block Q": [(1, 1600, "5 Marla")],
-        "Block R": [(1, 1800, "5 Marla")]
-    },
-    "DHA Phase 9 Town": {
-        "Block A": [(1, 900, "5 Marla")],
-        "Block B": [(1, 950, "5 Marla")],
-        "Block C": [(1, 1100, "8 Marla")],
-        "Block D": [(1, 850, "8 Marla")],
-        "Block E": [(1, 700, "10 Marla")]
-    },
-    "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)": {
-        "Sector 1": [(1, 600, "5 Marla")],
-        "Sector 2": [(1, 700, "5 Marla")],
-        "Sector 2 Extension": [(1, 500, "5 Marla")],
-        "Sector 3": [(1, 800, "5 Marla")],
-        "Sector 4": [(1, 900, "5 Marla")],
-        "Sector 5": [(1, 1000, "10 Marla")]
-    },
-    "DHA Phase 12 (EME Sector)": {
-        "Block A": [(1, 500, "2 Kanal"), (501, 1000, "1 Kanal")],
-        "Block B": [(1, 800, "1 Kanal")],
-        "Block C": [(1, 900, "1 Kanal")],
-        "Block D": [(1, 750, "1 Kanal")],
-        "Block E": [(1, 850, "10 Marla")],
-        "Block F": [(1, 950, "10 Marla")],
-        "Block G": [(1, 1100, "5 Marla")],
-        "Block H": [(1, 1200, "5 Marla")],
-        "Block J": [(1, 1050, "5 Marla")]
-    }
+    "DHA Phase 1": {"Block A": [(1, 800, "1 Kanal")], "Block B": [(1, 900, "1 Kanal")], "Block C": [(1, 850, "1 Kanal")], "Block D": [(1, 750, "1 Kanal")], "Block E": [(1, 600, "1 Kanal")], "Block J": [(1, 700, "1 Kanal")], "Block K": [(1, 650, "1 Kanal")], "Block L": [(1, 800, "10 Marla")], "Block M": [(1, 950, "10 Marla")], "Block N": [(1, 1100, "5 Marla")], "Block P": [(1, 1200, "5 Marla")]},
+    "DHA Phase 2": {"Block Q": [(1, 600, "1 Kanal")], "Block R": [(1, 700, "1 Kanal")], "Block S": [(1, 800, "1 Kanal")], "Block T": [(1, 900, "10 Marla")], "Block U": [(1, 1000, "10 Marla")], "Block V": [(1, 1200, "5 Marla")]},
+    "DHA Phase 3": {"Block W": [(1, 500, "2 Kanal"), (501, 1100, "1 Kanal")], "Block X": [(1, 400, "2 Kanal"), (401, 1000, "1 Kanal")], "Block Y": [(1, 300, "2 Kanal"), (301, 900, "1 Kanal")], "Block Z": [(1, 800, "1 Kanal")], "Block XX": [(1, 950, "1 Kanal")]},
+    "DHA Phase 4": {"Block AA": [(1, 700, "1 Kanal")], "Block BB": [(1, 800, "1 Kanal")], "Block CC": [(1, 900, "1 Kanal")], "Block DD": [(1, 650, "1 Kanal")], "Block EE": [(1, 850, "10 Marla")], "Block GG": [(1, 950, "10 Marla")], "Block JJ": [(1, 1100, "10 Marla")], "Block KK": [(1, 1200, "5 Marla")]},
+    "DHA Phase 5": {"Block A": [(1, 120, "2 Kanal"), (121, 500, "1 Kanal")], "Block B": [(1, 80, "2 Kanal"), (81, 600, "1 Kanal")], "Block C": [(1, 50, "2 Kanal"), (51, 450, "1 Kanal")], "Block D": [(1, 600, "1 Kanal")], "Block E": [(1, 550, "1 Kanal")], "Block F": [(1, 500, "1 Kanal")], "Block G": [(1, 350, "1 Kanal"), (351, 700, "10 Marla")], "Block H": [(1, 400, "10 Marla"), (401, 800, "5 Marla")], "Block J": [(1, 500, "10 Marla"), (501, 950, "5 Marla")], "Block K": [(1, 600, "10 Marla")], "Block L": [(1, 750, "10 Marla"), (751, 1200, "5 Marla")], "Block M": [(1, 800, "5 Marla")]},
+    "DHA Phase 6": {"Block A": [(1, 150, "2 Kanal"), (151, 800, "1 Kanal")], "Block B": [(1, 100, "2 Kanal"), (101, 700, "1 Kanal")], "Block C": [(1, 650, "1 Kanal")], "Block D": [(1, 700, "1 Kanal")], "Block E": [(1, 550, "1 Kanal")], "Block F": [(1, 600, "1 Kanal")], "Block G": [(1, 650, "1 Kanal")], "Block H": [(1, 700, "1 Kanal")], "Block J": [(1, 600, "10 Marla")], "Block K": [(1, 650, "10 Marla")], "Block L": [(1, 800, "10 Marla"), (801, 1200, "5 Marla")], "Block M": [(1, 850, "10 Marla")], "Block N": [(1, 900, "10 Marla")]},
+    "DHA Phase 7": {"Block P": [(1, 1100, "1 Kanal")], "Block Q": [(1, 900, "1 Kanal")], "Block R": [(1, 1050, "1 Kanal")], "Block S": [(1, 950, "1 Kanal")], "Block T": [(1, 1200, "1 Kanal")], "Block U": [(1, 1400, "1 Kanal")], "Block V": [(1, 1000, "1 Kanal")], "Block W": [(1, 1400, "10 Marla")], "Block X": [(1, 1300, "10 Marla")], "Block Y": [(1, 900, "5 Marla")], "Block Z": [(1, 1100, "5 Marla")], "Block Z-1": [(1, 800, "5 Marla")], "Block Z-2": [(1, 750, "5 Marla")]},
+    "DHA Phase 8 (Proper)": {"Block A": [(1, 100, "2 Kanal"), (101, 550, "1 Kanal")], "Block B": [(1, 80, "2 Kanal"), (81, 500, "1 Kanal")], "Block C": [(1, 70, "2 Kanal"), (71, 480, "1 Kanal")], "Block D": [(1, 600, "1 Kanal")], "Block E": [(1, 550, "1 Kanal")], "Block F": [(1, 500, "1 Kanal")], "Block G": [(1, 520, "1 Kanal")], "Block H": [(1, 480, "1 Kanal")], "Block J": [(1, 510, "1 Kanal")], "Block K": [(1, 560, "1 Kanal")], "Block L": [(1, 620, "1 Kanal")], "Block M": [(1, 580, "1 Kanal")], "Block N": [(1, 610, "1 Kanal")], "Block P": [(1, 640, "1 Kanal")], "Block Q": [(1, 590, "1 Kanal")], "Block R": [(1, 630, "1 Kanal")], "Block S": [(1, 750, "10 Marla")], "Block T": [(1, 800, "10 Marla"), (801, 1300, "5 Marla")], "Block U": [(1, 900, "5 Marla")], "Block V": [(1, 850, "5 Marla")], "Block W": [(1, 700, "8 Marla")], "Block X": [(1, 750, "8 Marla")], "Block Y": [(1, 800, "8 Marla")]},
+    "DHA Phase 8 (Ivy Green / Sector Z)": {"Block Z-1": [(1, 700, "5 Marla")], "Block Z-2": [(1, 800, "5 Marla")], "Block Z-3": [(1, 900, "5 Marla")], "Block Z-4": [(1, 750, "5 Marla")], "Block Z-5": [(1, 650, "5 Marla")], "Block Z-6": [(1, 600, "5 Marla")]},
+    "DHA Phase 8 (Park View)": {"Block A": [(1, 500, "2 Kanal"), (501, 1200, "1 Kanal")], "Block B": [(1, 400, "2 Kanal"), (401, 1100, "1 Kanal")], "Block C": [(1, 1000, "1 Kanal")], "Block D": [(1, 950, "1 Kanal")], "Block E": [(1, 900, "1 Kanal")], "Block F": [(1, 850, "1 Kanal")], "Block G": [(1, 800, "1 Kanal")], "Block H": [(1, 750, "1 Kanal")], "Block J": [(1, 1200, "10 Marla")], "Block K": [(1, 1100, "10 Marla")]},
+    "DHA Phase 8 (Air Avenue / Sector AA)": {"Block L": [(1, 800, "1 Kanal")], "Block M": [(1, 850, "1 Kanal")], "Block N": [(1, 900, "1 Kanal")], "Block P": [(1, 1100, "10 Marla")], "Block Q": [(1, 1200, "10 Marla")], "Block R": [(1, 1400, "5 Marla")]},
+    "DHA Phase 9 Prism": {"Block A": [(1, 600, "1 Kanal")], "Block B": [(1, 550, "1 Kanal")], "Block C": [(1, 700, "1 Kanal")], "Block D": [(1, 650, "1 Kanal")], "Block E": [(1, 500, "1 Kanal")], "Block F": [(1, 700, "1 Kanal")], "Block G": [(1, 600, "1 Kanal")], "Block H": [(1, 650, "1 Kanal")], "Block J": [(1, 1200, "10 Marla")], "Block K": [(1, 1100, "10 Marla")], "Block L": [(1, 1300, "10 Marla")], "Block M": [(1, 1250, "10 Marla")], "Block N": [(1, 1150, "10 Marla")], "Block P": [(1, 1400, "5 Marla")], "Block Q": [(1, 1600, "5 Marla")], "Block R": [(1, 1800, "5 Marla")]},
+    "DHA Phase 9 Town": {"Block A": [(1, 900, "5 Marla")], "Block B": [(1, 950, "5 Marla")], "Block C": [(1, 1100, "8 Marla")], "Block D": [(1, 850, "8 Marla")], "Block E": [(1, 700, "10 Marla")]},
+    "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)": {"Sector 1": [(1, 600, "5 Marla")], "Sector 2": [(1, 700, "5 Marla")], "Sector 2 Extension": [(1, 500, "5 Marla")], "Sector 3": [(1, 800, "5 Marla")], "Sector 4": [(1, 900, "5 Marla")], "Sector 5": [(1, 1000, "10 Marla")]},
+    "DHA Phase 12 (EME Sector)": {"Block A": [(1, 500, "2 Kanal"), (501, 1000, "1 Kanal")], "Block B": [(1, 800, "1 Kanal")], "Block C": [(1, 900, "1 Kanal")], "Block D": [(1, 750, "1 Kanal")], "Block E": [(1, 850, "10 Marla")], "Block F": [(1, 950, "10 Marla")], "Block G": [(1, 1100, "5 Marla")], "Block H": [(1, 1200, "5 Marla")], "Block J": [(1, 1050, "5 Marla")]}
 }
 
 # Complete DHA Phases & Block Tabs Catalog
 DHA_PHASE_BLOCK_CATALOG = {
-    "DHA Phase 1": {
-        "residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P"],
-        "commercial": ["Block F Commercial", "Block G Commercial", "Block H Commercial", "Block J Commercial", "Block M Commercial", "Sector Shops"]
-    },
-    "DHA Phase 2": {
-        "residential": ["Block Q", "Block R", "Block S", "Block T", "Block U", "Block V"],
-        "commercial": ["Commercial CCA", "Block R Commercial", "Block T Commercial", "Sector Shops"]
-    },
-    "DHA Phase 3": {
-        "residential": ["Block W", "Block X", "Block Y", "Block Z", "Block XX"],
-        "commercial": ["Y Block Commercial", "Z Block Commercial", "W Block Commercial", "Sector Shops"]
-    },
-    "DHA Phase 4": {
-        "residential": ["Block AA", "Block BB", "Block CC", "Block DD", "Block EE", "Block GG", "Block JJ", "Block KK"],
-        "commercial": ["CCA 1 Commercial", "CCA 2 Commercial", "Block DD Commercial", "Sector Shops"]
-    },
-    "DHA Phase 5": {
-        "residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M"],
-        "commercial": ["CCA 1 Commercial", "CCA 2 Commercial", "Sector Shops"]
-    },
-    "DHA Phase 6": {
-        "residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M", "Block N"],
-        "commercial": ["Main Boulevard (MB) Commercial", "CCA 1 Commercial", "CCA 2 Commercial", "Sector Shops"]
-    },
-    "DHA Phase 7": {
-        "residential": ["Block P", "Block Q", "Block R", "Block S", "Block T", "Block U", "Block V", "Block W", "Block X", "Block Y", "Block Z", "Block Z-1", "Block Z-2"],
-        "commercial": ["CCA 1 Commercial", "CCA 2 Commercial", "CCA 3 Commercial", "CCA 4 Commercial", "Sector Y Commercial", "Sector Shops"]
-    },
-    "DHA Phase 8 (Proper)": {
-        "residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P", "Block Q", "Block R", "Block S", "Block T", "Block U", "Block V", "Block W", "Block X", "Block Y"],
-        "commercial": ["Broadway Commercial", "Commercial CCA 1", "Commercial CCA 2", "Commercial CCA 3", "Sector Shops"]
-    },
-    "DHA Phase 8 (Ivy Green / Sector Z)": {
-        "residential": ["Block Z-1", "Block Z-2", "Block Z-3", "Block Z-4", "Block Z-5", "Block Z-6"],
-        "commercial": ["Commercial CCA Sector Z", "Sector Shops"]
-    },
-    "DHA Phase 8 (Park View)": {
-        "residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K"],
-        "commercial": ["Commercial Zone Park View", "Sector Shops"]
-    },
-    "DHA Phase 8 (Air Avenue / Sector AA)": {
-        "residential": ["Block L", "Block M", "Block N", "Block P", "Block Q", "Block R"],
-        "commercial": ["Commercial CCA Air Avenue"]
-    },
-    "DHA Phase 9 Prism": {
-        "residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P", "Block Q", "Block R"],
-        "commercial": ["Zone 1 Commercial", "Zone 2 Commercial", "Zone 3 Commercial", "Main Oval Commercial", "Prism Direct MB Commercial"]
-    },
-    "DHA Phase 9 Town": {
-        "residential": ["Block A", "Block B", "Block C", "Block D", "Block E"],
-        "commercial": ["Commercial CCA Phase 9 Town", "Sector Shops"]
-    },
-    "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)": {
-        "residential": ["Sector 1", "Sector 2", "Sector 2 Extension", "Sector 3", "Sector 4", "Sector 5"],
-        "commercial": ["Rahbar CCA 1", "Rahbar CCA 2", "Rahbar Sector 5 Commercial", "Sector Shops"]
-    },
-    "DHA Phase 12 (EME Sector)": {
-        "residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J"],
-        "commercial": ["Civic Centre EME", "Block D Commercial", "Block H Commercial", "Sector Shops"]
-    }
+    "DHA Phase 1": {"residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P"], "commercial": ["Block F Commercial", "Block G Commercial", "Block H Commercial", "Block J Commercial", "Block M Commercial", "Sector Shops"]},
+    "DHA Phase 2": {"residential": ["Block Q", "Block R", "Block S", "Block T", "Block U", "Block V"], "commercial": ["Commercial CCA", "Block R Commercial", "Block T Commercial", "Sector Shops"]},
+    "DHA Phase 3": {"residential": ["Block W", "Block X", "Block Y", "Block Z", "Block XX"], "commercial": ["Y Block Commercial", "Z Block Commercial", "W Block Commercial", "Sector Shops"]},
+    "DHA Phase 4": {"residential": ["Block AA", "Block BB", "Block CC", "Block DD", "Block EE", "Block GG", "Block JJ", "Block KK"], "commercial": ["CCA 1 Commercial", "CCA 2 Commercial", "Block DD Commercial", "Sector Shops"]},
+    "DHA Phase 5": {"residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M"], "commercial": ["CCA 1 Commercial", "CCA 2 Commercial", "Sector Shops"]},
+    "DHA Phase 6": {"residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M", "Block N"], "commercial": ["Main Boulevard (MB) Commercial", "CCA 1 Commercial", "CCA 2 Commercial", "Sector Shops"]},
+    "DHA Phase 7": {"residential": ["Block P", "Block Q", "Block R", "Block S", "Block T", "Block U", "Block V", "Block W", "Block X", "Block Y", "Block Z", "Block Z-1", "Block Z-2"], "commercial": ["CCA 1 Commercial", "CCA 2 Commercial", "CCA 3 Commercial", "CCA 4 Commercial", "Sector Y Commercial", "Sector Shops"]},
+    "DHA Phase 8 (Proper)": {"residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P", "Block Q", "Block R", "Block S", "Block T", "Block U", "Block V", "Block W", "Block X", "Block Y"], "commercial": ["Broadway Commercial", "Commercial CCA 1", "Commercial CCA 2", "Commercial CCA 3", "Sector Shops"]},
+    "DHA Phase 8 (Ivy Green / Sector Z)": {"residential": ["Block Z-1", "Block Z-2", "Block Z-3", "Block Z-4", "Block Z-5", "Block Z-6"], "commercial": ["Commercial CCA Sector Z", "Sector Shops"]},
+    "DHA Phase 8 (Park View)": {"residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K"], "commercial": ["Commercial Zone Park View", "Sector Shops"]},
+    "DHA Phase 8 (Air Avenue / Sector AA)": {"residential": ["Block L", "Block M", "Block N", "Block P", "Block Q", "Block R"], "commercial": ["Commercial CCA Air Avenue"]},
+    "DHA Phase 9 Prism": {"residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P", "Block Q", "Block R"], "commercial": ["Zone 1 Commercial", "Zone 2 Commercial", "Zone 3 Commercial", "Main Oval Commercial", "Prism Direct MB Commercial"]},
+    "DHA Phase 9 Town": {"residential": ["Block A", "Block B", "Block C", "Block D", "Block E"], "commercial": ["Commercial CCA Phase 9 Town", "Sector Shops"]},
+    "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)": {"residential": ["Sector 1", "Sector 2", "Sector 2 Extension", "Sector 3", "Sector 4", "Sector 5"], "commercial": ["Rahbar CCA 1", "Rahbar CCA 2", "Rahbar Sector 5 Commercial", "Sector Shops"]},
+    "DHA Phase 12 (EME Sector)": {"residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block F", "Block G", "Block H", "Block J"], "commercial": ["Civic Centre EME", "Block D Commercial", "Block H Commercial", "Sector Shops"]}
 }
 
-# Cutting Size Map Resolver
 def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
     cleaned_size = str(extracted_size).strip() if extracted_size else ""
     if cleaned_size and cleaned_size.lower() not in ["n/a", "unknown", "none", ""]:
@@ -365,7 +155,6 @@ def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
             return official_sz
     return ""
 
-# Google Spreadsheets Client Safe Handshake
 @st.cache_resource
 def get_gspread_client():
     try:
@@ -378,14 +167,12 @@ def get_gspread_client():
                 creds_dict["private_key"] = creds_dict["private_key"].replace('\\n', '\n')
         else:
             return None
-                
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         credentials = service_account.Credentials.from_service_account_info(creds_dict, scopes=scope)
         return gspread.authorize(credentials)
     except Exception:
         return None
 
-# Google Cloud API 429 Exponential Backoff Retrier
 def safe_gspread_call(func, *args, **kwargs):
     retries = 10
     delay = 2.5
@@ -642,22 +429,11 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
     return file_bytes.decode('utf-8', errors='ignore')
 
 def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
-    msg_split_pattern = r'(?=\n?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2})'
-    raw_messages = re.split(msg_split_pattern, raw_text)
-    clean_messages = []
-    for msg in raw_messages:
-        m_str = msg.strip()
-        if not m_str:
-            continue
-        if "Messages and calls are end-to-end encrypted" in m_str or "<Media omitted>" in m_str or "security code changed" in m_str:
-            continue
-        clean_messages.append(m_str)
-    if not clean_messages:
-        clean_messages = [l.strip() for l in raw_text.splitlines() if l.strip()]
+    lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
     chunks = []
-    for i in range(0, len(clean_messages), messages_per_chunk):
-        chunk_batch = clean_messages[i:i + messages_per_chunk]
-        chunks.append("\n\n===MESSAGE_START===\n" + "\n\n===MESSAGE_START===\n".join(chunk_batch))
+    for i in range(0, len(lines), messages_per_chunk):
+        chunk_batch = lines[i:i + messages_per_chunk]
+        chunks.append("\n".join(chunk_batch))
     return chunks
 
 def fetch_content_from_gdrive_url(drive_url):
@@ -717,112 +493,90 @@ def detect_phase_from_header(line_up):
         return "DHA Phase 1"
     return None
 
+# Robust Line-By-Line Parser Engine
 def smart_accurate_rule_parser(chunk_text, default_phase):
-    messages = chunk_text.split("===MESSAGE_START===")
     results = []
+    lines = [clean_line_from_artifacts(l) for l in chunk_text.splitlines() if clean_line_from_artifacts(l)]
+    active_phase = default_phase
+    
     FORBIDDEN_BLOCK_WORDS = {
         "PHASE", "PH", "SECTOR", "DHA", "CCA", "COMMERCIAL", "PAIR", "DEMAND", "ASKING",
         "OFFER", "FINAL", "DIRECT", "MEETING", "COMPLETE", "FILE", "PAPER", "CORNER", "PARK",
         "ROAD", "FACING", "POSSESSION", "RS", "LAC", "LACS", "CRORE", "CR", "KANAL", "MARLA",
         "MAIN", "NEAR", "BOULEVARD", "ZONE", "SE", "CA", "TH", "ST", "ND", "RD"
     }
-    for msg in messages:
-        m_clean = msg.strip()
-        if not m_clean:
-            continue
-        phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', m_clean)
+
+    for line in lines:
+        l_up = line.upper()
+        ph_found = detect_phase_from_header(l_up)
+        if ph_found:
+            active_phase = ph_found
+            
+        phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', line)
         main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else ""
-        active_phase = detect_phase_from_header(m_clean.upper()) or default_phase
-        lines = [clean_line_from_artifacts(l) for l in m_clean.splitlines() if clean_line_from_artifacts(l)]
-        current_section_phase = active_phase
-        current_section_size = ""
-        matched_in_message = False
-        for line in lines:
-            l_up = line.upper()
-            ph_found = detect_phase_from_header(l_up)
-            if ph_found:
-                current_section_phase = ph_found
-                continue
-            if "1 KANAL" in l_up:
-                current_section_size = "1 Kanal"
-            elif "2 KANAL" in l_up:
-                current_section_size = "2 Kanal"
-            elif "10 MARLA" in l_up or "10M" in l_up:
-                current_section_size = "10 Marla"
-            elif "5 MARLA" in l_up or "5M" in l_up:
-                current_section_size = "5 Marla"
-            elif "4 MARLA" in l_up or "4M" in l_up:
-                current_section_size = "4 Marla"
-            elif "8 MARLA" in l_up or "8M" in l_up:
-                current_section_size = "8 Marla"
 
-            cca_match = re.search(r'CCA\s*([0-9])?\s*([A-Z])?\s*[-.:_/# ]\s*([0-9]{1,4})\s*(?:@|RS|DEMAND)?\s*([0-9]{2,5})?\s*(LAC|LACS|CRORE|CR)?', l_up)
-            if cca_match:
-                matched_in_message = True
-                cca_num = cca_match.group(1) or "1"
-                blk_cca = f"CCA {cca_num} Commercial"
-                plt_num = cca_match.group(3)
-                prc_val = cca_match.group(4)
-                prc_unit = cca_match.group(5) or "Lac"
-                prc_str = f"{prc_val} {prc_unit}".strip() if prc_val else ""
-                results.append({
-                    "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "Date": datetime.now().strftime("%Y-%m-%d"),
-                    "Category": "Selling",
-                    "Phase": current_section_phase,
-                    "Block": blk_cca,
-                    "Plot No": f"Plot {plt_num}",
-                    "Size": current_section_size if current_section_size else "4 Marla Commercial",
-                    "Plot Features": "Commercial / CCA",
-                    "Demand / Price": prc_str,
-                    "Seller Type": "Authorized Dealer",
-                    "Seller / Dealer Name": "",
-                    "Contact No": main_phone,
-                    "Office / Agency": st.session_state["office_name"],
-                    "Deal Status": "Available",
-                    "Last Conversation / Notes": "Direct Ingestion",
-                    "Raw Listing & Source Material": line.strip()
-                })
-                continue
+        # Check for CCA match
+        cca_match = re.search(r'CCA\s*([0-9])?\s*([A-Z])?.*?(?:PLOT|NO|#)?\s*([0-9]{1,4})', l_up)
+        # Check for Standard Plot match (e.g. Block A plot 125 or A-125)
+        p_match = re.search(r'(?:BLOCK\s+)?([A-Z]{1,2}[0-9]?)\s+(?:PLOT|NO|#)?\s*([0-9]{1,5}(?:[+/][0-9]{1,5})?)', l_up)
+        
+        # Price match (e.g. 425 lac, 3.5 crore)
+        prc_match = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*(LAC|LACS|CRORE|CR)', l_up)
+        prc_str = f"{prc_match.group(1)} {prc_match.group(2).capitalize()}" if prc_match else ""
 
-            p_match = re.search(r'(?:^|[\s*])([A-Z]{1,2}[0-9]?)\s*[\.\-_/:\s]+\s*([0-9]{1,5}(?:[+/][0-9]{1,5})?)\s*(?:@|RS|DEMAND|ASKING|[:\s-])?\s*([0-9]{2,5}(?:\.[0-9]+)?)?\s*(LAC|LACS|CRORE|CR)?', l_up)
-            if p_match:
-                raw_b = p_match.group(1).strip()
-                if raw_b in FORBIDDEN_BLOCK_WORDS or len(raw_b) > 3:
-                    continue
-                matched_in_message = True
+        # Size match
+        sz_str = ""
+        if "1 KANAL" in l_up or "1K" in l_up:
+            sz_str = "1 Kanal"
+        elif "2 KANAL" in l_up or "2K" in l_up:
+            sz_str = "2 Kanal"
+        elif "10 MARLA" in l_up or "10M" in l_up:
+            sz_str = "10 Marla"
+        elif "5 MARLA" in l_up or "5M" in l_up:
+            sz_str = "5 Marla"
+        elif "4 MARLA" in l_up or "4M" in l_up:
+            sz_str = "4 Marla"
+        elif "8 MARLA" in l_up or "8M" in l_up:
+            sz_str = "8 Marla"
+
+        feat = "Corner" if "CORNER" in l_up else ("Park Facing" if "PARK" in l_up else ("Possession" if "POSSESSION" in l_up else "Standard Layout"))
+
+        if cca_match:
+            cca_num = cca_match.group(1) or "1"
+            blk_cca = f"CCA {cca_num} Commercial"
+            plt_num = cca_match.group(3)
+            results.append({
+                "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "Date": datetime.now().strftime("%Y-%m-%d"),
+                "Category": "Selling",
+                "Phase": active_phase,
+                "Block": blk_cca,
+                "Plot No": f"Plot {plt_num}",
+                "Size": sz_str if sz_str else "4 Marla Commercial",
+                "Plot Features": "Commercial / CCA",
+                "Demand / Price": prc_str,
+                "Seller Type": "Authorized Dealer",
+                "Seller / Dealer Name": "",
+                "Contact No": main_phone,
+                "Office / Agency": st.session_state["office_name"],
+                "Deal Status": "Available",
+                "Last Conversation / Notes": "Direct Ingestion",
+                "Raw Listing & Source Material": line.strip()
+            })
+        elif p_match:
+            raw_b = p_match.group(1).strip()
+            if raw_b not in FORBIDDEN_BLOCK_WORDS:
                 raw_p = p_match.group(2).strip()
-                raw_prc = p_match.group(3)
-                raw_unit = p_match.group(4) or "Lac"
-                prc_str = f"{raw_prc} {raw_unit}".strip() if raw_prc else ""
-                if raw_b.startswith("Z") and len(raw_b) == 2 and raw_b[1].isdigit():
-                    blk_str = f"Block Z-{raw_b[1]}"
-                elif raw_b.startswith("BLOCK"):
-                    blk_str = raw_b
-                else:
-                    blk_str = f"Block {raw_b}"
-                sz_str = ""
-                if "5 MARLA" in l_up or "5M" in l_up:
-                    sz_str = "5 Marla"
-                elif "10 MARLA" in l_up or "10M" in l_up:
-                    sz_str = "10 Marla"
-                elif "2 KANAL" in l_up or "2K" in l_up:
-                    sz_str = "2 Kanal"
-                elif "1 KANAL" in l_up or "1K" in l_up:
-                    sz_str = "1 Kanal"
-                elif current_section_size:
-                    sz_str = current_section_size
-                else:
-                    sz_str = resolve_size_text_first_or_map(current_section_phase, blk_str, f"Plot {raw_p}", "")
-                feat = "Corner" if "CORNER" in l_up else ("Park Facing" if "PARK" in l_up else ("Possession" if "POSSESSION" in l_up else "Standard Layout"))
+                blk_str = f"Block Z-{raw_b[1]}" if (raw_b.startswith("Z") and len(raw_b) == 2 and raw_b[1].isdigit()) else f"Block {raw_b}"
+                final_sz = sz_str if sz_str else resolve_size_text_first_or_map(active_phase, blk_str, f"Plot {raw_p}", "")
                 results.append({
                     "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "Date": datetime.now().strftime("%Y-%m-%d"),
                     "Category": "Selling",
-                    "Phase": current_section_phase,
+                    "Phase": active_phase,
                     "Block": blk_str,
                     "Plot No": f"Plot {raw_p}",
-                    "Size": sz_str,
+                    "Size": final_sz,
                     "Plot Features": feat,
                     "Demand / Price": prc_str,
                     "Seller Type": "Authorized Dealer",
@@ -833,7 +587,7 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     "Last Conversation / Notes": "Direct Ingestion",
                     "Raw Listing & Source Material": line.strip()
                 })
-        if not matched_in_message and main_phone:
+        elif main_phone and len(line) > 15:
             results.append({
                 "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "Date": datetime.now().strftime("%Y-%m-%d"),
@@ -841,16 +595,16 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 "Phase": active_phase,
                 "Block": "General Lead",
                 "Plot No": "General Option / Portfolio",
-                "Size": "",
+                "Size": sz_str,
                 "Plot Features": "Direct Broadcast / Portfolio",
-                "Demand / Price": "",
+                "Demand / Price": prc_str,
                 "Seller Type": "Authorized Dealer",
                 "Seller / Dealer Name": "",
                 "Contact No": main_phone,
                 "Office / Agency": st.session_state["office_name"],
                 "Deal Status": "Available",
                 "Last Conversation / Notes": "Direct Ingestion",
-                "Raw Listing & Source Material": m_clean
+                "Raw Listing & Source Material": line.strip()
             })
     return results
 
@@ -859,39 +613,34 @@ def process_single_chunk_via_gemini(chunk_text, default_phase):
     today_date = datetime.now().strftime("%Y-%m-%d")
     now_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     system_prompt = f"""You are the Master DHA Lahore Real Estate Data Pipeline Architect & Forensic Text Parsing Specialist.
-Your explicit objective is to ingest messy, unorganized, highly-abbreviated, mixed-dealer WhatsApp broadcasts and restructure them into perfectly normalized, aligned CRM JSON records with 100% precision.
+Your explicit objective is to ingest messy, unorganized, highly-abbreviated, mixed-dealer WhatsApp broadcasts and extract EVERY SINGLE PROPERTY LISTING into a structured JSON array.
 
-### STRICT 15-COLUMN CANONICAL CRM SCHEMA (MANDATORY KEYS FOR EVERY JSON OBJECT):
+CRITICAL INSTRUCTION: Each bullet point or line containing a property details MUST be parsed as a SEPARATE JSON OBJECT. Do NOT combine multiple plots into one.
+
+STRICT 15-COLUMN CANONICAL CRM SCHEMA FOR EVERY OBJECT:
 1. "Date / Timestamp": "{now_timestamp}"
-2. "Category": 'Selling', 'Buying', or 'Rental' (Default: 'Selling')
+2. "Category": 'Selling'
 3. "Phase": The exact DHA Phase name matched to catalog.
-4. "Block": The exact Canonical Block / CCA name.
-5. "Plot No": Extracted isolated plot identifier (e.g. 'Plot 450', 'Plot 112/4', 'Plot 890+891').
-6. "Size": Strict normalized property cutting size.
-7. "Plot Features": Extracted key features ('Corner', 'Facing Park', 'Main Boulevard (MB)', '100ft Road', 'Direct Approach', 'Possession', 'Non-Possession', 'Standard Layout').
-8. "Demand / Price": Normalized asking rate in 'X Lac' or 'X Crore' (e.g. '585 Lac', '5.85 Crore', '325 Lac'). If missing, leave empty string "".
-9. "Seller Type": 'Authorized Dealer' or 'Direct Owner' (Default: 'Authorized Dealer').
-10. "Seller / Dealer Name": Extracted dealer/owner name if mentioned, else empty string "".
+4. "Block": The exact Canonical Block / CCA name (e.g. 'Block A', 'Block J', 'CCA 1 Commercial').
+5. "Plot No": Extracted isolated plot identifier (e.g. 'Plot 125', 'Plot 450', 'Plot 18').
+6. "Size": Strict normalized property cutting size ('1 Kanal', '10 Marla', '5 Marla', '4 Marla Commercial').
+7. "Plot Features": Extracted key features ('Corner', 'Facing Park', 'Main Boulevard (MB)', 'Possession', 'Standard Layout').
+8. "Demand / Price": Normalized asking rate in 'X Lac' or 'X Crore' (e.g. '425 Lac', '3.5 Crore', '115 Lac').
+9. "Seller Type": 'Authorized Dealer'
+10. "Seller / Dealer Name": Extracted dealer name if mentioned, else "".
 11. "Contact No": Clean Pakistani phone format ('03XXXXXXXXX' or '+923XXXXXXXXX').
 12. "Office / Agency": "{st.session_state['office_name']}"
 13. "Deal Status": 'Available'
 14. "Last Conversation / Notes": 'Direct Ingestion'
-15. "Raw Listing & Source Material": The EXACT ISOLATED origin snippet for this listing (See Source Granularity Rule below).
+15. "Raw Listing & Source Material": The EXACT single line text of this specific listing.
 
-### SOURCE DATA GRANULARITY & FORENSIC AUDIT RULE (COLUMN 11 / RAW LISTING):
-- "Raw Listing & Source Material": You MUST provide ONLY the exact, isolated single message snippet that generated this specific listing.
-- If the input is an exported WhatsApp chat file, extract and attach ONLY the single message block containing the plot details. Do NOT attach the entire 100-message chunk or surrounding irrelevant chatter.
-- If the input is direct text or multi-message pastes, isolate ONLY the relevant lines containing the specific plot, phase, block, demand, and phone number.
-- Under NO circumstances should one listing's source contain data from another unrelated listing in the chunk.
-
-OFFICIAL DHA PHASE & BLOCK CATALOG:
+OFFICIAL CATALOG:
 {catalog_json_str}
 
-INPUT MESSY WHATSAPP STREAM:
+INPUT TEXT:
 {chunk_text}
 
-OUTPUT SPECIFICATION:
-Return ONLY a valid JSON array of objects strictly conforming to the 15 canonical keys above. Strictly no explanations, markdown ticks (```json), or commentary.
+OUTPUT: Return ONLY a valid JSON array of objects. No explanations or markdown commentary.
 """
     if gemini_active and gemini_client:
         try:
@@ -1141,7 +890,7 @@ else:
                         st.session_state["uploaded_temp_text"] = ""
                         st.rerun()
             with tab_gdrive:
-                gdrive_url_in = st.text_input("G-Drive Link:", placeholder="[https://drive.google.com/](https://drive.google.com/)...", key="inner_gdrive_in")
+                gdrive_url_in = st.text_input("G-Drive Link:", placeholder="https://drive.google.com/...", key="inner_gdrive_in")
                 if st.button("📥 Load Drive", key="btn_push_gdrive_inner"):
                     if gdrive_url_in.strip():
                         gdrive_content = fetch_content_from_gdrive_url(gdrive_url_in.strip())
@@ -1160,7 +909,7 @@ else:
                     st.session_state["extracted_file_text"] = pasted_txt.strip()
                     st.rerun()
             with tab_zameen:
-                portal_url = st.text_input("Zameen URL:", placeholder="[https://www.zameen.com/](https://www.zameen.com/)...", key="inner_portal_in")
+                portal_url = st.text_input("Zameen URL:", placeholder="https://www.zameen.com/...", key="inner_portal_in")
                 if st.button("🌐 Load Portal", key="btn_push_portal_inner"):
                     portal_raw = fetch_text_from_portal_url(portal_url.strip())
                     st.session_state["extracted_file_text"] = portal_raw
@@ -1168,12 +917,12 @@ else:
             with tab_news:
                 st.markdown("""
                     <b>📰 Quick Access to Newspaper Portals:</b><br>
-                    <a href="[https://classified.jang.com.pk](https://classified.jang.com.pk)" target="_blank" class="news-badge">📰 Daily Jang ↗</a>
-                    <a href="[https://classifieds.dawn.com](https://classifieds.dawn.com)" target="_blank" class="news-badge">📰 Daily Dawn ↗</a>
-                    <a href="[https://express.pk/epaper](https://express.pk/epaper)" target="_blank" class="news-badge">📰 Daily Express ↗</a>
-                    <a href="[https://e.thenews.com.pk](https://e.thenews.com.pk)" target="_blank" class="news-badge">📰 The News ↗</a>
-                    <a href="[https://epaper.nawaiwaqt.com.pk](https://epaper.nawaiwaqt.com.pk)" target="_blank" class="news-badge">📰 Daily Nawa-i-Waqt ↗</a>
-                    <a href="[https://e.dunya.com.pk](https://e.dunya.com.pk)" target="_blank" class="news-badge">📰 Daily Dunya ↗</a>
+                    <a href="https://classified.jang.com.pk" target="_blank" class="news-badge">📰 Daily Jang ↗</a>
+                    <a href="https://classifieds.dawn.com" target="_blank" class="news-badge">📰 Daily Dawn ↗</a>
+                    <a href="https://express.pk/epaper" target="_blank" class="news-badge">📰 Daily Express ↗</a>
+                    <a href="https://e.thenews.com.pk" target="_blank" class="news-badge">📰 The News ↗</a>
+                    <a href="https://epaper.nawaiwaqt.com.pk" target="_blank" class="news-badge">📰 Daily Nawa-i-Waqt ↗</a>
+                    <a href="https://e.dunya.com.pk" target="_blank" class="news-badge">📰 Daily Dunya ↗</a>
                 """, unsafe_allow_html=True)
                 news_txt = st.text_area("Paste News Text:", height=80, key="inner_news_in")
                 if st.button("📥 Load News", key="btn_push_news_inner"):
