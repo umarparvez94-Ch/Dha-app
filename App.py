@@ -58,8 +58,6 @@ if "all_chunks" not in st.session_state:
     st.session_state["all_chunks"] = []
 if "current_chunk_idx" not in st.session_state:
     st.session_state["current_chunk_idx"] = 0
-if "extraction_default_phase" not in st.session_state:
-    st.session_state["extraction_default_phase"] = "DHA Phase 9 Prism"
 
 # Safe Gemini Client Activation
 gemini_client = None
@@ -75,7 +73,7 @@ except Exception:
 # 2. Modern Responsive UI/UX Styling
 st.markdown("""<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"><style>#MainMenu, header, footer { visibility: hidden !important; height: 0 !important; }.stAppDeployButton { display: none !important; }.block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 100% !important; }.stApp { background-color: #F7F9FB !important; font-family: 'Inter', sans-serif !important; color: #191C1E !important; }.header-banner { background: linear-gradient(135deg, #00113A 0%, #102A6B 100%); padding: 16px 20px; border-radius: 12px; color: white; margin-bottom: 14px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; box-shadow: 0 4px 14px rgba(0, 17, 58, 0.1); }.header-title { font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 800; margin: 0; color: #FFFFFF; }.header-subtitle { color: #B3C5FF; font-size: 12px; margin-top: 2px; }.office-badge { background-color: #006B5E; color: #9FF2E1; padding: 4px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; }.stitch-login-box { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04); padding: 32px 28px; margin-bottom: 16px; text-align: center; }.stitch-avatar { width: 60px; height: 60px; border-radius: 50%; background-color: #D6E2FF; border: 1px solid #B3C5FF; display: inline-flex; align-items: center; justify-content: center; color: #00113A; margin-bottom: 12px; }div[role="radiogroup"] { display: flex !important; flex-direction: row !important; overflow-x: auto !important; white-space: nowrap !important; padding-bottom: 8px !important; gap: 8px !important; scrollbar-width: thin; }div[role="radiogroup"] label { background: #FFFFFF !important; border: 1px solid #C5C6D0 !important; border-radius: 20px !important; padding: 4px 14px !important; font-size: 12px !important; font-weight: 600 !important; color: #191C1E !important; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important; }.summary-card { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); display: flex; flex-wrap: wrap; gap: 8px; }.stat-pill { background: #ECEEF0; border-radius: 20px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #191C1E; display: inline-block; }.stat-pill b { color: #00113A; font-family: 'JetBrains Mono', monospace; }.stitch-card-container { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 12px; padding: 14px; box-shadow: 0 2px 8px rgba(0, 17, 58, 0.03); margin-bottom: 12px; }.control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 14px 18px; margin: 12px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.06); }.backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }.news-badge { display: inline-block; padding: 4px 10px; margin: 3px 2px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #00113A; background: #E2E8F0; border: 1px solid #CBD5E1; }.stButton > button { border-radius: 8px !important; font-weight: 600 !important; font-size: 13px !important; min-height: 38px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #00113A !important; transition: all 0.15s ease-in-out !important; }div[data-baseweb="select"] > div, div[data-baseweb="input"] > div, textarea { background-color: #FFFFFF !important; border: 1px solid #CBD5E1 !important; border-radius: 8px !important; color: #191C1E !important; font-size: 13px !important; }@media (max-width: 768px) { .header-banner { flex-direction: column; align-items: flex-start; } .stButton > button { width: 100% !important; } }</style>""", unsafe_allow_html=True)
 
-# 15 Canonical CRM Schema Columns
+# 15 Canonical CRM Schema Columns for Google Sheets Backend
 CRM_SHEET_HEADERS = [
     "Date / Timestamp", "Category", "Phase", "Block", "Plot No",
     "Size", "Plot Features", "Demand / Price", "Seller Type",
@@ -102,7 +100,7 @@ DHA_PHASE_SHEET_URLS = {
     "DHA Phase 12 (EME Sector)": "https://docs.google.com/spreadsheets/d/1Ai07OSySM4pcPV9yRr--fsMpKNPXtD2uwJx285_mPho/edit"
 }
 
-# Full Complete Official DHA Cutting Map Rules
+# Full Official DHA Cutting Map Rules
 DHA_CUTTING_MAP_RULES = {
     "DHA Phase 1": {"Block A": [(1, 800, "1 Kanal")], "Block B": [(1, 900, "1 Kanal")], "Block C": [(1, 850, "1 Kanal")], "Block D": [(1, 750, "1 Kanal")], "Block E": [(1, 600, "1 Kanal")], "Block J": [(1, 700, "1 Kanal")], "Block K": [(1, 650, "1 Kanal")], "Block L": [(1, 800, "10 Marla")], "Block M": [(1, 950, "10 Marla")], "Block N": [(1, 1100, "5 Marla")], "Block P": [(1, 1200, "5 Marla")]},
     "DHA Phase 2": {"Block Q": [(1, 600, "1 Kanal")], "Block R": [(1, 700, "1 Kanal")], "Block S": [(1, 800, "1 Kanal")], "Block T": [(1, 900, "10 Marla")], "Block U": [(1, 1000, "10 Marla")], "Block V": [(1, 1200, "5 Marla")]},
@@ -316,10 +314,10 @@ def show_whatsapp_share_dialog(df_share):
         "----------------------------------------"
     ]
     for idx, (_, row) in enumerate(df_share.iterrows(), 1):
-        p_str = f"*{row.get('Target Phase', '')} - {row.get('Target Tab', '')}*"
+        p_str = f"*{row.get('Phase', '')} - {row.get('Block No', '')}*"
         plt = row.get('Plot No', '')
         sz = row.get('Size', '')
-        dem = row.get('Demand / Price', 'Call for Price')
+        dem = row.get('Price', 'Call for Price')
         feat = row.get('Plot Features', '')
         line = f"📍 {p_str} | {plt} ({sz})\n   💰 Demand: *{dem}* | Feature: {feat}"
         broadcast_lines.append(line)
@@ -348,12 +346,13 @@ def show_pdf_catalog_dialog(df_cat):
             <thead>
                 <tr style="background:#F1F5F9; border-bottom:1px solid #CBD5E1;">
                     <th style="padding:8px;">#</th>
+                    <th style="padding:8px;">Date / Timestamp</th>
                     <th style="padding:8px;">Phase</th>
-                    <th style="padding:8px;">Block</th>
+                    <th style="padding:8px;">Block No</th>
                     <th style="padding:8px;">Plot No</th>
                     <th style="padding:8px;">Size</th>
                     <th style="padding:8px;">Features</th>
-                    <th style="padding:8px;">Demand</th>
+                    <th style="padding:8px;">Price</th>
                     <th style="padding:8px;">Status</th>
                 </tr>
             </thead>
@@ -363,13 +362,14 @@ def show_pdf_catalog_dialog(df_cat):
         html_preview += f"""
             <tr style="border-bottom:1px solid #E2E8F0;">
                 <td style="padding:8px;">{idx}</td>
-                <td style="padding:8px; font-weight:600;">{row.get('Target Phase', '')}</td>
-                <td style="padding:8px;">{row.get('Target Tab', '')}</td>
+                <td style="padding:8px;">{row.get('Date / Timestamp', '')}</td>
+                <td style="padding:8px; font-weight:600;">{row.get('Phase', '')}</td>
+                <td style="padding:8px;">{row.get('Block No', '')}</td>
                 <td style="padding:8px; font-weight:600; color:#00113A;">{row.get('Plot No', '')}</td>
                 <td style="padding:8px;">{row.get('Size', '')}</td>
                 <td style="padding:8px;">{row.get('Plot Features', '')}</td>
-                <td style="padding:8px; font-weight:600; color:#006B5E;">{row.get('Demand / Price', '')}</td>
-                <td style="padding:8px;">{row.get('Category', 'Selling')}</td>
+                <td style="padding:8px; font-weight:600; color:#006B5E;">{row.get('Price', '')}</td>
+                <td style="padding:8px;">{row.get('Status', 'Available')}</td>
             </tr>
         """
     html_preview += "</tbody></table></div>"
@@ -428,12 +428,24 @@ def extract_text_from_any_file_or_image(file_obj, is_camera=False):
             return "[pypdf not installed]"
     return file_bytes.decode('utf-8', errors='ignore')
 
+# Message Boundary Chunker
 def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
-    lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
+    msg_split_pattern = r'(?=\n?\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2})'
+    raw_messages = re.split(msg_split_pattern, raw_text)
+    clean_messages = []
+    for msg in raw_messages:
+        m_str = msg.strip()
+        if not m_str:
+            continue
+        if "Messages and calls are end-to-end encrypted" in m_str or "<Media omitted>" in m_str or "security code changed" in m_str:
+            continue
+        clean_messages.append(m_str)
+    if not clean_messages:
+        clean_messages = [l.strip() for l in raw_text.splitlines() if l.strip()]
     chunks = []
-    for i in range(0, len(lines), messages_per_chunk):
-        chunk_batch = lines[i:i + messages_per_chunk]
-        chunks.append("\n".join(chunk_batch))
+    for i in range(0, len(clean_messages), messages_per_chunk):
+        chunk_batch = clean_messages[i:i + messages_per_chunk]
+        chunks.append("\n\n===WHATSAPP_MESSAGE_START===\n" + "\n\n===WHATSAPP_MESSAGE_START===\n".join(chunk_batch))
     return chunks
 
 def fetch_content_from_gdrive_url(drive_url):
@@ -465,6 +477,9 @@ def clean_line_from_artifacts(l):
     return re.sub(r'[\*\_~`]', ' ', l).strip()
 
 def detect_phase_from_header(line_up):
+    # Strictly ignore generic broad titles
+    if "ALL DHA" in line_up or "DHA LAHORE" in line_up or "HOT DEALS" in line_up or "AVAILABLE PLOTS" in line_up:
+        return None
     if "PHASE 12" in line_up or "EME" in line_up:
         return "DHA Phase 12 (EME Sector)"
     elif "PHASE 11" in line_up or "RAHBAR" in line_up:
@@ -493,91 +508,68 @@ def detect_phase_from_header(line_up):
         return "DHA Phase 1"
     return None
 
-# Robust Line-By-Line Parser Engine
-def smart_accurate_rule_parser(chunk_text, default_phase):
+# High-Precision WhatsApp Fallback Parser
+def smart_accurate_rule_parser(chunk_text):
+    raw_messages = chunk_text.split("===WHATSAPP_MESSAGE_START===")
     results = []
-    lines = [clean_line_from_artifacts(l) for l in chunk_text.splitlines() if clean_line_from_artifacts(l)]
-    active_phase = default_phase
-    
     FORBIDDEN_BLOCK_WORDS = {
         "PHASE", "PH", "SECTOR", "DHA", "CCA", "COMMERCIAL", "PAIR", "DEMAND", "ASKING",
         "OFFER", "FINAL", "DIRECT", "MEETING", "COMPLETE", "FILE", "PAPER", "CORNER", "PARK",
         "ROAD", "FACING", "POSSESSION", "RS", "LAC", "LACS", "CRORE", "CR", "KANAL", "MARLA",
         "MAIN", "NEAR", "BOULEVARD", "ZONE", "SE", "CA", "TH", "ST", "ND", "RD"
     }
-
-    for line in lines:
-        l_up = line.upper()
-        ph_found = detect_phase_from_header(l_up)
-        if ph_found:
-            active_phase = ph_found
-            
-        phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', line)
-        main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else ""
-
-        # Check for CCA match
-        cca_match = re.search(r'CCA\s*([0-9])?\s*([A-Z])?.*?(?:PLOT|NO|#)?\s*([0-9]{1,4})', l_up)
-        # Check for Standard Plot match (e.g. Block A plot 125 or A-125)
-        p_match = re.search(r'(?:BLOCK\s+)?([A-Z]{1,2}[0-9]?)\s+(?:PLOT|NO|#)?\s*([0-9]{1,5}(?:[+/][0-9]{1,5})?)', l_up)
+    
+    for msg in raw_messages:
+        m_clean = msg.strip()
+        if not m_clean:
+            continue
         
-        # Price match (e.g. 425 lac, 3.5 crore)
-        prc_match = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*(LAC|LACS|CRORE|CR)', l_up)
-        prc_str = f"{prc_match.group(1)} {prc_match.group(2).capitalize()}" if prc_match else ""
-
-        # Size match
-        sz_str = ""
-        if "1 KANAL" in l_up or "1K" in l_up:
-            sz_str = "1 Kanal"
-        elif "2 KANAL" in l_up or "2K" in l_up:
-            sz_str = "2 Kanal"
-        elif "10 MARLA" in l_up or "10M" in l_up:
-            sz_str = "10 Marla"
-        elif "5 MARLA" in l_up or "5M" in l_up:
-            sz_str = "5 Marla"
-        elif "4 MARLA" in l_up or "4M" in l_up:
-            sz_str = "4 Marla"
-        elif "8 MARLA" in l_up or "8M" in l_up:
-            sz_str = "8 Marla"
-
-        feat = "Corner" if "CORNER" in l_up else ("Park Facing" if "PARK" in l_up else ("Possession" if "POSSESSION" in l_up else "Standard Layout"))
-
-        if cca_match:
-            cca_num = cca_match.group(1) or "1"
-            blk_cca = f"CCA {cca_num} Commercial"
-            plt_num = cca_match.group(3)
-            results.append({
-                "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "Date": datetime.now().strftime("%Y-%m-%d"),
-                "Category": "Selling",
-                "Phase": active_phase,
-                "Block": blk_cca,
-                "Plot No": f"Plot {plt_num}",
-                "Size": sz_str if sz_str else "4 Marla Commercial",
-                "Plot Features": "Commercial / CCA",
-                "Demand / Price": prc_str,
-                "Seller Type": "Authorized Dealer",
-                "Seller / Dealer Name": "",
-                "Contact No": main_phone,
-                "Office / Agency": st.session_state["office_name"],
-                "Deal Status": "Available",
-                "Last Conversation / Notes": "Direct Ingestion",
-                "Raw Listing & Source Material": line.strip()
-            })
-        elif p_match:
-            raw_b = p_match.group(1).strip()
-            if raw_b not in FORBIDDEN_BLOCK_WORDS:
-                raw_p = p_match.group(2).strip()
-                blk_str = f"Block Z-{raw_b[1]}" if (raw_b.startswith("Z") and len(raw_b) == 2 and raw_b[1].isdigit()) else f"Block {raw_b}"
-                final_sz = sz_str if sz_str else resolve_size_text_first_or_map(active_phase, blk_str, f"Plot {raw_p}", "")
+        ts_match = re.search(r'(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4},?\s+\d{1,2}:\d{2})', m_clean)
+        msg_timestamp = ts_match.group(1) if ts_match else datetime.now().strftime("%Y-%m-%d %H:%M")
+        
+        phones = re.findall(r'(?:03\d{2}[- ]?\d{7}|\+?92[- ]?3\d{2}[- ]?\d{7})', m_clean)
+        main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else ""
+        
+        # Initial phase state: None (No auto-assignment from UI dropdown)
+        active_phase = detect_phase_from_header(m_clean.upper())
+        lines = [clean_line_from_artifacts(l) for l in m_clean.splitlines() if clean_line_from_artifacts(l)]
+        
+        for line in lines:
+            l_up = line.upper()
+            ph_found = detect_phase_from_header(l_up)
+            if ph_found:
+                active_phase = ph_found
+                continue
+                
+            cca_match = re.search(r'CCA\s*([0-9])?\s*([A-Z])?.*?(?:PLOT|NO|#)?\s*([0-9]{1,4})', l_up)
+            p_match = re.search(r'(?:BLOCK\s+)?([A-Z]{1,2}[0-9]?)\s+(?:PLOT|NO|#)?\s*([0-9]{1,5}(?:[+/][0-9]{1,5})?)', l_up)
+            
+            prc_match = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*(LAC|LACS|CRORE|CR)', l_up)
+            prc_str = f"{prc_match.group(1)} {prc_match.group(2).capitalize()}" if prc_match else ""
+            
+            sz_str = ""
+            if "1 KANAL" in l_up or "1K" in l_up: sz_str = "1 Kanal"
+            elif "2 KANAL" in l_up or "2K" in l_up: sz_str = "2 Kanal"
+            elif "10 MARLA" in l_up or "10M" in l_up: sz_str = "10 Marla"
+            elif "5 MARLA" in l_up or "5M" in l_up: sz_str = "5 Marla"
+            elif "4 MARLA" in l_up or "4M" in l_up: sz_str = "4 Marla"
+            elif "8 MARLA" in l_up or "8M" in l_up: sz_str = "8 Marla"
+            
+            feat = "Corner" if "CORNER" in l_up else ("Facing Park" if "PARK" in l_up else ("Possession" if "POSSESSION" in l_up else "Standard Layout"))
+            final_phase_str = active_phase if active_phase else "Unassigned Phase"
+            
+            if cca_match:
+                cca_num = cca_match.group(1) or "1"
+                blk_cca = f"CCA {cca_num} Commercial"
+                plt_num = cca_match.group(3)
                 results.append({
-                    "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "Date": datetime.now().strftime("%Y-%m-%d"),
+                    "Date / Timestamp": msg_timestamp,
                     "Category": "Selling",
-                    "Phase": active_phase,
-                    "Block": blk_str,
-                    "Plot No": f"Plot {raw_p}",
-                    "Size": final_sz,
-                    "Plot Features": feat,
+                    "Phase": final_phase_str,
+                    "Block": blk_cca,
+                    "Plot No": f"Plot {plt_num}",
+                    "Size": sz_str if sz_str else "4 Marla Commercial",
+                    "Plot Features": "Commercial / CCA",
                     "Demand / Price": prc_str,
                     "Seller Type": "Authorized Dealer",
                     "Seller / Dealer Name": "",
@@ -585,62 +577,83 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     "Office / Agency": st.session_state["office_name"],
                     "Deal Status": "Available",
                     "Last Conversation / Notes": "Direct Ingestion",
-                    "Raw Listing & Source Material": line.strip()
+                    "Raw Listing & Source Material": m_clean
                 })
-        elif main_phone and len(line) > 15:
-            results.append({
-                "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "Date": datetime.now().strftime("%Y-%m-%d"),
-                "Category": "Selling",
-                "Phase": active_phase,
-                "Block": "General Lead",
-                "Plot No": "General Option / Portfolio",
-                "Size": sz_str,
-                "Plot Features": "Direct Broadcast / Portfolio",
-                "Demand / Price": prc_str,
-                "Seller Type": "Authorized Dealer",
-                "Seller / Dealer Name": "",
-                "Contact No": main_phone,
-                "Office / Agency": st.session_state["office_name"],
-                "Deal Status": "Available",
-                "Last Conversation / Notes": "Direct Ingestion",
-                "Raw Listing & Source Material": line.strip()
-            })
+            elif p_match:
+                raw_b = p_match.group(1).strip()
+                if raw_b not in FORBIDDEN_BLOCK_WORDS:
+                    raw_p = p_match.group(2).strip()
+                    blk_str = f"Block Z-{raw_b[1]}" if (raw_b.startswith("Z") and len(raw_b) == 2 and raw_b[1].isdigit()) else f"Block {raw_b}"
+                    final_sz = sz_str if sz_str else (resolve_size_text_first_or_map(final_phase_str, blk_str, f"Plot {raw_p}", "") if final_phase_str != "Unassigned Phase" else "")
+                    results.append({
+                        "Date / Timestamp": msg_timestamp,
+                        "Category": "Selling",
+                        "Phase": final_phase_str,
+                        "Block": blk_str,
+                        "Plot No": f"Plot {raw_p}",
+                        "Size": final_sz,
+                        "Plot Features": feat,
+                        "Demand / Price": prc_str,
+                        "Seller Type": "Authorized Dealer",
+                        "Seller / Dealer Name": "",
+                        "Contact No": main_phone,
+                        "Office / Agency": st.session_state["office_name"],
+                        "Deal Status": "Available",
+                        "Last Conversation / Notes": "Direct Ingestion",
+                        "Raw Listing & Source Material": m_clean
+                    })
     return results
 
-def process_single_chunk_via_gemini(chunk_text, default_phase):
+# Gemini 2.5 Flash Dedicated Parser
+def process_single_chunk_via_gemini(chunk_text):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
-    today_date = datetime.now().strftime("%Y-%m-%d")
     now_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    
     system_prompt = f"""You are the Master DHA Lahore Real Estate Data Pipeline Architect & Forensic Text Parsing Specialist.
-Your explicit objective is to ingest messy, unorganized, highly-abbreviated, mixed-dealer WhatsApp broadcasts and extract EVERY SINGLE PROPERTY LISTING into a structured JSON array.
+Your explicit objective is to ingest WhatsApp export files, chats, spreadsheets, notebooks, and extract EVERY PROPERTY LISTING into a structured JSON array with 100% precision.
 
-CRITICAL INSTRUCTION: Each bullet point or line containing a property details MUST be parsed as a SEPARATE JSON OBJECT. Do NOT combine multiple plots into one.
+### STRICT PHASE DETECTION & UNASSIGNED RULE:
+1. STRICT DETECTION: Extract the Phase name ONLY if explicitly written in the message (e.g. 'Phase 9 Prism', 'Ph 6', 'Phase 8 Proper').
+2. UNASSIGNED PHASE FLAG: If NO DHA phase is specified anywhere in the message context, you MUST set "Phase": "Unassigned Phase". DO NOT GUESS OR DEFAULT TO ANY PHASE.
+3. DYNAMIC INHERITANCE: If a phase header is present, all subsequent plots inherit it until a new phase header is encountered.
+4. GENERIC HEADERS: Ignore generic headers like 'ALL DHA LAHORE', 'HOT DEALS'. Look for specific phase indicators.
 
-STRICT 15-COLUMN CANONICAL CRM SCHEMA FOR EVERY OBJECT:
-1. "Date / Timestamp": "{now_timestamp}"
+### LOCAL MARKET VOCABULARY NORMALIZATION:
+- '1k', '1kanal' -> '1 Kanal'
+- '10m', '10marla' -> '10 Marla'
+- '5m', '5marla' -> '5 Marla'
+- '4cca', '4m comm' -> '4 Marla Commercial'
+- 'cnr' -> 'Corner'
+- 'pk fcg', 'facing park' -> 'Facing Park'
+- 'posn', 'pos' -> 'Possession'
+- 'mb', 'main blvd' -> 'Main Boulevard (MB)'
+- 'cr', 'crore' -> 'Crore' (e.g. '3.5 Crore')
+- 'lac', 'lacs' -> 'Lac' (e.g. '425 Lac')
+
+### STRICT 15-COLUMN CANONICAL CRM SCHEMA:
+1. "Date / Timestamp": Exact timestamp from WhatsApp (or "{now_timestamp}")
 2. "Category": 'Selling'
-3. "Phase": The exact DHA Phase name matched to catalog.
-4. "Block": The exact Canonical Block / CCA name (e.g. 'Block A', 'Block J', 'CCA 1 Commercial').
-5. "Plot No": Extracted isolated plot identifier (e.g. 'Plot 125', 'Plot 450', 'Plot 18').
-6. "Size": Strict normalized property cutting size ('1 Kanal', '10 Marla', '5 Marla', '4 Marla Commercial').
-7. "Plot Features": Extracted key features ('Corner', 'Facing Park', 'Main Boulevard (MB)', 'Possession', 'Standard Layout').
-8. "Demand / Price": Normalized asking rate in 'X Lac' or 'X Crore' (e.g. '425 Lac', '3.5 Crore', '115 Lac').
+3. "Phase": Explicitly detected DHA Phase name OR "Unassigned Phase"
+4. "Block": Canonical Block / CCA name (e.g. 'Block A', 'Block J', 'CCA 1 Commercial')
+5. "Plot No": Extracted isolated plot identifier (e.g. 'Plot 125', 'Plot 450', 'Plot 18')
+6. "Size": Strict normalized cutting size ('1 Kanal', '10 Marla', '5 Marla', '4 Marla Commercial')
+7. "Plot Features": 'Corner', 'Facing Park', 'Main Boulevard (MB)', 'Possession', or 'Standard Layout'
+8. "Demand / Price": Normalized asking rate in 'X Lac' or 'X Crore' (e.g. '425 Lac', '3.5 Crore')
 9. "Seller Type": 'Authorized Dealer'
-10. "Seller / Dealer Name": Extracted dealer name if mentioned, else "".
-11. "Contact No": Clean Pakistani phone format ('03XXXXXXXXX' or '+923XXXXXXXXX').
+10. "Seller / Dealer Name": Extracted dealer name if mentioned, else ""
+11. "Contact No": Clean Pakistani phone format ('03XXXXXXXXX' or '+923XXXXXXXXX')
 12. "Office / Agency": "{st.session_state['office_name']}"
 13. "Deal Status": 'Available'
 14. "Last Conversation / Notes": 'Direct Ingestion'
-15. "Raw Listing & Source Material": The EXACT single line text of this specific listing.
+15. "Raw Listing & Source Material": Full original WhatsApp message unit
 
-OFFICIAL CATALOG:
+OFFICIAL DHA CATALOG:
 {catalog_json_str}
 
-INPUT TEXT:
+INPUT WHATSAPP STREAM:
 {chunk_text}
 
-OUTPUT: Return ONLY a valid JSON array of objects. No explanations or markdown commentary.
+OUTPUT: Return ONLY a valid JSON array of objects. No markdown code ticks (```json), no explanations.
 """
     if gemini_active and gemini_client:
         try:
@@ -656,20 +669,18 @@ OUTPUT: Return ONLY a valid JSON array of objects. No explanations or markdown c
             parsed_json = json.loads(raw_json)
             if isinstance(parsed_json, list) and len(parsed_json) > 0:
                 for item in parsed_json:
-                    if "Date" not in item or not item["Date"]:
-                        item["Date"] = today_date
                     if "Date / Timestamp" not in item or not item["Date / Timestamp"]:
                         item["Date / Timestamp"] = now_timestamp
                     blk = str(item.get("Block", "")).strip()
                     plt = str(item.get("Plot No", "")).strip()
                     sz = str(item.get("Size", "")).strip()
-                    ph = item.get("Phase", default_phase)
-                    if plt and plt.lower() != "general option / portfolio":
+                    ph = item.get("Phase", "Unassigned Phase")
+                    if plt and plt.lower() != "general option / portfolio" and ph != "Unassigned Phase":
                         item["Size"] = resolve_size_text_first_or_map(ph, blk, plt, sz)
                 return parsed_json
         except Exception:
             pass
-    return smart_accurate_rule_parser(chunk_text, default_phase)
+    return smart_accurate_rule_parser(chunk_text)
 
 # Login & SSO Screen
 if not st.session_state["authenticated"]:
@@ -769,29 +780,31 @@ else:
 
     st.markdown("---")
 
-    # Table Records & Global Slicers Preparation
+    # Realigned Table Data Preparation with Bottom-Sorting for Unassigned Phase
     total_parsed_now = len(st.session_state["parsed_payloads"])
     if total_parsed_now > 0:
         base_data = []
         for item in st.session_state["parsed_payloads"]:
+            ph_val = str(item.get("Phase", "Unassigned Phase"))
             base_data.append({
-                "Date": str(item.get("Date", datetime.now().strftime("%Y-%m-%d"))),
-                "Target Phase": str(item.get("Phase", "DHA Phase 1")),
-                "Target Tab": str(item.get("Block", "Block A")),
+                "Date / Timestamp": str(item.get("Date / Timestamp", datetime.now().strftime("%Y-%m-%d %H:%M"))),
+                "Phase": ph_val,
+                "Block No": str(item.get("Block", "Block A")),
                 "Plot No": str(item.get("Plot No", "")),
                 "Size": str(item.get("Size", "")),
-                "Demand / Price": str(item.get("Demand / Price", "")),
+                "Price": str(item.get("Demand / Price", "")),
                 "Contact No": str(item.get("Contact No", "")),
-                "Category": str(item.get("Category", "Selling")),
                 "Plot Features": str(item.get("Plot Features", "Standard Layout")),
-                "Deal Status": str(item.get("Deal Status", "Available")),
-                "Source Data": str(item.get("Raw Listing & Source Material", ""))
+                "Source Data": str(item.get("Raw Listing & Source Material", "")),
+                "Status": str(item.get("Deal Status", "Available")),
+                "_sort_key": 1 if ph_val == "Unassigned Phase" else 0
             })
         df_all_live = pd.DataFrame(base_data)
+        df_all_live = df_all_live.sort_values(by=["_sort_key", "Date / Timestamp"], ascending=[True, False]).drop(columns=["_sort_key"])
     else:
         df_all_live = pd.DataFrame(columns=[
-            "Date", "Target Phase", "Target Tab", "Plot No", "Size", "Demand / Price",
-            "Contact No", "Category", "Plot Features", "Deal Status", "Source Data"
+            "Date / Timestamp", "Phase", "Block No", "Plot No", "Size",
+            "Price", "Contact No", "Plot Features", "Source Data", "Status"
         ])
 
     # Filter Bar
@@ -800,24 +813,27 @@ else:
         edit_summary_mode = st.toggle("✏️ Edit Mode (ON / OFF)", value=False, key="toggle_summary_edit_mode")
         highlight_incomplete = st.toggle("⚠️ Incomplete Flags", value=False, key="toggle_incomplete_flags")
         
-    all_dha_phases_summary = ["All Phases (Everything)"] + list(DHA_PHASE_BLOCK_CATALOG.keys())
+    all_dha_phases_summary = ["All Phases (Everything)", "⚠️ Unassigned Phase Only"] + list(DHA_PHASE_BLOCK_CATALOG.keys())
     with col_sc2:
         selected_summary_phase = st.selectbox("📍 Filter / Target Phase:", options=all_dha_phases_summary, index=0, key="summary_target_phase_select")
 
     if selected_summary_phase == "All Phases (Everything)":
-        available_summary_tabs = ["All Block Tabs / CCAs"] + (sorted(list(df_all_live["Target Tab"].unique())) if total_parsed_now > 0 else [])
+        available_summary_tabs = ["All Block Tabs / CCAs"] + (sorted(list(df_all_live["Block No"].unique())) if total_parsed_now > 0 else [])
         df_filtered_summary_phase = df_all_live
+    elif selected_summary_phase == "⚠️ Unassigned Phase Only":
+        df_filtered_summary_phase = df_all_live[df_all_live["Phase"] == "Unassigned Phase"] if total_parsed_now > 0 else df_all_live
+        available_summary_tabs = ["All Block Tabs / CCAs"] + (sorted(list(df_filtered_summary_phase["Block No"].unique())) if not df_filtered_summary_phase.empty else [])
     else:
         p_data = DHA_PHASE_BLOCK_CATALOG.get(selected_summary_phase, {})
         full_catalog_blocks = p_data.get("residential", []) + p_data.get("commercial", [])
         available_summary_tabs = ["All Block Tabs / CCAs"] + full_catalog_blocks
-        df_filtered_summary_phase = df_all_live[df_all_live["Target Phase"] == selected_summary_phase] if total_parsed_now > 0 else df_all_live
+        df_filtered_summary_phase = df_all_live[df_all_live["Phase"] == selected_summary_phase] if total_parsed_now > 0 else df_all_live
 
     with col_sc3:
         selected_summary_block = st.selectbox("🧱 Filter / Target Block:", options=available_summary_tabs, index=0, key="summary_target_block_select")
 
-    if selected_summary_block != "All Block Tabs / CCAs" and total_parsed_now > 0:
-        df_final_summary_display = df_filtered_summary_phase[df_filtered_summary_phase["Target Tab"] == selected_summary_block]
+    if selected_summary_block != "All Block Tabs / CCAs" and not df_filtered_summary_phase.empty:
+        df_final_summary_display = df_filtered_summary_phase[df_filtered_summary_phase["Block No"] == selected_summary_block]
     else:
         df_final_summary_display = df_filtered_summary_phase
 
@@ -829,24 +845,24 @@ else:
         df_final_summary_display = df_final_summary_display[mask]
 
     if highlight_incomplete and not df_final_summary_display.empty:
-        inc_mask = (df_final_summary_display["Demand / Price"] == "") | (df_final_summary_display["Contact No"] == "")
+        inc_mask = (df_final_summary_display["Price"] == "") | (df_final_summary_display["Contact No"] == "")
         df_final_summary_display = df_final_summary_display[inc_mask]
 
     with col_sc4:
         st.metric(label="📊 Plots In View", value=f"{len(df_final_summary_display)}", delta=f"{total_parsed_now} Total Extracted")
 
-    # KPI Summary Strip (Stitch-Style Badges)
+    # KPI Summary Strip with Unassigned Counting Metric
     num_selected_live = len(df_final_summary_display)
-    unique_tabs_count_live = df_final_summary_display[["Target Phase", "Target Tab"]].drop_duplicates().shape[0] if num_selected_live > 0 else 0
-    with_demand_count_live = df_final_summary_display[df_final_summary_display["Demand / Price"] != ""].shape[0] if num_selected_live > 0 else 0
-    with_contact_count_live = df_final_summary_display[df_final_summary_display["Contact No"] != ""].shape[0] if num_selected_live > 0 else 0
+    unique_tabs_count_live = df_final_summary_display[["Phase", "Block No"]].drop_duplicates().shape[0] if num_selected_live > 0 else 0
+    with_demand_count_live = df_final_summary_display[df_final_summary_display["Price"] != ""].shape[0] if num_selected_live > 0 else 0
+    unassigned_count_live = df_all_live[df_all_live["Phase"] == "Unassigned Phase"].shape[0] if total_parsed_now > 0 else 0
 
     st.markdown(f"""
         <div class="summary-card">
             <span class="stat-pill">📊 <b>Selected View:</b> {num_selected_live} Plots</span>
             <span class="stat-pill">📁 <b>Target Tabs:</b> {unique_tabs_count_live} Tabs</span>
             <span class="stat-pill">💰 <b>Prices Identified:</b> {with_demand_count_live}</span>
-            <span class="stat-pill">📞 <b>Contacts Identified:</b> {with_contact_count_live}</span>
+            <span class="stat-pill" style="background:{'#FEE2E2' if unassigned_count_live > 0 else '#ECEEF0'}; color:{'#991B1B' if unassigned_count_live > 0 else '#191C1E'};">⚠️ <b>Phase Not Detected:</b> {unassigned_count_live} Plots</span>
             <span class="stat-pill" style="background:#E0F2FE; color:#0369A1;">⚡ <b>Live Extracted:</b> {total_parsed_now} Listings</span>
         </div>
     """, unsafe_allow_html=True)
@@ -858,7 +874,7 @@ else:
         st.markdown("""
             <div class="stitch-card-container">
                 <h4 style="font-family:'Manrope',sans-serif; color:#00113A; margin:0 0 6px 0; font-size:16px;">🧠 Ingestion Engine</h4>
-                <p style="font-size:12px; color:#64748B; margin-bottom:10px;">Paste raw WhatsApp feeds, portals, or attach sources to extract.</p>
+                <p style="font-size:12px; color:#64748B; margin-bottom:10px;">Paste WhatsApp chats, exports, portal feeds, or upload files.</p>
             </div>
         """, unsafe_allow_html=True)
         default_box_value = st.session_state.get("extracted_file_text", "")
@@ -890,7 +906,7 @@ else:
                         st.session_state["uploaded_temp_text"] = ""
                         st.rerun()
             with tab_gdrive:
-                gdrive_url_in = st.text_input("G-Drive Link:", placeholder="https://drive.google.com/...", key="inner_gdrive_in")
+                gdrive_url_in = st.text_input("G-Drive Link:", placeholder="[https://drive.google.com/](https://drive.google.com/)...", key="inner_gdrive_in")
                 if st.button("📥 Load Drive", key="btn_push_gdrive_inner"):
                     if gdrive_url_in.strip():
                         gdrive_content = fetch_content_from_gdrive_url(gdrive_url_in.strip())
@@ -909,7 +925,7 @@ else:
                     st.session_state["extracted_file_text"] = pasted_txt.strip()
                     st.rerun()
             with tab_zameen:
-                portal_url = st.text_input("Zameen URL:", placeholder="https://www.zameen.com/...", key="inner_portal_in")
+                portal_url = st.text_input("Zameen URL:", placeholder="[https://www.zameen.com/](https://www.zameen.com/)...", key="inner_portal_in")
                 if st.button("🌐 Load Portal", key="btn_push_portal_inner"):
                     portal_raw = fetch_text_from_portal_url(portal_url.strip())
                     st.session_state["extracted_file_text"] = portal_raw
@@ -917,12 +933,12 @@ else:
             with tab_news:
                 st.markdown("""
                     <b>📰 Quick Access to Newspaper Portals:</b><br>
-                    <a href="https://classified.jang.com.pk" target="_blank" class="news-badge">📰 Daily Jang ↗</a>
-                    <a href="https://classifieds.dawn.com" target="_blank" class="news-badge">📰 Daily Dawn ↗</a>
-                    <a href="https://express.pk/epaper" target="_blank" class="news-badge">📰 Daily Express ↗</a>
-                    <a href="https://e.thenews.com.pk" target="_blank" class="news-badge">📰 The News ↗</a>
-                    <a href="https://epaper.nawaiwaqt.com.pk" target="_blank" class="news-badge">📰 Daily Nawa-i-Waqt ↗</a>
-                    <a href="https://e.dunya.com.pk" target="_blank" class="news-badge">📰 Daily Dunya ↗</a>
+                    <a href="[https://classified.jang.com.pk](https://classified.jang.com.pk)" target="_blank" class="news-badge">📰 Daily Jang ↗</a>
+                    <a href="[https://classifieds.dawn.com](https://classifieds.dawn.com)" target="_blank" class="news-badge">📰 Daily Dawn ↗</a>
+                    <a href="[https://express.pk/epaper](https://express.pk/epaper)" target="_blank" class="news-badge">📰 Daily Express ↗</a>
+                    <a href="[https://e.thenews.com.pk](https://e.thenews.com.pk)" target="_blank" class="news-badge">📰 The News ↗</a>
+                    <a href="[https://epaper.nawaiwaqt.com.pk](https://epaper.nawaiwaqt.com.pk)" target="_blank" class="news-badge">📰 Daily Nawa-i-Waqt ↗</a>
+                    <a href="[https://e.dunya.com.pk](https://e.dunya.com.pk)" target="_blank" class="news-badge">📰 Daily Dunya ↗</a>
                 """, unsafe_allow_html=True)
                 news_txt = st.text_area("Paste News Text:", height=80, key="inner_news_in")
                 if st.button("📥 Load News", key="btn_push_news_inner"):
@@ -941,7 +957,6 @@ else:
                         st.session_state["parsed_payloads"] = []
                         st.session_state["extraction_active"] = True
                         st.session_state["extraction_paused"] = False
-                        st.session_state["extraction_default_phase"] = selected_phase
                         st.rerun()
                     else:
                         st.warning("Please paste listings or attach files.")
@@ -958,7 +973,10 @@ else:
         with col_th_title:
             st.markdown("<h4 style='font-family:\"Manrope\",sans-serif; color:#00113A; margin:4px 0 0 0; font-size:16px;'>⚡ Extracted Inventory</h4>", unsafe_allow_html=True)
         
-        final_sync_count_live = len(df_final_summary_display)
+        # Valid Pushable Count (Excludes Unassigned Phase)
+        df_valid_to_push = df_final_summary_display[df_final_summary_display["Phase"] != "Unassigned Phase"] if not df_final_summary_display.empty else pd.DataFrame()
+        final_sync_count_live = len(df_valid_to_push)
+        
         with col_th_actions:
             col_a_push, col_a_csv, col_a_xlsx, col_a_wa, col_a_pdf, col_a_clr = st.columns([1.8, 1, 1, 1.2, 1, 1.2])
             with col_a_push:
@@ -969,9 +987,9 @@ else:
                         now_dt = datetime.now()
                         now_str = now_dt.strftime("%Y-%m-%d %H:%M")
                         grouped_data = {}
-                        for _, row in df_final_summary_display.iterrows():
-                            target_phase = str(row.get("Target Phase", "DHA Phase 1")).strip()
-                            target_block = str(row.get("Target Tab", "Block A")).strip()
+                        for _, row in df_valid_to_push.iterrows():
+                            target_phase = str(row.get("Phase", "")).strip()
+                            target_block = str(row.get("Block No", "Block A")).strip()
                             key = (target_phase, target_block)
                             if key not in grouped_data:
                                 grouped_data[key] = []
@@ -997,10 +1015,10 @@ else:
                             for row in rows_list:
                                 plot_val = str(row.get("Plot No", "")).strip()
                                 row_data = [
-                                    str(row.get("Date", now_str)), str(row.get("Category", "Selling")), str(phase), str(block),
+                                    str(row.get("Date / Timestamp", now_str)), "Selling", str(phase), str(block),
                                     str(plot_val), str(row.get("Size", "")), str(row.get("Plot Features", "Standard Layout")),
-                                    str(row.get("Demand / Price", "")), "Authorized Dealer", "", str(row.get("Contact No", "")),
-                                    str(st.session_state['office_name']), str(row.get("Deal Status", "Available")), "Direct Ingestion",
+                                    str(row.get("Price", "")), "Authorized Dealer", "", str(row.get("Contact No", "")),
+                                    str(st.session_state['office_name']), str(row.get("Status", "Available")), "Direct Ingestion",
                                     f"[AI Ingest] {str(row.get('Source Data', ''))}"
                                 ]
                                 rows_to_append.append(row_data)
@@ -1062,13 +1080,11 @@ else:
 
         col_act1, col_act2 = st.columns(2)
         with col_act1:
-            if st.button("🧹 Remove Duplicates (Same Date)", disabled=df_final_summary_display.empty, use_container_width=True):
+            if st.button("🧹 Remove Duplicates", disabled=df_final_summary_display.empty, use_container_width=True):
                 initial_len = len(st.session_state["parsed_payloads"])
                 df_temp = pd.DataFrame(st.session_state["parsed_payloads"])
                 if not df_temp.empty:
-                    if "Date" not in df_temp.columns:
-                        df_temp["Date"] = datetime.now().strftime("%Y-%m-%d")
-                    df_dedup = df_temp.groupby(["Date", "Phase", "Block", "Plot No"], as_index=False).agg({
+                    df_dedup = df_temp.groupby(["Date / Timestamp", "Phase", "Block", "Plot No"], as_index=False).agg({
                         "Size": "first",
                         "Plot Features": lambda x: ", ".join(set([str(v) for v in x if str(v).strip()])),
                         "Demand / Price": "last",
@@ -1130,7 +1146,7 @@ else:
         if not st.session_state["extraction_paused"] and curr_idx < total_chunks:
             with st.spinner(f"🧠 Processing Chunk {curr_idx + 1} of {total_chunks} (100 msgs)..."):
                 chunk_to_process = chunks[curr_idx]
-                new_listings = process_single_chunk_via_gemini(chunk_to_process, st.session_state["extraction_default_phase"])
+                new_listings = process_single_chunk_via_gemini(chunk_to_process)
                 st.session_state["parsed_payloads"].extend(new_listings)
                 st.session_state["current_chunk_idx"] += 1
                 
