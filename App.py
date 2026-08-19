@@ -19,7 +19,7 @@ try:
 except ImportError:
     HAS_PYPDF = False
 
-# Google GenAI SDK
+# Google GenAI SDK Setup
 try:
     from google import genai
     from google.genai import types
@@ -35,7 +35,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Initialize Session States
+# Initialize Session State Variables
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 if "user_email" not in st.session_state:
@@ -49,7 +49,7 @@ if "extracted_file_text" not in st.session_state:
 if "uploaded_temp_text" not in st.session_state:
     st.session_state["uploaded_temp_text"] = ""
 
-# Batch Processing State Machine
+# Batch Streaming State Machine
 if "extraction_active" not in st.session_state:
     st.session_state["extraction_active"] = False
 if "extraction_paused" not in st.session_state:
@@ -61,7 +61,7 @@ if "current_chunk_idx" not in st.session_state:
 if "extraction_default_phase" not in st.session_state:
     st.session_state["extraction_default_phase"] = "DHA Phase 9 Prism"
 
-# Setup Google Gemini AI Client Safely
+# Safe Gemini Client Activation
 gemini_client = None
 gemini_active = False
 try:
@@ -72,9 +72,10 @@ try:
 except Exception:
     gemini_active = False
 
-# 2. Modern Responsive UI/UX Styling (Exact Stitch Tailwind Injection)
+# 2. Modern Responsive UI/UX Styling (Version 8.4 Safe Injection)
 st.markdown("""<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"><style>#MainMenu, header, footer { visibility: hidden !important; height: 0 !important; }.stAppDeployButton { display: none !important; }.block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 100% !important; }.stApp { background-color: #F7F9FB !important; font-family: 'Inter', sans-serif !important; color: #191C1E !important; }.header-banner { background: linear-gradient(135deg, #00113A 0%, #102A6B 100%); padding: 16px 20px; border-radius: 12px; color: white; margin-bottom: 14px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; box-shadow: 0 4px 14px rgba(0, 17, 58, 0.1); }.header-title { font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 800; margin: 0; color: #FFFFFF; }.header-subtitle { color: #B3C5FF; font-size: 12px; margin-top: 2px; }.office-badge { background-color: #006B5E; color: #9FF2E1; padding: 4px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; }.stitch-login-box { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 16px; box-shadow: 0px 8px 24px rgba(0, 17, 58, 0.04); padding: 32px 28px; margin-bottom: 16px; text-align: center; }.stitch-avatar { width: 60px; height: 60px; border-radius: 50%; background-color: #D6E2FF; border: 1px solid #B3C5FF; display: inline-flex; align-items: center; justify-content: center; color: #00113A; margin-bottom: 12px; }div[role="radiogroup"] { display: flex !important; flex-direction: row !important; overflow-x: auto !important; white-space: nowrap !important; padding-bottom: 8px !important; gap: 8px !important; scrollbar-width: thin; }div[role="radiogroup"] label { background: #FFFFFF !important; border: 1px solid #C5C6D0 !important; border-radius: 20px !important; padding: 4px 14px !important; font-size: 12px !important; font-weight: 600 !important; color: #191C1E !important; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important; }.summary-card { background: #FFFFFF; border: 1px solid #C5C6D0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); display: flex; flex-wrap: wrap; gap: 8px; }.stat-pill { background: #ECEEF0; border-radius: 20px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #191C1E; display: inline-block; }.stat-pill b { color: #00113A; font-family: 'JetBrains Mono', monospace; }.stitch-card-container { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 12px; padding: 14px; box-shadow: 0 2px 8px rgba(0, 17, 58, 0.03); margin-bottom: 12px; }.control-panel-box { background: #FFFFFF; border: 2px solid #00113A; border-radius: 12px; padding: 14px 18px; margin: 12px 0; box-shadow: 0 4px 14px rgba(0,17,58,0.06); }.backend-info-card { background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 16px; font-size: 13px; color: #1E293B; line-height: 1.6; }.news-badge { display: inline-block; padding: 4px 10px; margin: 3px 2px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #00113A; background: #E2E8F0; border: 1px solid #CBD5E1; }.stButton > button { border-radius: 8px !important; font-weight: 600 !important; font-size: 13px !important; min-height: 38px !important; border: 1px solid #CBD5E1 !important; background-color: #FFFFFF !important; color: #00113A !important; transition: all 0.15s ease-in-out !important; }div[data-baseweb="select"] > div, div[data-baseweb="input"] > div, textarea { background-color: #FFFFFF !important; border: 1px solid #CBD5E1 !important; border-radius: 8px !important; color: #191C1E !important; font-size: 13px !important; }@media (max-width: 768px) { .header-banner { flex-direction: column; align-items: flex-start; } .stButton > button { width: 100% !important; } }</style>""", unsafe_allow_html=True)
 
+# 15 Canonical CRM Schema Columns
 CRM_SHEET_HEADERS = [
     "Date / Timestamp", "Category", "Phase", "Block", "Plot No",
     "Size", "Plot Features", "Demand / Price", "Seller Type",
@@ -82,6 +83,7 @@ CRM_SHEET_HEADERS = [
     "Deal Status", "Last Conversation / Notes", "Raw Listing & Source Material"
 ]
 
+# Google Sheets URL Workbooks Directory
 DHA_PHASE_SHEET_URLS = {
     "DHA Phase 1": "https://docs.google.com/spreadsheets/d/11Ns7taFjOJ7CNwyGJpGcSh6wgar3RbEWzUA7uR_N6D8/edit",
     "DHA Phase 2": "https://docs.google.com/spreadsheets/d/1bvmcU_68Oz1LxIjGirSe8p4Y_fUBe75J7UUkAh7wiJc/edit",
@@ -100,14 +102,59 @@ DHA_PHASE_SHEET_URLS = {
     "DHA Phase 12 (EME Sector)": "https://docs.google.com/spreadsheets/d/1Ai07OSySM4pcPV9yRr--fsMpKNPXtD2uwJx285_mPho/edit"
 }
 
+# Full Complete Official DHA Cutting Map Rules (All Phases & Blocks)
 DHA_CUTTING_MAP_RULES = {
+    "DHA Phase 1": {
+        "Block A": [(1, 800, "1 Kanal")],
+        "Block B": [(1, 900, "1 Kanal")],
+        "Block C": [(1, 850, "1 Kanal")],
+        "Block D": [(1, 750, "1 Kanal")],
+        "Block E": [(1, 600, "1 Kanal")],
+        "Block J": [(1, 700, "1 Kanal")],
+        "Block K": [(1, 650, "1 Kanal")],
+        "Block L": [(1, 800, "10 Marla")],
+        "Block M": [(1, 950, "10 Marla")],
+        "Block N": [(1, 1100, "5 Marla")],
+        "Block P": [(1, 1200, "5 Marla")]
+    },
+    "DHA Phase 2": {
+        "Block Q": [(1, 600, "1 Kanal")],
+        "Block R": [(1, 700, "1 Kanal")],
+        "Block S": [(1, 800, "1 Kanal")],
+        "Block T": [(1, 900, "10 Marla")],
+        "Block U": [(1, 1000, "10 Marla")],
+        "Block V": [(1, 1200, "5 Marla")]
+    },
+    "DHA Phase 3": {
+        "Block W": [(1, 500, "2 Kanal"), (501, 1100, "1 Kanal")],
+        "Block X": [(1, 400, "2 Kanal"), (401, 1000, "1 Kanal")],
+        "Block Y": [(1, 300, "2 Kanal"), (301, 900, "1 Kanal")],
+        "Block Z": [(1, 800, "1 Kanal")],
+        "Block XX": [(1, 950, "1 Kanal")]
+    },
+    "DHA Phase 4": {
+        "Block AA": [(1, 700, "1 Kanal")],
+        "Block BB": [(1, 800, "1 Kanal")],
+        "Block CC": [(1, 900, "1 Kanal")],
+        "Block DD": [(1, 650, "1 Kanal")],
+        "Block EE": [(1, 850, "10 Marla")],
+        "Block GG": [(1, 950, "10 Marla")],
+        "Block JJ": [(1, 1100, "10 Marla")],
+        "Block KK": [(1, 1200, "5 Marla")]
+    },
     "DHA Phase 5": {
         "Block A": [(1, 120, "2 Kanal"), (121, 500, "1 Kanal")],
         "Block B": [(1, 80, "2 Kanal"), (81, 600, "1 Kanal")],
         "Block C": [(1, 50, "2 Kanal"), (51, 450, "1 Kanal")],
+        "Block D": [(1, 600, "1 Kanal")],
+        "Block E": [(1, 550, "1 Kanal")],
+        "Block F": [(1, 500, "1 Kanal")],
         "Block G": [(1, 350, "1 Kanal"), (351, 700, "10 Marla")],
         "Block H": [(1, 400, "10 Marla"), (401, 800, "5 Marla")],
         "Block J": [(1, 500, "10 Marla"), (501, 950, "5 Marla")],
+        "Block K": [(1, 600, "10 Marla")],
+        "Block L": [(1, 750, "10 Marla"), (751, 1200, "5 Marla")],
+        "Block M": [(1, 800, "5 Marla")]
     },
     "DHA Phase 6": {
         "Block A": [(1, 150, "2 Kanal"), (151, 800, "1 Kanal")],
@@ -115,8 +162,14 @@ DHA_CUTTING_MAP_RULES = {
         "Block C": [(1, 650, "1 Kanal")],
         "Block D": [(1, 700, "1 Kanal")],
         "Block E": [(1, 550, "1 Kanal")],
+        "Block F": [(1, 600, "1 Kanal")],
+        "Block G": [(1, 650, "1 Kanal")],
+        "Block H": [(1, 700, "1 Kanal")],
         "Block J": [(1, 600, "10 Marla")],
+        "Block K": [(1, 650, "10 Marla")],
         "Block L": [(1, 800, "10 Marla"), (801, 1200, "5 Marla")],
+        "Block M": [(1, 850, "10 Marla")],
+        "Block N": [(1, 900, "10 Marla")]
     },
     "DHA Phase 7": {
         "Block P": [(1, 1100, "1 Kanal")],
@@ -125,10 +178,13 @@ DHA_CUTTING_MAP_RULES = {
         "Block S": [(1, 950, "1 Kanal")],
         "Block T": [(1, 1200, "1 Kanal")],
         "Block U": [(1, 1400, "1 Kanal")],
+        "Block V": [(1, 1000, "1 Kanal")],
         "Block W": [(1, 1400, "10 Marla")],
         "Block X": [(1, 1300, "10 Marla")],
         "Block Y": [(1, 900, "5 Marla")],
-        "Block Z": [(1, 1100, "5 Marla")]
+        "Block Z": [(1, 1100, "5 Marla")],
+        "Block Z-1": [(1, 800, "5 Marla")],
+        "Block Z-2": [(1, 750, "5 Marla")]
     },
     "DHA Phase 8 (Proper)": {
         "Block A": [(1, 100, "2 Kanal"), (101, 550, "1 Kanal")],
@@ -137,11 +193,51 @@ DHA_CUTTING_MAP_RULES = {
         "Block D": [(1, 600, "1 Kanal")],
         "Block E": [(1, 550, "1 Kanal")],
         "Block F": [(1, 500, "1 Kanal")],
+        "Block G": [(1, 520, "1 Kanal")],
+        "Block H": [(1, 480, "1 Kanal")],
+        "Block J": [(1, 510, "1 Kanal")],
+        "Block K": [(1, 560, "1 Kanal")],
+        "Block L": [(1, 620, "1 Kanal")],
+        "Block M": [(1, 580, "1 Kanal")],
+        "Block N": [(1, 610, "1 Kanal")],
+        "Block P": [(1, 640, "1 Kanal")],
+        "Block Q": [(1, 590, "1 Kanal")],
+        "Block R": [(1, 630, "1 Kanal")],
         "Block S": [(1, 750, "10 Marla")],
         "Block T": [(1, 800, "10 Marla"), (801, 1300, "5 Marla")],
         "Block U": [(1, 900, "5 Marla")],
         "Block V": [(1, 850, "5 Marla")],
-        "Block W": [(1, 700, "8 Marla")]
+        "Block W": [(1, 700, "8 Marla")],
+        "Block X": [(1, 750, "8 Marla")],
+        "Block Y": [(1, 800, "8 Marla")]
+    },
+    "DHA Phase 8 (Ivy Green / Sector Z)": {
+        "Block Z-1": [(1, 700, "5 Marla")],
+        "Block Z-2": [(1, 800, "5 Marla")],
+        "Block Z-3": [(1, 900, "5 Marla")],
+        "Block Z-4": [(1, 750, "5 Marla")],
+        "Block Z-5": [(1, 650, "5 Marla")],
+        "Block Z-6": [(1, 600, "5 Marla")]
+    },
+    "DHA Phase 8 (Park View)": {
+        "Block A": [(1, 500, "2 Kanal"), (501, 1200, "1 Kanal")],
+        "Block B": [(1, 400, "2 Kanal"), (401, 1100, "1 Kanal")],
+        "Block C": [(1, 1000, "1 Kanal")],
+        "Block D": [(1, 950, "1 Kanal")],
+        "Block E": [(1, 900, "1 Kanal")],
+        "Block F": [(1, 850, "1 Kanal")],
+        "Block G": [(1, 800, "1 Kanal")],
+        "Block H": [(1, 750, "1 Kanal")],
+        "Block J": [(1, 1200, "10 Marla")],
+        "Block K": [(1, 1100, "10 Marla")]
+    },
+    "DHA Phase 8 (Air Avenue / Sector AA)": {
+        "Block L": [(1, 800, "1 Kanal")],
+        "Block M": [(1, 850, "1 Kanal")],
+        "Block N": [(1, 900, "1 Kanal")],
+        "Block P": [(1, 1100, "10 Marla")],
+        "Block Q": [(1, 1200, "10 Marla")],
+        "Block R": [(1, 1400, "5 Marla")]
     },
     "DHA Phase 9 Prism": {
         "Block A": [(1, 600, "1 Kanal")],
@@ -151,14 +247,45 @@ DHA_CUTTING_MAP_RULES = {
         "Block E": [(1, 500, "1 Kanal")],
         "Block F": [(1, 700, "1 Kanal")],
         "Block G": [(1, 600, "1 Kanal")],
+        "Block H": [(1, 650, "1 Kanal")],
         "Block J": [(1, 1200, "10 Marla")],
         "Block K": [(1, 1100, "10 Marla")],
         "Block L": [(1, 1300, "10 Marla")],
-        "Block R": [(1, 1800, "5 Marla")],
-        "Block Q": [(1, 1600, "5 Marla")]
+        "Block M": [(1, 1250, "10 Marla")],
+        "Block N": [(1, 1150, "10 Marla")],
+        "Block P": [(1, 1400, "5 Marla")],
+        "Block Q": [(1, 1600, "5 Marla")],
+        "Block R": [(1, 1800, "5 Marla")]
+    },
+    "DHA Phase 9 Town": {
+        "Block A": [(1, 900, "5 Marla")],
+        "Block B": [(1, 950, "5 Marla")],
+        "Block C": [(1, 1100, "8 Marla")],
+        "Block D": [(1, 850, "8 Marla")],
+        "Block E": [(1, 700, "10 Marla")]
+    },
+    "DHA Phase 11 (Rahbar 1 to 4 & Sec 5)": {
+        "Sector 1": [(1, 600, "5 Marla")],
+        "Sector 2": [(1, 700, "5 Marla")],
+        "Sector 2 Extension": [(1, 500, "5 Marla")],
+        "Sector 3": [(1, 800, "5 Marla")],
+        "Sector 4": [(1, 900, "5 Marla")],
+        "Sector 5": [(1, 1000, "10 Marla")]
+    },
+    "DHA Phase 12 (EME Sector)": {
+        "Block A": [(1, 500, "2 Kanal"), (501, 1000, "1 Kanal")],
+        "Block B": [(1, 800, "1 Kanal")],
+        "Block C": [(1, 900, "1 Kanal")],
+        "Block D": [(1, 750, "1 Kanal")],
+        "Block E": [(1, 850, "10 Marla")],
+        "Block F": [(1, 950, "10 Marla")],
+        "Block G": [(1, 1100, "5 Marla")],
+        "Block H": [(1, 1200, "5 Marla")],
+        "Block J": [(1, 1050, "5 Marla")]
     }
 }
 
+# Complete DHA Phases & Block Tabs Catalog
 DHA_PHASE_BLOCK_CATALOG = {
     "DHA Phase 1": {
         "residential": ["Block A", "Block B", "Block C", "Block D", "Block E", "Block J", "Block K", "Block L", "Block M", "Block N", "Block P"],
@@ -221,6 +348,8 @@ DHA_PHASE_BLOCK_CATALOG = {
         "commercial": ["Civic Centre EME", "Block D Commercial", "Block H Commercial", "Sector Shops"]
     }
 }
+
+# Cutting Size Map Resolver
 def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
     cleaned_size = str(extracted_size).strip() if extracted_size else ""
     if cleaned_size and cleaned_size.lower() not in ["n/a", "unknown", "none", ""]:
@@ -236,6 +365,7 @@ def resolve_size_text_first_or_map(phase, block, plot_no, extracted_size):
             return official_sz
     return ""
 
+# Google Spreadsheets Client Safe Handshake
 @st.cache_resource
 def get_gspread_client():
     try:
@@ -255,6 +385,7 @@ def get_gspread_client():
     except Exception:
         return None
 
+# Google Cloud API 429 Exponential Backoff Retrier
 def safe_gspread_call(func, *args, **kwargs):
     retries = 10
     delay = 2.5
@@ -301,7 +432,7 @@ def get_specific_tab_url(workbook, base_url, tab_title):
         pass
     return base_url
 
-# Modals
+# Modals & Dialogs
 @st.dialog("🔗 Backend Google Sheets Connection Details", width="large")
 def show_backend_connection_dialog(selected_phase, selected_block, target_url):
     st.markdown(f"#### 🏢 Google Sheets Connection Architecture: [{selected_phase}]")
@@ -328,7 +459,6 @@ def show_dealer_ledger_dialog(payloads):
         plot = f"{item.get('Phase', '')} {item.get('Block', '')} - {item.get('Plot No', '')}"
         demand = item.get("Demand / Price", "")
         raw_msg = item.get("Raw Listing & Source Material", "")
-        
         dealer_key = contact if contact else (dealer_name if dealer_name else "Unknown Direct")
         dealer_data.append({
             "Dealer / Phone": dealer_key,
@@ -353,23 +483,19 @@ def show_price_analytics_dialog(payloads):
     if not payloads:
         st.info("No property records available for price analytics.")
         return
-    
     clean_records = []
     for item in payloads:
         price_str = str(item.get("Demand / Price", "")).upper().strip()
         phase = str(item.get("Phase", "Unknown"))
         block = str(item.get("Block", "Unknown"))
         size = str(item.get("Size", "Unknown"))
-        
         lac_val = 0.0
         match_lac = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*(?:LAC|LACS)', price_str)
         match_cr = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*(?:CRORE|CR)', price_str)
-        
         if match_cr:
             lac_val = float(match_cr.group(1)) * 100.0
         elif match_lac:
             lac_val = float(match_lac.group(1))
-            
         if lac_val > 0:
             clean_records.append({
                 "Phase": phase,
@@ -378,7 +504,6 @@ def show_price_analytics_dialog(payloads):
                 "Price (Lacs)": lac_val,
                 "Raw Demand": price_str
             })
-            
     if clean_records:
         df_analytics = pd.DataFrame(clean_records)
         summary_analytics = df_analytics.groupby(["Phase", "Block", "Size"]).agg(
@@ -387,7 +512,6 @@ def show_price_analytics_dialog(payloads):
             Min_Price_Lacs=("Price (Lacs)", "min"),
             Max_Price_Lacs=("Price (Lacs)", "max")
         ).reset_index().sort_values(by="Total_Options", ascending=False)
-        
         st.markdown(f"**Calculated from `{len(clean_records)}` listings with explicit pricing:**")
         st.dataframe(summary_analytics, height=350, use_container_width=True)
     else:
@@ -399,13 +523,11 @@ def show_whatsapp_share_dialog(df_share):
     if df_share.empty:
         st.warning("No records selected for broadcast.")
         return
-    
     broadcast_lines = [
         f"🏢 *{st.session_state['office_name']}* - Available Inventory Update",
         f"📅 Date: {datetime.now().strftime('%d-%b-%Y')}",
         "----------------------------------------"
     ]
-    
     for idx, (_, row) in enumerate(df_share.iterrows(), 1):
         p_str = f"*{row.get('Target Phase', '')} - {row.get('Target Tab', '')}*"
         plt = row.get('Plot No', '')
@@ -414,10 +536,8 @@ def show_whatsapp_share_dialog(df_share):
         feat = row.get('Plot Features', '')
         line = f"📍 {p_str} | {plt} ({sz})\n   💰 Demand: *{dem}* | Feature: {feat}"
         broadcast_lines.append(line)
-        
     broadcast_lines.append("----------------------------------------")
     broadcast_lines.append("📞 For Deals & Inquiries: Direct Message or Call.")
-    
     final_text = "\n\n".join(broadcast_lines)
     st.text_area("📋 Copy Broadcast Text Directly:", value=final_text, height=260)
     encoded_text = urllib.parse.quote(final_text)
@@ -430,7 +550,6 @@ def show_pdf_catalog_dialog(df_cat):
     if df_cat.empty:
         st.warning("No records selected for catalog.")
         return
-        
     now_str = datetime.now().strftime("%d %B, %Y - %H:%M")
     html_preview = f"""
     <div style="background:#FFFFFF; border:1px solid #CBD5E1; padding:24px; border-radius:8px; font-family:'Inter', sans-serif;">
@@ -470,12 +589,11 @@ def show_pdf_catalog_dialog(df_cat):
     st.markdown(html_preview, unsafe_allow_html=True)
     st.caption("ℹ️ Use Browser Print (Ctrl + P / Cmd + P) to Save as PDF.")
 
-# File Parsers
+# File Parsers & Readers
 def extract_text_from_any_file_or_image(file_obj, is_camera=False):
     if file_obj is None:
         return ""
     file_bytes = file_obj.getvalue()
-    
     if is_camera or (hasattr(file_obj, 'name') and any(file_obj.name.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"])):
         if gemini_active and gemini_client:
             try:
@@ -534,7 +652,6 @@ def split_raw_into_message_chunks(raw_text, messages_per_chunk=100):
         if "Messages and calls are end-to-end encrypted" in m_str or "<Media omitted>" in m_str or "security code changed" in m_str:
             continue
         clean_messages.append(m_str)
-    
     if not clean_messages:
         clean_messages = [l.strip() for l in raw_text.splitlines() if l.strip()]
     chunks = []
@@ -617,7 +734,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
         main_phone = re.sub(r'[^0-9+]', '', phones[0]) if phones else ""
         active_phase = detect_phase_from_header(m_clean.upper()) or default_phase
         lines = [clean_line_from_artifacts(l) for l in m_clean.splitlines() if clean_line_from_artifacts(l)]
-        
         current_section_phase = active_phase
         current_section_size = ""
         matched_in_message = False
@@ -627,7 +743,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
             if ph_found:
                 current_section_phase = ph_found
                 continue
-            
             if "1 KANAL" in l_up:
                 current_section_size = "1 Kanal"
             elif "2 KANAL" in l_up:
@@ -650,7 +765,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 prc_val = cca_match.group(4)
                 prc_unit = cca_match.group(5) or "Lac"
                 prc_str = f"{prc_val} {prc_unit}".strip() if prc_val else ""
-                
                 results.append({
                     "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "Date": datetime.now().strftime("%Y-%m-%d"),
@@ -681,14 +795,12 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                 raw_prc = p_match.group(3)
                 raw_unit = p_match.group(4) or "Lac"
                 prc_str = f"{raw_prc} {raw_unit}".strip() if raw_prc else ""
-                
                 if raw_b.startswith("Z") and len(raw_b) == 2 and raw_b[1].isdigit():
                     blk_str = f"Block Z-{raw_b[1]}"
                 elif raw_b.startswith("BLOCK"):
                     blk_str = raw_b
                 else:
                     blk_str = f"Block {raw_b}"
-                
                 sz_str = ""
                 if "5 MARLA" in l_up or "5M" in l_up:
                     sz_str = "5 Marla"
@@ -702,7 +814,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     sz_str = current_section_size
                 else:
                     sz_str = resolve_size_text_first_or_map(current_section_phase, blk_str, f"Plot {raw_p}", "")
-                    
                 feat = "Corner" if "CORNER" in l_up else ("Park Facing" if "PARK" in l_up else ("Possession" if "POSSESSION" in l_up else "Standard Layout"))
                 results.append({
                     "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -722,7 +833,6 @@ def smart_accurate_rule_parser(chunk_text, default_phase):
                     "Last Conversation / Notes": "Direct Ingestion",
                     "Raw Listing & Source Material": line.strip()
                 })
-                
         if not matched_in_message and main_phone:
             results.append({
                 "Date / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -748,7 +858,6 @@ def process_single_chunk_via_gemini(chunk_text, default_phase):
     catalog_json_str = json.dumps(DHA_PHASE_BLOCK_CATALOG)
     today_date = datetime.now().strftime("%Y-%m-%d")
     now_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    
     system_prompt = f"""You are the Master DHA Lahore Real Estate Data Pipeline Architect & Forensic Text Parsing Specialist.
 Your explicit objective is to ingest messy, unorganized, highly-abbreviated, mixed-dealer WhatsApp broadcasts and restructure them into perfectly normalized, aligned CRM JSON records with 100% precision.
 
@@ -812,7 +921,8 @@ Return ONLY a valid JSON array of objects strictly conforming to the 15 canonica
         except Exception:
             pass
     return smart_accurate_rule_parser(chunk_text, default_phase)
-# Login Screen
+
+# Login & SSO Screen
 if not st.session_state["authenticated"]:
     st.markdown("""
         <div style="background:#FFFFFF; border-bottom:1px solid #C5C6D0; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; border-radius:12px; margin-bottom:20px;">
@@ -877,7 +987,7 @@ else:
             if st.button("📈 Analytics", use_container_width=True):
                 show_price_analytics_dialog(st.session_state.get("parsed_payloads", []))
 
-    # 2. Selectors & Block Ribbon
+    # 2. Selectors & Direct Block Ribbon
     col_city, col_phase = st.columns([1.2, 2.5])
     with col_city:
         selected_city = st.selectbox("🏙️ City", ["Lahore", "Karachi", "Islamabad", "Multan", "Gujranwala"])
@@ -910,7 +1020,7 @@ else:
 
     st.markdown("---")
 
-    # Data Calculations for Table & Slicers
+    # Table Records & Global Slicers Preparation
     total_parsed_now = len(st.session_state["parsed_payloads"])
     if total_parsed_now > 0:
         base_data = []
@@ -976,7 +1086,7 @@ else:
     with col_sc4:
         st.metric(label="📊 Plots In View", value=f"{len(df_final_summary_display)}", delta=f"{total_parsed_now} Total Extracted")
 
-    # Modern KPI Summary Strip (Stitch Exact Look)
+    # KPI Summary Strip (Stitch-Style Badges)
     num_selected_live = len(df_final_summary_display)
     unique_tabs_count_live = df_final_summary_display[["Target Phase", "Target Tab"]].drop_duplicates().shape[0] if num_selected_live > 0 else 0
     with_demand_count_live = df_final_summary_display[df_final_summary_display["Demand / Price"] != ""].shape[0] if num_selected_live > 0 else 0
@@ -992,7 +1102,7 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # 3. Stitch 2-Column Split Layout (Left Ingestion Box + Right 520px Extracted Table)
+    # 3. Stitch 2-Column Split Dashboard (Left Ingestion Box + Right Extracted Table)
     col_stitch_left, col_stitch_right = st.columns([1.1, 2.9])
 
     with col_stitch_left:
@@ -1056,7 +1166,15 @@ else:
                     st.session_state["extracted_file_text"] = portal_raw
                     st.rerun()
             with tab_news:
-                st.markdown('<a href="[https://classified.jang.com.pk](https://classified.jang.com.pk)" target="_blank" class="news-badge">📰 Jang ↗</a> <a href="[https://classifieds.dawn.com](https://classifieds.dawn.com)" target="_blank" class="news-badge">📰 Dawn ↗</a>', unsafe_allow_html=True)
+                st.markdown("""
+                    <b>📰 Quick Access to Newspaper Portals:</b><br>
+                    <a href="[https://classified.jang.com.pk](https://classified.jang.com.pk)" target="_blank" class="news-badge">📰 Daily Jang ↗</a>
+                    <a href="[https://classifieds.dawn.com](https://classifieds.dawn.com)" target="_blank" class="news-badge">📰 Daily Dawn ↗</a>
+                    <a href="[https://express.pk/epaper](https://express.pk/epaper)" target="_blank" class="news-badge">📰 Daily Express ↗</a>
+                    <a href="[https://e.thenews.com.pk](https://e.thenews.com.pk)" target="_blank" class="news-badge">📰 The News ↗</a>
+                    <a href="[https://epaper.nawaiwaqt.com.pk](https://epaper.nawaiwaqt.com.pk)" target="_blank" class="news-badge">📰 Daily Nawa-i-Waqt ↗</a>
+                    <a href="[https://e.dunya.com.pk](https://e.dunya.com.pk)" target="_blank" class="news-badge">📰 Daily Dunya ↗</a>
+                """, unsafe_allow_html=True)
                 news_txt = st.text_area("Paste News Text:", height=80, key="inner_news_in")
                 if st.button("📥 Load News", key="btn_push_news_inner"):
                     st.session_state["extracted_file_text"] = news_txt.strip()
@@ -1086,7 +1204,7 @@ else:
                     st.rerun()
 
     with col_stitch_right:
-        # Table Header & Stitch Action Ribbon
+        # Table Header & Integrated Action Ribbon
         col_th_title, col_th_actions = st.columns([1.1, 2.9])
         with col_th_title:
             st.markdown("<h4 style='font-family:\"Manrope\",sans-serif; color:#00113A; margin:4px 0 0 0; font-size:16px;'>⚡ Extracted Inventory</h4>", unsafe_allow_html=True)
@@ -1178,7 +1296,7 @@ else:
                     st.session_state["extraction_paused"] = False
                     st.rerun()
 
-        # Data Table Container (Height: 520px)
+        # Table Display Container (Height: 520px)
         if not df_final_summary_display.empty:
             if edit_summary_mode:
                 final_summary_df = st.data_editor(
@@ -1273,4 +1391,3 @@ else:
                     st.rerun()
                 else:
                     st.rerun()
-
